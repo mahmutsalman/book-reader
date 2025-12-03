@@ -93,3 +93,6 @@ out/
 
 # User notes
 .notes/
+
+# Local resources (scripts, etc.)
+localResources/
