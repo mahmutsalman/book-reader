@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useSettings } from './SettingsContext';
 import type {
   QueuedWordEntry,
@@ -17,16 +17,18 @@ const CACHE_EXPIRATION_MS = 30 * 60 * 1000; // 30 minutes
 interface DeferredWordContextType {
   // Queue a word for background fetching
   queueWord: (word: string, sentence: string, pageNumber: number, bookId: number) => void;
-  // Check if a word has ready data
-  isWordReady: (word: string, bookId: number) => boolean;
-  // Get the status of a word
-  getWordStatus: (word: string, bookId: number) => QueuedWordStatus | null;
-  // Get cached data for a word
-  getWordData: (word: string, bookId: number) => CachedWordData | null;
+  // Check if a word has ready data (page-specific)
+  isWordReady: (word: string, bookId: number, pageNumber: number) => boolean;
+  // Get the status of a word (page-specific)
+  getWordStatus: (word: string, bookId: number, pageNumber: number) => QueuedWordStatus | null;
+  // Get cached data for a word (page-specific)
+  getWordData: (word: string, bookId: number, pageNumber: number) => CachedWordData | null;
   // Clear all words for a specific book
   clearBookWords: (bookId: number) => void;
   // Get count of words currently being fetched
   fetchingCount: number;
+  // Get count of words pending in queue (waiting to be fetched)
+  pendingCount: number;
 }
 
 const DeferredWordContext = createContext<DeferredWordContextType | null>(null);
@@ -270,10 +272,10 @@ export const DeferredWordProvider: React.FC<DeferredWordProviderProps> = ({ chil
       ? word.toLowerCase().trim()
       : word.replace(/[^\w'-]/g, '').toLowerCase();
 
-    // Use appropriate key generator
+    // Use appropriate key generator (include pageNumber for page-specific caching)
     const key = isPhrase(word)
       ? generatePhraseKey(bookId, cleanText)
-      : generateWordKey(bookId, cleanText);
+      : generateWordKey(bookId, cleanText, pageNumber);
 
     setQueuedWords(prev => {
       // Don't re-queue if already exists
@@ -307,38 +309,38 @@ export const DeferredWordProvider: React.FC<DeferredWordProviderProps> = ({ chil
     });
   }, []);
 
-  // Check if a word or phrase has ready data
-  const isWordReady = useCallback((word: string, bookId: number): boolean => {
+  // Check if a word or phrase has ready data (page-specific for words)
+  const isWordReady = useCallback((word: string, bookId: number, pageNumber: number): boolean => {
     const cleanText = isPhrase(word)
       ? word.toLowerCase().trim()
       : word.replace(/[^\w'-]/g, '').toLowerCase();
     const key = isPhrase(word)
       ? generatePhraseKey(bookId, cleanText)
-      : generateWordKey(bookId, cleanText);
+      : generateWordKey(bookId, cleanText, pageNumber);
     const entry = queuedWords.get(key);
     return entry?.status === 'ready';
   }, [queuedWords]);
 
-  // Get the status of a word or phrase
-  const getWordStatus = useCallback((word: string, bookId: number): QueuedWordStatus | null => {
+  // Get the status of a word or phrase (page-specific for words)
+  const getWordStatus = useCallback((word: string, bookId: number, pageNumber: number): QueuedWordStatus | null => {
     const cleanText = isPhrase(word)
       ? word.toLowerCase().trim()
       : word.replace(/[^\w'-]/g, '').toLowerCase();
     const key = isPhrase(word)
       ? generatePhraseKey(bookId, cleanText)
-      : generateWordKey(bookId, cleanText);
+      : generateWordKey(bookId, cleanText, pageNumber);
     const entry = queuedWords.get(key);
     return entry?.status ?? null;
   }, [queuedWords]);
 
-  // Get cached data for a word or phrase
-  const getWordData = useCallback((word: string, bookId: number): CachedWordData | null => {
+  // Get cached data for a word or phrase (page-specific for words)
+  const getWordData = useCallback((word: string, bookId: number, pageNumber: number): CachedWordData | null => {
     const cleanText = isPhrase(word)
       ? word.toLowerCase().trim()
       : word.replace(/[^\w'-]/g, '').toLowerCase();
     const key = isPhrase(word)
       ? generatePhraseKey(bookId, cleanText)
-      : generateWordKey(bookId, cleanText);
+      : generateWordKey(bookId, cleanText, pageNumber);
     const entry = queuedWords.get(key);
     return entry?.data ?? null;
   }, [queuedWords]);
@@ -356,6 +358,17 @@ export const DeferredWordProvider: React.FC<DeferredWordProviderProps> = ({ chil
     });
   }, []);
 
+  // Count pending words in the queue
+  const pendingCount = useMemo(() => {
+    let count = 0;
+    for (const entry of queuedWords.values()) {
+      if (entry.status === 'pending') {
+        count++;
+      }
+    }
+    return count;
+  }, [queuedWords]);
+
   return (
     <DeferredWordContext.Provider
       value={{
@@ -365,6 +378,7 @@ export const DeferredWordProvider: React.FC<DeferredWordProviderProps> = ({ chil
         getWordData,
         clearBookWords,
         fetchingCount,
+        pendingCount,
       }}
     >
       {children}

@@ -40,7 +40,7 @@ interface Chapter {
 const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, initialProgress }) => {
   const navigate = useNavigate();
   const { updateProgress } = useBooks();
-  const { queueWord, isWordReady, getWordData, getWordStatus } = useDeferredWords();
+  const { queueWord, isWordReady, getWordData, getWordStatus, fetchingCount, pendingCount } = useDeferredWords();
   const containerRef = useRef<HTMLDivElement>(null);
 
   const [zoom, setZoom] = useState(initialProgress?.zoom_level || ZOOM_LEVELS.DEFAULT);
@@ -62,6 +62,10 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
   const [selectedIndices, setSelectedIndices] = useState<number[]>([]);
   const [isShiftHeld, setIsShiftHeld] = useState(false);
   const [phraseRanges, setPhraseRanges] = useState<Map<string, PhraseRange>>(new Map());
+
+  // Track words that have been looked up before (across all pages in this book)
+  // Used to show gray dots for known words that haven't been fetched for current page
+  const [knownWords, setKnownWords] = useState<Set<string>>(new Set());
 
   // Map word indices to their actual words for phrase construction
   const wordIndexMapRef = useRef<Map<number, string>>(new Map());
@@ -115,32 +119,20 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
     saveProgress();
   }, [reflowState.characterOffset, reflowState.originalPage, zoom, updateProgress]);
 
-  // Smart sentence extraction - looks at surrounding pages for complete sentences
-  const extractFullSentence = useCallback((word: string, currentPageNum: number): string => {
-    // Get text from surrounding pages to handle sentences spanning page boundaries
-    const prevPage = bookData.pages.find(p => p.page === currentPageNum - 1);
-    const currentPage = bookData.pages.find(p => p.page === currentPageNum);
-    const nextPage = bookData.pages.find(p => p.page === currentPageNum + 1);
+  // Extract sentence from current view text ONLY (not across pages)
+  // This ensures we get the sentence from the actual displayed text
+  const extractSentenceFromCurrentView = useCallback((word: string): string => {
+    const text = reflowState.currentText;
+    if (!text) return '';
 
-    // Combine text from previous, current, and next pages
-    const combinedText = [
-      prevPage?.text || '',
-      currentPage?.text || '',
-      nextPage?.text || ''
-    ].join(' ').replace(/\s+/g, ' ').trim();
-
-    if (!combinedText) {
-      return reflowState.currentText.substring(0, 200);
-    }
-
-    // Find the word in the combined text (case insensitive)
+    // Find the word in current view text
     const cleanWord = word.replace(/[^\w'-]/g, '');
     const wordRegex = new RegExp(`\\b${cleanWord}\\b`, 'i');
-    const wordMatch = combinedText.match(wordRegex);
+    const wordMatch = text.match(wordRegex);
 
     if (!wordMatch || wordMatch.index === undefined) {
-      // Fallback: return current view text
-      return reflowState.currentText.substring(0, 200);
+      // Fallback: return a portion of current view text
+      return text.substring(0, 200);
     }
 
     const wordPosition = wordMatch.index;
@@ -148,10 +140,10 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
     // Find sentence start: look backwards for . ! ? or start of text
     let sentenceStart = 0;
     for (let i = wordPosition - 1; i >= 0; i--) {
-      const char = combinedText[i];
+      const char = text[i];
       if (char === '.' || char === '!' || char === '?') {
         // Check it's not an abbreviation (e.g., "Mr.", "Dr.")
-        const beforePunctuation = combinedText.substring(Math.max(0, i - 3), i);
+        const beforePunctuation = text.substring(Math.max(0, i - 3), i);
         if (!/^(Mr|Mrs|Ms|Dr|Jr|Sr|St)$/i.test(beforePunctuation.trim())) {
           sentenceStart = i + 1;
           break;
@@ -160,12 +152,12 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
     }
 
     // Find sentence end: look forwards for . ! ? or end of text
-    let sentenceEnd = combinedText.length;
-    for (let i = wordPosition; i < combinedText.length; i++) {
-      const char = combinedText[i];
+    let sentenceEnd = text.length;
+    for (let i = wordPosition; i < text.length; i++) {
+      const char = text[i];
       if (char === '.' || char === '!' || char === '?') {
         // Check it's not an abbreviation
-        const beforePunctuation = combinedText.substring(Math.max(0, i - 3), i);
+        const beforePunctuation = text.substring(Math.max(0, i - 3), i);
         if (!/^(Mr|Mrs|Ms|Dr|Jr|Sr|St)$/i.test(beforePunctuation.trim())) {
           sentenceEnd = i + 1;
           break;
@@ -174,19 +166,18 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
     }
 
     // Extract and clean the sentence
-    let sentence = combinedText.substring(sentenceStart, sentenceEnd).trim();
+    let sentence = text.substring(sentenceStart, sentenceEnd).trim();
 
-    // Limit length if too long (some sentences can be very long)
+    // Limit length if too long
     if (sentence.length > 500) {
-      // Try to find a reasonable break point
       const halfLength = 250;
       const startPos = Math.max(0, wordPosition - sentenceStart - halfLength);
       const endPos = Math.min(sentence.length, wordPosition - sentenceStart + halfLength);
       sentence = '...' + sentence.substring(startPos, endPos).trim() + '...';
     }
 
-    return sentence || reflowState.currentText.substring(0, 200);
-  }, [bookData.pages, reflowState.currentText]);
+    return sentence || text.substring(0, 200);
+  }, [reflowState.currentText]);
 
   // Build phrase from selected indices
   const buildPhraseFromIndices = useCallback((indices: number[]): string => {
@@ -210,12 +201,12 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
     const sortedIndices = [...selectedIndices].sort((a, b) => a - b);
     const phrase = buildPhraseFromIndices(sortedIndices);
     const middleIndex = calculateMiddleIndex(sortedIndices);
-    const fullSentence = extractFullSentence(phrase, reflowState.originalPage);
+    const fullSentence = extractSentenceFromCurrentView(phrase);
 
     console.log('[PHRASE DEBUG] finalizePhrase:', { sortedIndices, phrase, middleIndex, fullSentence });
 
     // Check if phrase is already cached
-    const isPhraseReady = isWordReady(phrase, book.id);
+    const isPhraseReady = isWordReady(phrase, book.id, reflowState.originalPage);
 
     if (isPhraseReady) {
       // Phrase is ready - open panel with cached data
@@ -226,7 +217,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
         isPhrase: true,
         wordIndices: sortedIndices,
       });
-      setPreloadedData(getWordData(phrase, book.id));
+      setPreloadedData(getWordData(phrase, book.id, reflowState.originalPage));
       setIsPanelOpen(true);
     } else {
       // Queue phrase for background fetch
@@ -257,7 +248,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
 
     // Clear selection
     setSelectedIndices([]);
-  }, [selectedIndices, buildPhraseFromIndices, extractFullSentence, reflowState.originalPage, book.id, isWordReady, getWordData, queueWord]);
+  }, [selectedIndices, buildPhraseFromIndices, extractSentenceFromCurrentView, reflowState.originalPage, book.id, isWordReady, getWordData, queueWord]);
 
   // Handle word click with deferred lookup behavior and phrase selection
   const handleWordClick = useCallback((word: string, wordIndex: number, event: React.MouseEvent) => {
@@ -301,7 +292,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
     // Check if clicked word is part of a cached phrase (before treating as single word)
     for (const [phrase, range] of phraseRanges) {
       if (range.indices.includes(wordIndex) && range.status === 'ready') {
-        const phraseSentence = extractFullSentence(phrase, reflowState.originalPage);
+        const phraseSentence = extractSentenceFromCurrentView(phrase);
         setSelectedWord({
           word: phrase,
           sentence: phraseSentence,
@@ -309,7 +300,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
           isPhrase: true,
           wordIndices: range.indices,
         });
-        setPreloadedData(getWordData(phrase, book.id));
+        setPreloadedData(getWordData(phrase, book.id, reflowState.originalPage));
         setIsPanelOpen(true);
         console.log('[PHRASE DEBUG] Opened cached phrase panel:', phrase);
         return;
@@ -321,17 +312,17 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
       setSelectedIndices([]);
     }
 
-    const fullSentence = extractFullSentence(word, reflowState.originalPage);
+    const fullSentence = extractSentenceFromCurrentView(word);
 
-    // Check if word is ready (has cached data)
-    if (isWordReady(cleanWord, book.id)) {
+    // Check if word is ready (has cached data for this page)
+    if (isWordReady(cleanWord, book.id, reflowState.originalPage)) {
       // Word is ready - open panel with cached data
       setSelectedWord({
         word: cleanWord,
         sentence: fullSentence,
         pageNumber: reflowState.originalPage,
       });
-      setPreloadedData(getWordData(cleanWord, book.id));
+      setPreloadedData(getWordData(cleanWord, book.id, reflowState.originalPage));
       setIsPanelOpen(true);
       // Remove from loading positions if it was there
       setLoadingPositions(prev => {
@@ -341,11 +332,14 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
       });
     } else {
       // Queue word for background fetch
-      const status = getWordStatus(cleanWord, book.id);
+      const status = getWordStatus(cleanWord, book.id, reflowState.originalPage);
 
       // Only queue if not already pending or fetching
       if (!status || status === 'error') {
         queueWord(cleanWord, fullSentence, reflowState.originalPage, book.id);
+
+        // Add to known words (for gray dot on other pages)
+        setKnownWords(prev => new Set(prev).add(cleanWord));
 
         // Add this position to loading positions (for yellow dot)
         setLoadingPositions(prev => new Set(prev).add(wordIndex));
@@ -362,7 +356,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
         }, 400);
       }
     }
-  }, [extractFullSentence, reflowState.originalPage, book.id, isWordReady, getWordData, getWordStatus, queueWord, selectedIndices, phraseRanges]);
+  }, [extractSentenceFromCurrentView, reflowState.originalPage, book.id, isWordReady, getWordData, getWordStatus, queueWord, selectedIndices, phraseRanges]);
 
   // Keyboard navigation and Shift key handling
   useEffect(() => {
@@ -395,18 +389,18 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
           const wordIndex = selectedIndices[0];
           const word = wordIndexMapRef.current.get(wordIndex);
           if (word) {
-            const fullSentence = extractFullSentence(word, reflowState.originalPage);
+            const fullSentence = extractSentenceFromCurrentView(word);
 
-            if (isWordReady(word, book.id)) {
+            if (isWordReady(word, book.id, reflowState.originalPage)) {
               setSelectedWord({
                 word,
                 sentence: fullSentence,
                 pageNumber: reflowState.originalPage,
               });
-              setPreloadedData(getWordData(word, book.id));
+              setPreloadedData(getWordData(word, book.id, reflowState.originalPage));
               setIsPanelOpen(true);
             } else {
-              const status = getWordStatus(word, book.id);
+              const status = getWordStatus(word, book.id, reflowState.originalPage);
               if (!status || status === 'error') {
                 queueWord(word, fullSentence, reflowState.originalPage, book.id);
                 setLoadingPositions(prev => new Set(prev).add(wordIndex));
@@ -425,7 +419,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [goToNextPage, goToPrevPage, selectedIndices, finalizePhrase, extractFullSentence, reflowState.originalPage, book.id, isWordReady, getWordData, getWordStatus, queueWord]);
+  }, [goToNextPage, goToPrevPage, selectedIndices, finalizePhrase, extractSentenceFromCurrentView, reflowState.originalPage, book.id, isWordReady, getWordData, getWordStatus, queueWord]);
 
   // Clear loading positions when words become ready
   useEffect(() => {
@@ -434,7 +428,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
     const positionsToRemove: number[] = [];
     loadingPositions.forEach(pos => {
       const word = loadingWordsMapRef.current.get(pos);
-      if (word && isWordReady(word, book.id)) {
+      if (word && isWordReady(word, book.id, reflowState.originalPage)) {
         positionsToRemove.push(pos);
       }
     });
@@ -449,7 +443,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
         return newSet;
       });
     }
-  }, [loadingPositions, isWordReady, book.id]);
+  }, [loadingPositions, isWordReady, book.id, reflowState.originalPage]);
 
   // Clear loading positions and phrase selection when page changes
   useEffect(() => {
@@ -468,7 +462,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
     let hasChanges = false;
 
     phraseRanges.forEach((range, phrase) => {
-      if (range.status === 'loading' && isWordReady(phrase, book.id)) {
+      if (range.status === 'loading' && isWordReady(phrase, book.id, reflowState.originalPage)) {
         updatedRanges.set(phrase, { ...range, status: 'ready' });
         hasChanges = true;
       }
@@ -477,7 +471,50 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
     if (hasChanges) {
       setPhraseRanges(updatedRanges);
     }
-  }, [phraseRanges, isWordReady, book.id]);
+  }, [phraseRanges, isWordReady, book.id, reflowState.originalPage]);
+
+  // Auto-queue known words after 5 seconds on a page
+  // This turns gray dots into yellow dots and fetches AI translations for the new context
+  // The 5-second delay gives the user time to navigate away before wasting AI calls
+  useEffect(() => {
+    if (knownWords.size === 0) return;
+
+    // Set a 5-second timer before auto-queuing
+    const timer = setTimeout(() => {
+      // Parse current page text for known words
+      const parts = reflowState.currentText.split(/(\s+)/);
+      const wordsToQueue: Array<{ word: string; index: number }> = [];
+
+      parts.forEach((part, index) => {
+        // Skip whitespace
+        if (/^\s+$/.test(part)) return;
+
+        const cleanWord = part.replace(/[^\w'-]/g, '').toLowerCase();
+        if (!cleanWord) return;
+
+        // Check if this is a known word that needs fetching for current page
+        if (knownWords.has(cleanWord)) {
+          // Check if not already ready or loading for this page
+          if (!isWordReady(cleanWord, book.id, reflowState.originalPage)) {
+            const status = getWordStatus(cleanWord, book.id, reflowState.originalPage);
+            if (!status || status === 'error') {
+              wordsToQueue.push({ word: cleanWord, index });
+            }
+          }
+        }
+      });
+
+      // Queue words for background fetch (limit to avoid overload)
+      wordsToQueue.slice(0, 5).forEach(({ word, index }) => {
+        const sentence = extractSentenceFromCurrentView(word);
+        queueWord(word, sentence, reflowState.originalPage, book.id);
+        setLoadingPositions(prev => new Set(prev).add(index));
+        loadingWordsMapRef.current.set(index, word);
+      });
+    }, 5000); // 5 second delay
+
+    return () => clearTimeout(timer);
+  }, [reflowState.originalPage, reflowState.currentText, knownWords, book.id, isWordReady, getWordStatus, queueWord, extractSentenceFromCurrentView]);
 
   // Helper to check if an index is part of any phrase range
   const getPhraseInfoForIndex = useCallback((index: number): { isInPhrase: boolean; isMiddle: boolean; status: 'loading' | 'ready' | null } => {
@@ -513,10 +550,11 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
       const cleanWord = part.replace(/[^\w'-]/g, '').toLowerCase();
       wordIndexMapRef.current.set(index, cleanWord);
 
-      // Check if this word has ready data (for single words)
-      const wordIsReady = isWordReady(cleanWord, book.id);
+      // Check if this word has ready data (for single words, page-specific)
+      const wordIsReady = isWordReady(cleanWord, book.id, reflowState.originalPage);
       const isPulsing = pulsingWords.has(cleanWord);
       const isLoading = loadingPositions.has(index);
+      const isKnownWord = knownWords.has(cleanWord);
 
       // Check phrase-related states
       const isCurrentlySelected = selectedIndices.includes(index);
@@ -533,10 +571,12 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
       ].filter(Boolean).join(' ');
 
       // Determine which dot to show:
+      // Three-dot system: Gray (known but not fetched) → Yellow (fetching) → Red (ready)
       // - For phrases: only show dot on middle word
       // - For single words: show dot on the word itself
       let showRedDot = false;
       let showYellowDot = false;
+      let showGrayDot = false;
 
       if (phraseInfo.isInPhrase) {
         // Part of a phrase - only middle word gets the dot
@@ -545,12 +585,17 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
           showYellowDot = phraseInfo.status === 'loading';
         }
       } else {
-        // Single word behavior
-        showRedDot = wordIsReady;
-        showYellowDot = isLoading && !wordIsReady;
+        // Single word behavior - three-dot system
+        if (wordIsReady) {
+          showRedDot = true;
+        } else if (isLoading) {
+          showYellowDot = true;
+        } else if (isKnownWord) {
+          showGrayDot = true; // Word was looked up before, but not for this page
+        }
       }
 
-      // Word - make it clickable with optional ready/loading indicator
+      // Word - make it clickable with optional ready/loading/known indicator
       return (
         <span
           key={index}
@@ -560,6 +605,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
           {part}
           {showRedDot && <span className="word-ready-dot" />}
           {showYellowDot && <span className="word-loading-dot" />}
+          {showGrayDot && <span className="word-gray-dot" />}
         </span>
       );
     });
@@ -632,6 +678,16 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
           <span className="text-xs text-gray-400 dark:text-gray-500">
             Book page: {reflowState.originalPage}
           </span>
+
+          {/* Queue indicator - show when words are pending or fetching */}
+          {(fetchingCount + pendingCount) > 0 && (
+            <span className="text-xs text-yellow-600 dark:text-yellow-400 flex items-center gap-1 px-2 py-1 bg-yellow-50 dark:bg-yellow-900/30 rounded">
+              <span className="relative inline-flex">
+                <span className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />
+              </span>
+              {fetchingCount + pendingCount} in queue
+            </span>
+          )}
 
           {/* Zoom control */}
           <div className="flex items-center gap-2">

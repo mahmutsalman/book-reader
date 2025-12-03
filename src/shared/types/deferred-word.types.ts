@@ -45,12 +45,12 @@ export interface DeferredWordState {
 }
 
 /**
- * Generate a unique key for a word in a specific book
- * Key format: `${bookId}-${cleanWord}`
- * This allows the same word to show red dots across all pages
+ * Generate a unique key for a word in a specific book and page
+ * Key format: `${bookId}-${cleanWord}-p${pageNumber}`
+ * Each occurrence on different pages gets its own cache entry for context-specific translations
  */
-export function generateWordKey(bookId: number, word: string): string {
-  return `${bookId}-${word.toLowerCase()}`;
+export function generateWordKey(bookId: number, word: string, pageNumber: number): string {
+  return `${bookId}-${word.toLowerCase()}-p${pageNumber}`;
 }
 
 /**

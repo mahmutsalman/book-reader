@@ -129,6 +129,20 @@
   animation: loading-dot-pulse 1s ease-in-out infinite;
 }
 
+/* Word known indicator - gray dot (word was looked up before, but not for current page) */
+.word-gray-dot {
+  position: absolute;
+  bottom: -3px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 5px;
+  height: 5px;
+  background-color: #9ca3af; /* gray-400 */
+  border-radius: 50%;
+  pointer-events: none;
+  animation: dot-appear 0.3s ease-out;
+}
+
 @keyframes loading-dot-pulse {
   0%, 100% {
     opacity: 1;
