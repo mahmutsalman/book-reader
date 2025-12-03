@@ -211,6 +211,7 @@
 /* Shift key held - selection mode cursor */
 .word-shift-mode {
   cursor: pointer !important;
+  user-select: none;
 }
 
 .word-shift-mode:hover {
