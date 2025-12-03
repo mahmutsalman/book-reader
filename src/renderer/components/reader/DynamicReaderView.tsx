@@ -82,22 +82,90 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
     saveProgress();
   }, [reflowState.characterOffset, reflowState.originalPage, zoom, updateProgress]);
 
+  // Smart sentence extraction - looks at surrounding pages for complete sentences
+  const extractFullSentence = useCallback((word: string, currentPageNum: number): string => {
+    // Get text from surrounding pages to handle sentences spanning page boundaries
+    const prevPage = bookData.pages.find(p => p.page === currentPageNum - 1);
+    const currentPage = bookData.pages.find(p => p.page === currentPageNum);
+    const nextPage = bookData.pages.find(p => p.page === currentPageNum + 1);
+
+    // Combine text from previous, current, and next pages
+    const combinedText = [
+      prevPage?.text || '',
+      currentPage?.text || '',
+      nextPage?.text || ''
+    ].join(' ').replace(/\s+/g, ' ').trim();
+
+    if (!combinedText) {
+      return reflowState.currentText.substring(0, 200);
+    }
+
+    // Find the word in the combined text (case insensitive)
+    const cleanWord = word.replace(/[^\w'-]/g, '');
+    const wordRegex = new RegExp(`\\b${cleanWord}\\b`, 'i');
+    const wordMatch = combinedText.match(wordRegex);
+
+    if (!wordMatch || wordMatch.index === undefined) {
+      // Fallback: return current view text
+      return reflowState.currentText.substring(0, 200);
+    }
+
+    const wordPosition = wordMatch.index;
+
+    // Find sentence start: look backwards for . ! ? or start of text
+    let sentenceStart = 0;
+    for (let i = wordPosition - 1; i >= 0; i--) {
+      const char = combinedText[i];
+      if (char === '.' || char === '!' || char === '?') {
+        // Check it's not an abbreviation (e.g., "Mr.", "Dr.")
+        const beforePunctuation = combinedText.substring(Math.max(0, i - 3), i);
+        if (!/^(Mr|Mrs|Ms|Dr|Jr|Sr|St)$/i.test(beforePunctuation.trim())) {
+          sentenceStart = i + 1;
+          break;
+        }
+      }
+    }
+
+    // Find sentence end: look forwards for . ! ? or end of text
+    let sentenceEnd = combinedText.length;
+    for (let i = wordPosition; i < combinedText.length; i++) {
+      const char = combinedText[i];
+      if (char === '.' || char === '!' || char === '?') {
+        // Check it's not an abbreviation
+        const beforePunctuation = combinedText.substring(Math.max(0, i - 3), i);
+        if (!/^(Mr|Mrs|Ms|Dr|Jr|Sr|St)$/i.test(beforePunctuation.trim())) {
+          sentenceEnd = i + 1;
+          break;
+        }
+      }
+    }
+
+    // Extract and clean the sentence
+    let sentence = combinedText.substring(sentenceStart, sentenceEnd).trim();
+
+    // Limit length if too long (some sentences can be very long)
+    if (sentence.length > 500) {
+      // Try to find a reasonable break point
+      const halfLength = 250;
+      const startPos = Math.max(0, wordPosition - sentenceStart - halfLength);
+      const endPos = Math.min(sentence.length, wordPosition - sentenceStart + halfLength);
+      sentence = '...' + sentence.substring(startPos, endPos).trim() + '...';
+    }
+
+    return sentence || reflowState.currentText.substring(0, 200);
+  }, [bookData.pages, reflowState.currentText]);
+
   // Handle word click
   const handleWordClick = useCallback((word: string) => {
-    const text = reflowState.currentText;
-    // Extract sentence containing the word
-    const sentences = text.split(/(?<=[.!?])\s+/);
-    const sentence = sentences.find(s =>
-      s.toLowerCase().includes(word.toLowerCase())
-    ) || text.substring(0, 200);
+    const fullSentence = extractFullSentence(word, reflowState.originalPage);
 
     setSelectedWord({
       word: word.replace(/[^\w'-]/g, ''), // Clean punctuation
-      sentence,
+      sentence: fullSentence,
       pageNumber: reflowState.originalPage,
     });
     setIsPanelOpen(true);
-  }, [reflowState.currentText, reflowState.originalPage]);
+  }, [extractFullSentence, reflowState.originalPage]);
 
   // Keyboard navigation
   useEffect(() => {
