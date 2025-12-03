@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useBooks } from '../context/BookContext';
-import ReaderView from '../components/reader/ReaderView';
+import DynamicReaderView from '../components/reader/DynamicReaderView';
 
 const ReaderPage: React.FC = () => {
   const { bookId } = useParams<{ bookId: string }>();
@@ -57,7 +57,7 @@ const ReaderPage: React.FC = () => {
   }
 
   return (
-    <ReaderView
+    <DynamicReaderView
       book={currentBook}
       bookData={currentBookData}
       initialProgress={currentProgress}

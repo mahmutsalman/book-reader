@@ -48,20 +48,38 @@ const LibraryPage: React.FC = () => {
 
   if (loading && books.length === 0) {
     return (
-      <div className="h-full flex items-center justify-center">
-        <div className="text-gray-500">Loading books...</div>
+      <div
+        className="h-full flex items-center justify-center"
+        style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+      >
+        <div className="text-gray-500" style={{ color: '#6b7280' }}>Loading books...</div>
       </div>
     );
   }
 
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-gray-800">Your Library</h2>
+    <div className="p-6" style={{ padding: '24px' }}>
+      <div
+        className="flex items-center justify-between mb-6"
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}
+      >
+        <h2 className="text-2xl font-bold text-gray-800" style={{ fontSize: '24px', fontWeight: 700, color: '#1f2937' }}>Your Library</h2>
         <button
           onClick={handleImportBook}
           disabled={importing}
           className="btn-primary flex items-center gap-2"
+          style={{
+            padding: '8px 16px',
+            backgroundColor: '#0284c7',
+            color: 'white',
+            borderRadius: '8px',
+            border: 'none',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            fontWeight: 500,
+          }}
         >
           {importing ? (
             <>
@@ -84,15 +102,27 @@ const LibraryPage: React.FC = () => {
       )}
 
       {books.length === 0 ? (
-        <div className="text-center py-12">
-          <div className="text-6xl mb-4">📖</div>
-          <h3 className="text-xl font-medium text-gray-700 mb-2">
+        <div className="text-center py-12" style={{ textAlign: 'center', paddingTop: '48px', paddingBottom: '48px' }}>
+          <div className="text-6xl mb-4" style={{ fontSize: '60px', marginBottom: '16px' }}>📖</div>
+          <h3 className="text-xl font-medium text-gray-700 mb-2" style={{ fontSize: '20px', fontWeight: 500, color: '#374151', marginBottom: '8px' }}>
             No books yet
           </h3>
-          <p className="text-gray-500 mb-4">
+          <p className="text-gray-500 mb-4" style={{ color: '#6b7280', marginBottom: '16px' }}>
             Import a JSON book to start reading
           </p>
-          <button onClick={handleImportBook} className="btn-primary">
+          <button
+            onClick={handleImportBook}
+            className="btn-primary"
+            style={{
+              padding: '8px 16px',
+              backgroundColor: '#0284c7',
+              color: 'white',
+              borderRadius: '8px',
+              border: 'none',
+              cursor: 'pointer',
+              fontWeight: 500,
+            }}
+          >
             Import Your First Book
           </button>
         </div>

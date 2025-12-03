@@ -24,6 +24,7 @@ export const ZOOM_LEVELS = {
 // Text reflow settings
 export const REFLOW_SETTINGS = {
   BASE_FONT_SIZE: 18, // pixels
+  LINE_HEIGHT: 1.8,
   DEBOUNCE_MS: 300,
   WORDS_PER_PAGE_MIN: 50,
   WORDS_PER_PAGE_MAX: 500,
