@@ -22,7 +22,7 @@ const ReaderPage: React.FC = () => {
       <div className="h-full flex items-center justify-center">
         <div className="text-center">
           <div className="text-4xl mb-4 animate-pulse">📖</div>
-          <div className="text-gray-500">Loading book...</div>
+          <div className="text-gray-500 dark:text-gray-400">Loading book...</div>
         </div>
       </div>
     );
@@ -33,7 +33,7 @@ const ReaderPage: React.FC = () => {
       <div className="h-full flex items-center justify-center">
         <div className="text-center">
           <div className="text-4xl mb-4">😕</div>
-          <div className="text-red-600 mb-4">{error}</div>
+          <div className="text-red-600 dark:text-red-400 mb-4">{error}</div>
           <button onClick={() => navigate('/library')} className="btn-primary">
             Back to Library
           </button>
@@ -47,7 +47,7 @@ const ReaderPage: React.FC = () => {
       <div className="h-full flex items-center justify-center">
         <div className="text-center">
           <div className="text-4xl mb-4">📚</div>
-          <div className="text-gray-500 mb-4">Book not found</div>
+          <div className="text-gray-500 dark:text-gray-400 mb-4">Book not found</div>
           <button onClick={() => navigate('/library')} className="btn-primary">
             Back to Library
           </button>

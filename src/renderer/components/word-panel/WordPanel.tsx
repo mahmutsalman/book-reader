@@ -75,7 +75,7 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
           // Check if this part matches (case-insensitive)
           const isMatch = part.toLowerCase() === searchWord.toLowerCase();
           return isMatch ? (
-            <span key={index} className="text-red-600 font-semibold not-italic">
+            <span key={index} className="text-red-600 dark:text-red-400 font-semibold not-italic">
               {part}
             </span>
           ) : (
@@ -218,12 +218,12 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/20 z-40"
+        className="fixed inset-0 bg-black/20 dark:bg-black/40 z-40"
         onClick={onClose}
       />
 
       {/* Panel */}
-      <div className="fixed top-0 right-0 h-full w-96 bg-white shadow-2xl z-50 overflow-hidden flex flex-col">
+      <div className="fixed top-0 right-0 h-full w-96 bg-white dark:bg-gray-800 shadow-2xl z-50 overflow-hidden flex flex-col">
         {/* Header */}
         <div className="bg-primary-600 text-white px-4 py-3 flex items-center justify-between">
           <div>
@@ -247,26 +247,26 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
           {wordData.loading ? (
             <div className="text-center py-8">
               <div className="text-4xl animate-pulse mb-2">🔍</div>
-              <div className="text-gray-500">Looking up word...</div>
+              <div className="text-gray-500 dark:text-gray-400">Looking up word...</div>
             </div>
           ) : wordData.error ? (
-            <div className="bg-red-50 text-red-700 p-4 rounded-lg">
+            <div className="bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 p-4 rounded-lg">
               {wordData.error}
             </div>
           ) : (
             <>
               {/* Definition */}
               <section>
-                <h3 className="font-semibold text-gray-700 mb-2">📖 Definition</h3>
-                <p className="text-gray-600 bg-gray-50 p-3 rounded-lg">
+                <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">📖 Definition</h3>
+                <p className="text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
                   {wordData.definition || 'No definition available'}
                 </p>
               </section>
 
               {/* Original Sentence */}
               <section>
-                <h3 className="font-semibold text-gray-700 mb-2">📝 Original Sentence</h3>
-                <p className="text-gray-600 bg-gray-50 p-3 rounded-lg italic">
+                <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">📝 Original Sentence</h3>
+                <p className="text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 p-3 rounded-lg italic">
                   "{highlightWord(selectedWord.sentence, selectedWord.word)}"
                 </p>
               </section>
@@ -274,8 +274,8 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
               {/* Simplified Sentence */}
               {wordData.simplifiedSentence && (
                 <section>
-                  <h3 className="font-semibold text-gray-700 mb-2">✨ Simplified</h3>
-                  <p className="text-gray-600 bg-green-50 p-3 rounded-lg">
+                  <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">✨ Simplified</h3>
+                  <p className="text-gray-600 dark:text-gray-300 bg-green-50 dark:bg-green-900/30 p-3 rounded-lg">
                     {wordData.wordEquivalent
                       ? highlightWord(wordData.simplifiedSentence, wordData.wordEquivalent)
                       : wordData.simplifiedSentence}
@@ -286,7 +286,7 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
               {/* Other Occurrences */}
               {wordData.occurrences && wordData.occurrences.length > 1 && (
                 <section>
-                  <h3 className="font-semibold text-gray-700 mb-2">
+                  <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">
                     📍 Other Occurrences ({wordData.occurrences.length})
                   </h3>
                   <div className="space-y-2 max-h-48 overflow-auto custom-scrollbar">
@@ -299,9 +299,9 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
                             onClose();
                           }
                         }}
-                        className="w-full text-left text-sm text-gray-600 bg-gray-50 p-2 rounded cursor-pointer hover:bg-gray-100 transition-colors"
+                        className="w-full text-left text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 p-2 rounded cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
                       >
-                        <span className="text-xs text-primary-600 font-medium">Page {occ.page} →</span>
+                        <span className="text-xs text-primary-600 dark:text-primary-400 font-medium">Page {occ.page} →</span>
                         <p className="line-clamp-2 mt-1">"{occ.sentence}"</p>
                       </button>
                     ))}
@@ -312,15 +312,15 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
               {/* Tatoeba Examples */}
               {settings.tatoeba_enabled && wordData.tatoebaExamples && wordData.tatoebaExamples.length > 0 && (
                 <section>
-                  <h3 className="font-semibold text-gray-700 mb-2">
+                  <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">
                     🌐 Example Sentences (Tatoeba)
                   </h3>
                   <div className="space-y-2 max-h-48 overflow-auto">
                     {wordData.tatoebaExamples.slice(0, 5).map((ex, idx) => (
-                      <div key={idx} className="text-sm bg-blue-50 p-2 rounded">
-                        <p className="text-gray-700">{ex.sentence}</p>
+                      <div key={idx} className="text-sm bg-blue-50 dark:bg-blue-900/30 p-2 rounded">
+                        <p className="text-gray-700 dark:text-gray-300">{ex.sentence}</p>
                         {ex.translation && (
-                          <p className="text-gray-500 text-xs mt-1">{ex.translation}</p>
+                          <p className="text-gray-500 dark:text-gray-400 text-xs mt-1">{ex.translation}</p>
                         )}
                       </div>
                     ))}
@@ -332,13 +332,13 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
         </div>
 
         {/* Footer */}
-        <div className="border-t border-gray-200 p-4">
+        <div className="border-t border-gray-200 dark:border-gray-700 p-4">
           <button
             onClick={handleSave}
             disabled={saved || wordData.loading}
             className={`w-full py-2 rounded-lg font-medium transition-colors ${
               saved
-                ? 'bg-green-100 text-green-700'
+                ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
                 : 'bg-primary-600 text-white hover:bg-primary-700'
             }`}
           >

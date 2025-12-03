@@ -24,6 +24,11 @@
     @apply h-full bg-gray-50 text-gray-900 antialiased;
   }
 
+  /* Dark mode base styles */
+  html.dark body {
+    @apply bg-gray-900 text-gray-100;
+  }
+
   #root {
     @apply h-full;
   }
@@ -41,6 +46,11 @@
            transition-colors duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
+  /* Dark mode button styles */
+  :is(html.dark .btn-secondary) {
+    @apply bg-gray-700 text-gray-200 hover:bg-gray-600;
+  }
+
   .btn-danger {
     @apply px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700
            transition-colors duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed;
@@ -50,9 +60,19 @@
     @apply bg-white rounded-xl shadow-sm border border-gray-200 p-6;
   }
 
+  /* Dark mode card */
+  :is(html.dark .card) {
+    @apply bg-gray-800 border-gray-700;
+  }
+
   .input {
     @apply px-3 py-2 border border-gray-300 rounded-lg focus:outline-none
            focus:ring-2 focus:ring-primary-500 focus:border-transparent;
+  }
+
+  /* Dark mode input */
+  :is(html.dark .input) {
+    @apply bg-gray-700 border-gray-600 text-gray-100;
   }
 }
 
@@ -67,13 +87,27 @@
 }
 
 .word-clickable:hover {
-  @apply underline decoration-yellow-400;
+  @apply underline decoration-yellow-400 text-gray-900;
+}
+
+/* Dark mode word clickable - use darker background with good contrast */
+:is(html.dark .word-clickable) {
+  @apply hover:bg-primary-700/50 text-gray-100;
+}
+
+:is(html.dark .word-clickable:hover) {
+  @apply decoration-primary-400;
 }
 
 /* Side panel animation */
 .slide-panel {
   @apply fixed top-0 right-0 h-full bg-white shadow-2xl z-50
          transform transition-transform duration-300 ease-out;
+}
+
+/* Dark mode slide panel */
+:is(html.dark .slide-panel) {
+  @apply bg-gray-800 shadow-gray-900/50;
 }
 
 .slide-panel-enter {
@@ -105,7 +139,21 @@
   @apply bg-gray-300 rounded hover:bg-gray-400;
 }
 
+/* Dark mode scrollbar */
+:is(html.dark .custom-scrollbar)::-webkit-scrollbar-track {
+  @apply bg-gray-800;
+}
+
+:is(html.dark .custom-scrollbar)::-webkit-scrollbar-thumb {
+  @apply bg-gray-600 hover:bg-gray-500;
+}
+
 /* Loading spinner */
 .spinner {
   @apply animate-spin rounded-full border-2 border-gray-200 border-t-primary-600;
+}
+
+/* Dark mode spinner */
+:is(html.dark .spinner) {
+  @apply border-gray-700 border-t-primary-400;
 }

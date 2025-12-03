@@ -3,81 +3,38 @@ import { Outlet, NavLink } from 'react-router-dom';
 
 const MainLayout: React.FC = () => {
   const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-    `px-4 py-2 rounded-lg transition-colors ${
+    `px-4 py-2 rounded-lg transition-colors no-underline ${
       isActive
         ? 'bg-primary-600 text-white'
-        : 'text-gray-600 hover:bg-gray-100'
+        : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
     }`;
 
   return (
-    <div className="h-full flex flex-col" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div className="h-full flex flex-col">
       {/* Header */}
-      <header
-        className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between"
-        style={{
-          backgroundColor: 'white',
-          borderBottom: '1px solid #e5e7eb',
-          padding: '12px 24px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}
-      >
-        <div className="flex items-center gap-2" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span className="text-2xl" style={{ fontSize: '24px' }}>📚</span>
-          <h1
-            className="text-xl font-semibold text-gray-800"
-            style={{ fontSize: '20px', fontWeight: 600, color: '#1f2937' }}
-          >
+      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="text-2xl">📚</span>
+          <h1 className="text-xl font-semibold text-gray-800 dark:text-gray-100">
             Book Reader
           </h1>
         </div>
 
-        <nav className="flex items-center gap-2" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <NavLink
-            to="/library"
-            className={navLinkClass}
-            style={({ isActive }) => ({
-              padding: '8px 16px',
-              borderRadius: '8px',
-              textDecoration: 'none',
-              backgroundColor: isActive ? '#0284c7' : 'transparent',
-              color: isActive ? 'white' : '#4b5563',
-            })}
-          >
+        <nav className="flex items-center gap-2">
+          <NavLink to="/library" className={navLinkClass}>
             Library
           </NavLink>
-          <NavLink
-            to="/vocabulary"
-            className={navLinkClass}
-            style={({ isActive }) => ({
-              padding: '8px 16px',
-              borderRadius: '8px',
-              textDecoration: 'none',
-              backgroundColor: isActive ? '#0284c7' : 'transparent',
-              color: isActive ? 'white' : '#4b5563',
-            })}
-          >
+          <NavLink to="/vocabulary" className={navLinkClass}>
             Vocabulary
           </NavLink>
-          <NavLink
-            to="/settings"
-            className={navLinkClass}
-            style={({ isActive }) => ({
-              padding: '8px 16px',
-              borderRadius: '8px',
-              textDecoration: 'none',
-              backgroundColor: isActive ? '#0284c7' : 'transparent',
-              color: isActive ? 'white' : '#4b5563',
-            })}
-          >
+          <NavLink to="/settings" className={navLinkClass}>
             Settings
           </NavLink>
         </nav>
       </header>
 
       {/* Main content */}
-      <main className="flex-1 overflow-auto" style={{ flex: 1, overflow: 'auto' }}>
+      <main className="flex-1 overflow-auto bg-gray-50 dark:bg-gray-900">
         <Outlet />
       </main>
     </div>
