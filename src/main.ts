@@ -18,6 +18,7 @@ const createWindow = () => {
     height: 800,
     minWidth: 800,
     minHeight: 600,
+    show: false, // Don't show until ready
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -26,6 +27,12 @@ const createWindow = () => {
     },
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 15, y: 15 },
+  });
+
+  // Show window when ready to prevent visual flash
+  mainWindow.once('ready-to-show', () => {
+    mainWindow?.show();
+    mainWindow?.focus();
   });
 
   // Load the app
