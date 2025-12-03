@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBooks } from '../../context/BookContext';
 import { ZOOM_LEVELS } from '../../../shared/constants';
@@ -17,6 +17,11 @@ interface SelectedWord {
   pageNumber: number;
 }
 
+interface Chapter {
+  name: string;
+  startPage: number;
+}
+
 const ReaderView: React.FC<ReaderViewProps> = ({ book, bookData, initialProgress }) => {
   const navigate = useNavigate();
   const { updateProgress } = useBooks();
@@ -24,9 +29,24 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, bookData, initialProgress
   const [zoom, setZoom] = useState(initialProgress?.zoom_level || ZOOM_LEVELS.DEFAULT);
   const [selectedWord, setSelectedWord] = useState<SelectedWord | null>(null);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
+  const [showChapterMenu, setShowChapterMenu] = useState(false);
 
   // Get current page data
   const pageData = bookData.pages[currentPage - 1];
+
+  // Extract unique chapters with their starting pages
+  const chapters = useMemo(() => {
+    const chapterMap = new Map<string, number>();
+    bookData.pages.forEach(page => {
+      if (page.chapter && !chapterMap.has(page.chapter)) {
+        chapterMap.set(page.chapter, page.page);
+      }
+    });
+    return Array.from(chapterMap.entries()).map(([name, startPage]) => ({
+      name,
+      startPage,
+    }));
+  }, [bookData.pages]);
 
   // Save progress when page or zoom changes
   useEffect(() => {
@@ -124,11 +144,45 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, bookData, initialProgress
         </div>
 
         <div className="flex items-center gap-4">
-          {/* Chapter indicator */}
-          {pageData?.chapter && (
-            <span className="text-sm text-gray-500 max-w-xs truncate">
-              {pageData.chapter}
-            </span>
+          {/* Chapter selector */}
+          {chapters.length > 0 && (
+            <div className="relative">
+              <button
+                onClick={() => setShowChapterMenu(!showChapterMenu)}
+                className="text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-100"
+              >
+                <span className="max-w-xs truncate">
+                  {pageData?.chapter || 'Select Chapter'}
+                </span>
+                <span className="text-xs">▼</span>
+              </button>
+
+              {showChapterMenu && (
+                <>
+                  <div
+                    className="fixed inset-0 z-10"
+                    onClick={() => setShowChapterMenu(false)}
+                  />
+                  <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 max-h-80 overflow-auto min-w-64">
+                    {chapters.map((chapter, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => {
+                          goToPage(chapter.startPage);
+                          setShowChapterMenu(false);
+                        }}
+                        className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${
+                          pageData?.chapter === chapter.name ? 'bg-primary-50 text-primary-700' : 'text-gray-700'
+                        }`}
+                      >
+                        <div className="truncate">{chapter.name}</div>
+                        <div className="text-xs text-gray-400">Page {chapter.startPage}</div>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           )}
 
           {/* Zoom control */}
@@ -164,34 +218,49 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, bookData, initialProgress
       </div>
 
       {/* Bottom navigation */}
-      <div className="bg-white border-t border-gray-200 px-4 py-3 flex items-center justify-center gap-4">
-        <button
-          onClick={goPrev}
-          disabled={currentPage <= 1}
-          className="btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          ← Previous
-        </button>
-
-        <div className="flex items-center gap-2">
-          <input
-            type="number"
-            min={1}
-            max={bookData.total_pages}
-            value={currentPage}
-            onChange={(e) => goToPage(parseInt(e.target.value, 10) || 1)}
-            className="w-16 px-2 py-1 text-center border border-gray-300 rounded"
-          />
-          <span className="text-gray-500">of {bookData.total_pages}</span>
+      <div className="bg-white border-t border-gray-200 px-4 py-3">
+        {/* Progress bar */}
+        <div className="max-w-3xl mx-auto mb-3">
+          <div className="h-1 bg-gray-200 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-primary-600 transition-all duration-300"
+              style={{ width: `${(currentPage / bookData.total_pages) * 100}%` }}
+            />
+          </div>
+          <div className="text-xs text-gray-400 text-center mt-1">
+            {Math.round((currentPage / bookData.total_pages) * 100)}% complete
+          </div>
         </div>
 
-        <button
-          onClick={goNext}
-          disabled={currentPage >= bookData.total_pages}
-          className="btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          Next →
-        </button>
+        <div className="flex items-center justify-center gap-4">
+          <button
+            onClick={goPrev}
+            disabled={currentPage <= 1}
+            className="btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            ← Previous
+          </button>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min={1}
+              max={bookData.total_pages}
+              value={currentPage}
+              onChange={(e) => goToPage(parseInt(e.target.value, 10) || 1)}
+              className="w-16 px-2 py-1 text-center border border-gray-300 rounded"
+            />
+            <span className="text-gray-500">of {bookData.total_pages}</span>
+          </div>
+
+          <button
+            onClick={goNext}
+            disabled={currentPage >= bookData.total_pages}
+            className="btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Next →
+          </button>
+        </div>
       </div>
 
       {/* Word Panel */}
@@ -200,6 +269,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, bookData, initialProgress
         onClose={() => setIsPanelOpen(false)}
         selectedWord={selectedWord}
         bookId={book.id}
+        onNavigateToPage={goToPage}
       />
     </div>
   );

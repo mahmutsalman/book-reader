@@ -12,6 +12,7 @@ interface WordPanelProps {
   onClose: () => void;
   selectedWord: SelectedWord | null;
   bookId: number;
+  onNavigateToPage?: (page: number) => void;
 }
 
 interface WordData {
@@ -24,7 +25,7 @@ interface WordData {
   error?: string;
 }
 
-const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bookId }) => {
+const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bookId, onNavigateToPage }) => {
   const { settings } = useSettings();
   const [wordData, setWordData] = useState<WordData>({ loading: false });
   const [saved, setSaved] = useState(false);
@@ -189,15 +190,21 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
                   <h3 className="font-semibold text-gray-700 mb-2">
                     📍 Other Occurrences ({wordData.occurrences.length})
                   </h3>
-                  <div className="space-y-2 max-h-48 overflow-auto">
-                    {wordData.occurrences.slice(0, 5).map((occ, idx) => (
-                      <div
+                  <div className="space-y-2 max-h-48 overflow-auto custom-scrollbar">
+                    {wordData.occurrences.slice(0, 10).map((occ, idx) => (
+                      <button
                         key={idx}
-                        className="text-sm text-gray-600 bg-gray-50 p-2 rounded cursor-pointer hover:bg-gray-100"
+                        onClick={() => {
+                          if (onNavigateToPage) {
+                            onNavigateToPage(occ.page);
+                            onClose();
+                          }
+                        }}
+                        className="w-full text-left text-sm text-gray-600 bg-gray-50 p-2 rounded cursor-pointer hover:bg-gray-100 transition-colors"
                       >
-                        <span className="text-xs text-gray-400">Page {occ.page}:</span>
-                        <p className="line-clamp-2">"{occ.sentence}"</p>
-                      </div>
+                        <span className="text-xs text-primary-600 font-medium">Page {occ.page} →</span>
+                        <p className="line-clamp-2 mt-1">"{occ.sentence}"</p>
+                      </button>
                     ))}
                   </div>
                 </section>
