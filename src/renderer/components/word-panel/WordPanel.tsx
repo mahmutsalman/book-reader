@@ -30,6 +30,29 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
   const [wordData, setWordData] = useState<WordData>({ loading: false });
   const [saved, setSaved] = useState(false);
 
+  // Helper function to highlight the selected word in a sentence
+  const highlightWord = useCallback((sentence: string, word: string) => {
+    if (!word) return <>{sentence}</>;
+
+    // Create a case-insensitive regex to find the word
+    const regex = new RegExp(`(\\b${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b)`, 'gi');
+    const parts = sentence.split(regex);
+
+    return (
+      <>
+        {parts.map((part, index) =>
+          regex.test(part) ? (
+            <span key={index} className="text-red-600 font-semibold not-italic">
+              {part}
+            </span>
+          ) : (
+            <span key={index}>{part}</span>
+          )
+        )}
+      </>
+    );
+  }, []);
+
   // Fetch word data when word changes
   useEffect(() => {
     if (!selectedWord || !isOpen) return;
@@ -170,7 +193,7 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
               <section>
                 <h3 className="font-semibold text-gray-700 mb-2">📝 Original Sentence</h3>
                 <p className="text-gray-600 bg-gray-50 p-3 rounded-lg italic">
-                  "{selectedWord.sentence}"
+                  "{highlightWord(selectedWord.sentence, selectedWord.word)}"
                 </p>
               </section>
 
