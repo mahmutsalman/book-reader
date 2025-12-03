@@ -1,8 +1,8 @@
 {
   "name": "bookreader",
-  "productName": "Book Reader",
+  "productName": "Smart Book",
   "version": "1.0.0",
-  "description": "A book reader app with dynamic text wrapping, AI-powered word lookup, and vocabulary tracking",
+  "description": "A smart book reader with dynamic text wrapping, AI-powered word lookup, and vocabulary tracking",
   "main": ".vite/build/main.js",
   "scripts": {
     "start": "electron-forge start",

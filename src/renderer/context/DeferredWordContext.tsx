@@ -5,7 +5,10 @@ import type {
   QueuedWordStatus,
   CachedWordData,
 } from '../../shared/types/deferred-word.types';
-import { generateWordKey } from '../../shared/types/deferred-word.types';
+import { generateWordKey, generatePhraseKey } from '../../shared/types/deferred-word.types';
+
+// Helper to check if a string is a phrase (multiple words)
+const isPhrase = (text: string): boolean => text.trim().includes(' ');
 
 // Configuration
 const MAX_CONCURRENT_FETCHES = 3;
@@ -119,7 +122,7 @@ export const DeferredWordProvider: React.FC<DeferredWordProviderProps> = ({ chil
     processPendingWords();
   }, [queuedWords, settings.tatoeba_enabled, settings.tatoeba_language]);
 
-  // Fetch word data from AI
+  // Fetch word or phrase data from AI
   const fetchWordData = async (key: string, entry: QueuedWordEntry) => {
     try {
       if (!window.electronAPI) {
@@ -130,68 +133,94 @@ export const DeferredWordProvider: React.FC<DeferredWordProviderProps> = ({ chil
         fetchedAt: Date.now(),
       };
 
-      // Fetch definition, IPA, and simplified sentence in parallel
-      const [defResult, ipaResult, simplifyResult] = await Promise.allSettled([
-        window.electronAPI.ai.getDefinition(entry.word, entry.sentence),
-        window.electronAPI.ai.getIPA(entry.word),
-        window.electronAPI.ai.simplifySentence(entry.sentence),
-      ]);
+      // Check if this is a phrase (contains spaces)
+      const isPhraseEntry = isPhrase(entry.word);
 
-      if (defResult.status === 'fulfilled') {
-        results.definition = defResult.value.definition;
-      }
-      if (ipaResult.status === 'fulfilled') {
-        results.ipa = ipaResult.value.ipa;
-      }
-      if (simplifyResult.status === 'fulfilled') {
-        results.simplifiedSentence = simplifyResult.value.simplified;
-
-        // Get word equivalent in simplified sentence
+      if (isPhraseEntry) {
+        // Phrase handling: get phrase meaning instead of word definition
+        console.log('[PHRASE DEBUG] Sending phrase to AI:', { phrase: entry.word, sentence: entry.sentence });
         try {
-          const equivalentResult = await window.electronAPI.ai.getWordEquivalent(
+          const phraseMeaningResult = await window.electronAPI.ai.getPhraseMeaning(
             entry.word,
-            entry.sentence,
-            simplifyResult.value.simplified
+            entry.sentence
           );
-
-          if (equivalentResult.equivalent) {
-            // Check if we need to regenerate the simplified sentence
-            if (equivalentResult.needsRegeneration) {
-              const resimplifyResult = await window.electronAPI.ai.resimplifyWithWord(
-                entry.sentence,
-                entry.word,
-                equivalentResult.equivalent
-              );
-              results.simplifiedSentence = resimplifyResult.simplified;
-            }
-            results.wordEquivalent = equivalentResult.equivalent;
+          console.log('[PHRASE DEBUG] AI phrase response:', phraseMeaningResult);
+          if (phraseMeaningResult.meaning) {
+            results.definition = phraseMeaningResult.meaning;
           }
         } catch (err) {
-          console.error('[DeferredWord] getWordEquivalent error:', err);
+          console.error('[DeferredWord] getPhraseMeaning error:', err);
         }
-      }
 
-      // Search for other occurrences
-      try {
-        const occurrences = await window.electronAPI.book.searchWord(entry.bookId, entry.word);
-        results.occurrences = occurrences;
-      } catch {
-        // Non-critical, ignore
-      }
+        // For phrases, skip IPA and word equivalent
+        // The phrase itself is the "equivalent"
+        results.wordEquivalent = entry.word;
 
-      // Tatoeba examples if enabled
-      if (settings.tatoeba_enabled) {
+      } else {
+        // Single word handling: original behavior
+        // Fetch definition, IPA, and simplified sentence in parallel
+        const [defResult, ipaResult, simplifyResult] = await Promise.allSettled([
+          window.electronAPI.ai.getDefinition(entry.word, entry.sentence),
+          window.electronAPI.ai.getIPA(entry.word),
+          window.electronAPI.ai.simplifySentence(entry.sentence),
+        ]);
+
+        if (defResult.status === 'fulfilled') {
+          results.definition = defResult.value.definition;
+        }
+        if (ipaResult.status === 'fulfilled') {
+          results.ipa = ipaResult.value.ipa;
+        }
+        if (simplifyResult.status === 'fulfilled') {
+          results.simplifiedSentence = simplifyResult.value.simplified;
+
+          // Get word equivalent in simplified sentence
+          try {
+            const equivalentResult = await window.electronAPI.ai.getWordEquivalent(
+              entry.word,
+              entry.sentence,
+              simplifyResult.value.simplified
+            );
+
+            if (equivalentResult.equivalent) {
+              // Check if we need to regenerate the simplified sentence
+              if (equivalentResult.needsRegeneration) {
+                const resimplifyResult = await window.electronAPI.ai.resimplifyWithWord(
+                  entry.sentence,
+                  entry.word,
+                  equivalentResult.equivalent
+                );
+                results.simplifiedSentence = resimplifyResult.simplified;
+              }
+              results.wordEquivalent = equivalentResult.equivalent;
+            }
+          } catch (err) {
+            console.error('[DeferredWord] getWordEquivalent error:', err);
+          }
+        }
+
+        // Search for other occurrences (only for single words)
         try {
-          const tatoeba = await window.electronAPI.tatoeba.search(
-            entry.word,
-            settings.tatoeba_language
-          );
-          results.tatoebaExamples = tatoeba.map((s: { sentence: string; translations?: { sentence: string }[] }) => ({
-            sentence: s.sentence,
-            translation: s.translations?.[0]?.sentence,
-          }));
+          const occurrences = await window.electronAPI.book.searchWord(entry.bookId, entry.word);
+          results.occurrences = occurrences;
         } catch {
           // Non-critical, ignore
+        }
+
+        // Tatoeba examples if enabled (only for single words)
+        if (settings.tatoeba_enabled) {
+          try {
+            const tatoeba = await window.electronAPI.tatoeba.search(
+              entry.word,
+              settings.tatoeba_language
+            );
+            results.tatoebaExamples = tatoeba.map((s: { sentence: string; translations?: { sentence: string }[] }) => ({
+              sentence: s.sentence,
+              translation: s.translations?.[0]?.sentence,
+            }));
+          } catch {
+            // Non-critical, ignore
+          }
         }
       }
 
@@ -234,10 +263,17 @@ export const DeferredWordProvider: React.FC<DeferredWordProviderProps> = ({ chil
     }
   };
 
-  // Queue a word for background fetching
+  // Queue a word or phrase for background fetching
   const queueWord = useCallback((word: string, sentence: string, pageNumber: number, bookId: number) => {
-    const cleanWord = word.replace(/[^\w'-]/g, '').toLowerCase();
-    const key = generateWordKey(bookId, cleanWord);
+    // For phrases, preserve spaces; for single words, clean normally
+    const cleanText = isPhrase(word)
+      ? word.toLowerCase().trim()
+      : word.replace(/[^\w'-]/g, '').toLowerCase();
+
+    // Use appropriate key generator
+    const key = isPhrase(word)
+      ? generatePhraseKey(bookId, cleanText)
+      : generateWordKey(bookId, cleanText);
 
     setQueuedWords(prev => {
       // Don't re-queue if already exists
@@ -260,7 +296,7 @@ export const DeferredWordProvider: React.FC<DeferredWordProviderProps> = ({ chil
       // Add new entry
       const newMap = new Map(prev);
       newMap.set(key, {
-        word: cleanWord,
+        word: cleanText,
         sentence,
         pageNumber,
         bookId,
@@ -271,26 +307,38 @@ export const DeferredWordProvider: React.FC<DeferredWordProviderProps> = ({ chil
     });
   }, []);
 
-  // Check if a word has ready data
+  // Check if a word or phrase has ready data
   const isWordReady = useCallback((word: string, bookId: number): boolean => {
-    const cleanWord = word.replace(/[^\w'-]/g, '').toLowerCase();
-    const key = generateWordKey(bookId, cleanWord);
+    const cleanText = isPhrase(word)
+      ? word.toLowerCase().trim()
+      : word.replace(/[^\w'-]/g, '').toLowerCase();
+    const key = isPhrase(word)
+      ? generatePhraseKey(bookId, cleanText)
+      : generateWordKey(bookId, cleanText);
     const entry = queuedWords.get(key);
     return entry?.status === 'ready';
   }, [queuedWords]);
 
-  // Get the status of a word
+  // Get the status of a word or phrase
   const getWordStatus = useCallback((word: string, bookId: number): QueuedWordStatus | null => {
-    const cleanWord = word.replace(/[^\w'-]/g, '').toLowerCase();
-    const key = generateWordKey(bookId, cleanWord);
+    const cleanText = isPhrase(word)
+      ? word.toLowerCase().trim()
+      : word.replace(/[^\w'-]/g, '').toLowerCase();
+    const key = isPhrase(word)
+      ? generatePhraseKey(bookId, cleanText)
+      : generateWordKey(bookId, cleanText);
     const entry = queuedWords.get(key);
     return entry?.status ?? null;
   }, [queuedWords]);
 
-  // Get cached data for a word
+  // Get cached data for a word or phrase
   const getWordData = useCallback((word: string, bookId: number): CachedWordData | null => {
-    const cleanWord = word.replace(/[^\w'-]/g, '').toLowerCase();
-    const key = generateWordKey(bookId, cleanWord);
+    const cleanText = isPhrase(word)
+      ? word.toLowerCase().trim()
+      : word.replace(/[^\w'-]/g, '').toLowerCase();
+    const key = isPhrase(word)
+      ? generatePhraseKey(bookId, cleanText)
+      : generateWordKey(bookId, cleanText);
     const entry = queuedWords.get(key);
     return entry?.data ?? null;
   }, [queuedWords]);

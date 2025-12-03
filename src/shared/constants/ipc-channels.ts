@@ -27,6 +27,7 @@ export const IPC_CHANNELS = {
   AI_SIMPLIFY_SENTENCE: 'ai:simplify-sentence',
   AI_GET_WORD_EQUIVALENT: 'ai:get-word-equivalent',
   AI_RESIMPLIFY_WITH_WORD: 'ai:resimplify-with-word',
+  AI_GET_PHRASE_MEANING: 'ai:get-phrase-meaning',
   AI_TEST_CONNECTION: 'ai:test-connection',
 
   // Tatoeba

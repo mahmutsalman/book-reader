@@ -22,6 +22,12 @@ export interface WordEquivalentResult {
   needsRegeneration: boolean;
 }
 
+export interface PhraseMeaningResult {
+  phrase: string;
+  meaning: string;
+  context: string;
+}
+
 // Tatoeba sentence
 export interface TatoebaSentence {
   id: number;

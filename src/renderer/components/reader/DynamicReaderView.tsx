@@ -6,7 +6,10 @@ import { useTextReflow } from '../../hooks/useTextReflow';
 import { ZOOM_LEVELS, REFLOW_SETTINGS } from '../../../shared/constants';
 import type { Book, BookData, ReadingProgress } from '../../../shared/types';
 import type { CachedWordData } from '../../../shared/types/deferred-word.types';
+import { calculateMiddleIndex, isWithinAdjacency } from '../../../shared/types/deferred-word.types';
 import WordPanel from '../word-panel/WordPanel';
+
+const MAX_PHRASE_WORDS = 10;
 
 interface DynamicReaderViewProps {
   book: Book;
@@ -18,6 +21,15 @@ interface SelectedWord {
   word: string;
   sentence: string;
   pageNumber: number;
+  isPhrase?: boolean;
+  wordIndices?: number[];
+}
+
+interface PhraseRange {
+  indices: number[];
+  middleIndex: number;
+  phrase: string;
+  status: 'loading' | 'ready';
 }
 
 interface Chapter {
@@ -45,6 +57,14 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
 
   // Map to track which word each loading position corresponds to
   const loadingWordsMapRef = useRef<Map<number, string>>(new Map());
+
+  // Phrase selection state
+  const [selectedIndices, setSelectedIndices] = useState<number[]>([]);
+  const [isShiftHeld, setIsShiftHeld] = useState(false);
+  const [phraseRanges, setPhraseRanges] = useState<Map<string, PhraseRange>>(new Map());
+
+  // Map word indices to their actual words for phrase construction
+  const wordIndexMapRef = useRef<Map<number, string>>(new Map());
 
   // Use the text reflow hook
   const {
@@ -168,9 +188,139 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
     return sentence || reflowState.currentText.substring(0, 200);
   }, [bookData.pages, reflowState.currentText]);
 
-  // Handle word click with deferred lookup behavior
-  const handleWordClick = useCallback((word: string, wordIndex: number) => {
+  // Build phrase from selected indices
+  const buildPhraseFromIndices = useCallback((indices: number[]): string => {
+    const sorted = [...indices].sort((a, b) => a - b);
+    const words = sorted.map(idx => wordIndexMapRef.current.get(idx) || '');
+    console.log('[PHRASE DEBUG] buildPhraseFromIndices:', { indices: sorted, words, mapSize: wordIndexMapRef.current.size });
+    return words.filter(Boolean).join(' ');
+  }, []);
+
+  // Finalize phrase selection and trigger AI lookup
+  const finalizePhrase = useCallback(() => {
+    console.log('[PHRASE DEBUG] finalizePhrase called with selectedIndices:', selectedIndices);
+
+    if (selectedIndices.length <= 1) {
+      // Single word or empty - clear selection
+      console.log('[PHRASE DEBUG] Single word or empty, clearing selection');
+      setSelectedIndices([]);
+      return;
+    }
+
+    const sortedIndices = [...selectedIndices].sort((a, b) => a - b);
+    const phrase = buildPhraseFromIndices(sortedIndices);
+    const middleIndex = calculateMiddleIndex(sortedIndices);
+    const fullSentence = extractFullSentence(phrase, reflowState.originalPage);
+
+    console.log('[PHRASE DEBUG] finalizePhrase:', { sortedIndices, phrase, middleIndex, fullSentence });
+
+    // Check if phrase is already cached
+    const isPhraseReady = isWordReady(phrase, book.id);
+
+    if (isPhraseReady) {
+      // Phrase is ready - open panel with cached data
+      setSelectedWord({
+        word: phrase,
+        sentence: fullSentence,
+        pageNumber: reflowState.originalPage,
+        isPhrase: true,
+        wordIndices: sortedIndices,
+      });
+      setPreloadedData(getWordData(phrase, book.id));
+      setIsPanelOpen(true);
+    } else {
+      // Queue phrase for background fetch
+      queueWord(phrase, fullSentence, reflowState.originalPage, book.id);
+
+      // Add to phrase ranges for dot display
+      setPhraseRanges(prev => {
+        const newMap = new Map(prev);
+        newMap.set(phrase, {
+          indices: sortedIndices,
+          middleIndex,
+          phrase,
+          status: 'loading',
+        });
+        return newMap;
+      });
+
+      // Add pulse animation
+      setPulsingWords(prev => new Set(prev).add(phrase));
+      setTimeout(() => {
+        setPulsingWords(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(phrase);
+          return newSet;
+        });
+      }, 400);
+    }
+
+    // Clear selection
+    setSelectedIndices([]);
+  }, [selectedIndices, buildPhraseFromIndices, extractFullSentence, reflowState.originalPage, book.id, isWordReady, getWordData, queueWord]);
+
+  // Handle word click with deferred lookup behavior and phrase selection
+  const handleWordClick = useCallback((word: string, wordIndex: number, event: React.MouseEvent) => {
     const cleanWord = word.replace(/[^\w'-]/g, '').toLowerCase();
+
+    console.log('[PHRASE DEBUG] handleWordClick:', { word: cleanWord, wordIndex, shiftKey: event.shiftKey, currentSelectedIndices: selectedIndices });
+
+    // Store word in map for phrase construction
+    wordIndexMapRef.current.set(wordIndex, cleanWord);
+
+    // Handle Shift+click for phrase selection
+    if (event.shiftKey) {
+      // PREVENT browser's native text selection when Shift is held
+      event.preventDefault();
+
+      setSelectedIndices(prev => {
+        console.log('[PHRASE DEBUG] Shift+click - updating selectedIndices from:', prev);
+        // Check if this word is within valid adjacency
+        if (prev.length > 0 && !isWithinAdjacency(wordIndex, prev)) {
+          // Too far - start new selection from this word
+          return [wordIndex];
+        }
+
+        // Check if already selected - remove it
+        if (prev.includes(wordIndex)) {
+          return prev.filter(idx => idx !== wordIndex);
+        }
+
+        // Check max phrase length
+        if (prev.length >= MAX_PHRASE_WORDS) {
+          // Max reached - ignore
+          return prev;
+        }
+
+        // Add to selection
+        return [...prev, wordIndex];
+      });
+      return;
+    }
+
+    // Check if clicked word is part of a cached phrase (before treating as single word)
+    for (const [phrase, range] of phraseRanges) {
+      if (range.indices.includes(wordIndex) && range.status === 'ready') {
+        const phraseSentence = extractFullSentence(phrase, reflowState.originalPage);
+        setSelectedWord({
+          word: phrase,
+          sentence: phraseSentence,
+          pageNumber: reflowState.originalPage,
+          isPhrase: true,
+          wordIndices: range.indices,
+        });
+        setPreloadedData(getWordData(phrase, book.id));
+        setIsPanelOpen(true);
+        console.log('[PHRASE DEBUG] Opened cached phrase panel:', phrase);
+        return;
+      }
+    }
+
+    // Normal click - clear any phrase selection first
+    if (selectedIndices.length > 0) {
+      setSelectedIndices([]);
+    }
+
     const fullSentence = extractFullSentence(word, reflowState.originalPage);
 
     // Check if word is ready (has cached data)
@@ -212,11 +362,15 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
         }, 400);
       }
     }
-  }, [extractFullSentence, reflowState.originalPage, book.id, isWordReady, getWordData, getWordStatus, queueWord]);
+  }, [extractFullSentence, reflowState.originalPage, book.id, isWordReady, getWordData, getWordStatus, queueWord, selectedIndices, phraseRanges]);
 
-  // Keyboard navigation
+  // Keyboard navigation and Shift key handling
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Shift') {
+        setIsShiftHeld(true);
+        return;
+      }
       if (e.key === 'ArrowRight' || e.key === ' ') {
         e.preventDefault();
         goToNextPage();
@@ -225,12 +379,53 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
         goToPrevPage();
       } else if (e.key === 'Escape') {
         setIsPanelOpen(false);
+        setSelectedIndices([]);
+        setIsShiftHeld(false);
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Shift') {
+        setIsShiftHeld(false);
+        // Finalize phrase selection when Shift is released
+        if (selectedIndices.length > 1) {
+          finalizePhrase();
+        } else if (selectedIndices.length === 1) {
+          // Single word with shift - treat as normal word click
+          const wordIndex = selectedIndices[0];
+          const word = wordIndexMapRef.current.get(wordIndex);
+          if (word) {
+            const fullSentence = extractFullSentence(word, reflowState.originalPage);
+
+            if (isWordReady(word, book.id)) {
+              setSelectedWord({
+                word,
+                sentence: fullSentence,
+                pageNumber: reflowState.originalPage,
+              });
+              setPreloadedData(getWordData(word, book.id));
+              setIsPanelOpen(true);
+            } else {
+              const status = getWordStatus(word, book.id);
+              if (!status || status === 'error') {
+                queueWord(word, fullSentence, reflowState.originalPage, book.id);
+                setLoadingPositions(prev => new Set(prev).add(wordIndex));
+                loadingWordsMapRef.current.set(wordIndex, word);
+              }
+            }
+          }
+          setSelectedIndices([]);
+        }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [goToNextPage, goToPrevPage]);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [goToNextPage, goToPrevPage, selectedIndices, finalizePhrase, extractFullSentence, reflowState.originalPage, book.id, isWordReady, getWordData, getWordStatus, queueWord]);
 
   // Clear loading positions when words become ready
   useEffect(() => {
@@ -256,11 +451,47 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
     }
   }, [loadingPositions, isWordReady, book.id]);
 
-  // Clear loading positions when page changes
+  // Clear loading positions and phrase selection when page changes
   useEffect(() => {
     setLoadingPositions(new Set());
     loadingWordsMapRef.current.clear();
+    setSelectedIndices([]);
+    wordIndexMapRef.current.clear();
+    setPhraseRanges(new Map());
   }, [reflowState.currentPageIndex]);
+
+  // Update phrase ranges when phrases become ready
+  useEffect(() => {
+    if (phraseRanges.size === 0) return;
+
+    const updatedRanges = new Map(phraseRanges);
+    let hasChanges = false;
+
+    phraseRanges.forEach((range, phrase) => {
+      if (range.status === 'loading' && isWordReady(phrase, book.id)) {
+        updatedRanges.set(phrase, { ...range, status: 'ready' });
+        hasChanges = true;
+      }
+    });
+
+    if (hasChanges) {
+      setPhraseRanges(updatedRanges);
+    }
+  }, [phraseRanges, isWordReady, book.id]);
+
+  // Helper to check if an index is part of any phrase range
+  const getPhraseInfoForIndex = useCallback((index: number): { isInPhrase: boolean; isMiddle: boolean; status: 'loading' | 'ready' | null } => {
+    for (const [, range] of phraseRanges) {
+      if (range.indices.includes(index)) {
+        return {
+          isInPhrase: true,
+          isMiddle: index === range.middleIndex,
+          status: range.status,
+        };
+      }
+    }
+    return { isInPhrase: false, isMiddle: false, status: null };
+  }, [phraseRanges]);
 
   // Render text with clickable words and ready indicators
   const renderText = (text: string) => {
@@ -278,22 +509,57 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
         return <span key={index}>{part}</span>;
       }
 
-      // Check if this word has ready data
+      // Store word in map for phrase construction
       const cleanWord = part.replace(/[^\w'-]/g, '').toLowerCase();
+      wordIndexMapRef.current.set(index, cleanWord);
+
+      // Check if this word has ready data (for single words)
       const wordIsReady = isWordReady(cleanWord, book.id);
       const isPulsing = pulsingWords.has(cleanWord);
       const isLoading = loadingPositions.has(index);
+
+      // Check phrase-related states
+      const isCurrentlySelected = selectedIndices.includes(index);
+      const phraseInfo = getPhraseInfoForIndex(index);
+
+      // Determine CSS classes
+      const classes = [
+        'word-clickable',
+        wordIsReady && !phraseInfo.isInPhrase ? 'word-ready' : '',
+        isPulsing ? 'word-queued-pulse' : '',
+        isShiftHeld ? 'word-shift-mode' : '',
+        isCurrentlySelected ? 'word-phrase-selected word-phrase-selecting' : '',
+        phraseInfo.isInPhrase ? 'word-phrase-selected' : '',
+      ].filter(Boolean).join(' ');
+
+      // Determine which dot to show:
+      // - For phrases: only show dot on middle word
+      // - For single words: show dot on the word itself
+      let showRedDot = false;
+      let showYellowDot = false;
+
+      if (phraseInfo.isInPhrase) {
+        // Part of a phrase - only middle word gets the dot
+        if (phraseInfo.isMiddle) {
+          showRedDot = phraseInfo.status === 'ready';
+          showYellowDot = phraseInfo.status === 'loading';
+        }
+      } else {
+        // Single word behavior
+        showRedDot = wordIsReady;
+        showYellowDot = isLoading && !wordIsReady;
+      }
 
       // Word - make it clickable with optional ready/loading indicator
       return (
         <span
           key={index}
-          onClick={() => handleWordClick(part, index)}
-          className={`word-clickable ${wordIsReady ? 'word-ready' : ''} ${isPulsing ? 'word-queued-pulse' : ''}`}
+          onClick={(e) => handleWordClick(part, index, e)}
+          className={classes}
         >
           {part}
-          {wordIsReady && <span className="word-ready-dot" />}
-          {isLoading && !wordIsReady && <span className="word-loading-dot" />}
+          {showRedDot && <span className="word-ready-dot" />}
+          {showYellowDot && <span className="word-loading-dot" />}
         </span>
       );
     });

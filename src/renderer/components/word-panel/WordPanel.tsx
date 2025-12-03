@@ -6,6 +6,8 @@ interface SelectedWord {
   word: string;
   sentence: string;
   pageNumber: number;
+  isPhrase?: boolean;
+  wordIndices?: number[];
 }
 
 interface WordPanelProps {
@@ -246,9 +248,15 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
         <div className="bg-primary-600 text-white px-4 py-3 flex items-center justify-between">
           <div>
             <h2 className="text-xl font-semibold">{selectedWord.word}</h2>
-            {wordData.ipa && (
+            {/* Only show IPA for single words, not phrases */}
+            {!selectedWord.isPhrase && wordData.ipa && (
               <span className="text-primary-100 font-mono text-sm">
                 /{wordData.ipa}/
+              </span>
+            )}
+            {selectedWord.isPhrase && (
+              <span className="text-primary-200 text-xs">
+                phrase
               </span>
             )}
           </div>
@@ -265,7 +273,9 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
           {wordData.loading ? (
             <div className="text-center py-8">
               <div className="text-4xl animate-pulse mb-2">🔍</div>
-              <div className="text-gray-500 dark:text-gray-400">Looking up word...</div>
+              <div className="text-gray-500 dark:text-gray-400">
+                {selectedWord.isPhrase ? 'Looking up phrase...' : 'Looking up word...'}
+              </div>
             </div>
           ) : wordData.error ? (
             <div className="bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 p-4 rounded-lg">
@@ -273,11 +283,13 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
             </div>
           ) : (
             <>
-              {/* Definition */}
+              {/* Definition / Phrase Meaning */}
               <section>
-                <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">📖 Definition</h3>
+                <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  {selectedWord.isPhrase ? '📖 Phrase Meaning' : '📖 Definition'}
+                </h3>
                 <p className="text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
-                  {wordData.definition || 'No definition available'}
+                  {wordData.definition || (selectedWord.isPhrase ? 'No phrase meaning available' : 'No definition available')}
                 </p>
               </section>
 
@@ -289,8 +301,8 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
                 </p>
               </section>
 
-              {/* Simplified Sentence */}
-              {wordData.simplifiedSentence && (
+              {/* Simplified Sentence - only for single words */}
+              {!selectedWord.isPhrase && wordData.simplifiedSentence && (
                 <section>
                   <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">✨ Simplified</h3>
                   <p className="text-gray-600 dark:text-gray-300 bg-green-50 dark:bg-green-900/30 p-3 rounded-lg">
@@ -301,8 +313,8 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
                 </section>
               )}
 
-              {/* Other Occurrences */}
-              {wordData.occurrences && wordData.occurrences.length > 1 && (
+              {/* Other Occurrences - only for single words */}
+              {!selectedWord.isPhrase && wordData.occurrences && wordData.occurrences.length > 1 && (
                 <section>
                   <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">
                     📍 Other Occurrences ({wordData.occurrences.length})
@@ -327,8 +339,8 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
                 </section>
               )}
 
-              {/* Tatoeba Examples */}
-              {settings.tatoeba_enabled && wordData.tatoebaExamples && wordData.tatoebaExamples.length > 0 && (
+              {/* Tatoeba Examples - only for single words */}
+              {!selectedWord.isPhrase && settings.tatoeba_enabled && wordData.tatoebaExamples && wordData.tatoebaExamples.length > 0 && (
                 <section>
                   <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">
                     🌐 Example Sentences (Tatoeba)
@@ -360,7 +372,11 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
                 : 'bg-primary-600 text-white hover:bg-primary-700'
             }`}
           >
-            {saved ? '✓ Saved to Vocabulary' : '💾 Save to Vocabulary'}
+            {saved
+              ? '✓ Saved to Vocabulary'
+              : selectedWord.isPhrase
+                ? '💾 Save Phrase to Vocabulary'
+                : '💾 Save to Vocabulary'}
           </button>
         </div>
       </div>

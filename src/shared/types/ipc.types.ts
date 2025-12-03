@@ -1,7 +1,7 @@
 import type { Book, BookData, ReadingProgress } from './book.types';
 import type { VocabularyEntry, CreateVocabularyEntry, VocabularyFilters, StoredWordOccurrence } from './vocabulary.types';
 import type { AppSettings, LMStudioConnectionResult } from './settings.types';
-import type { WordDefinitionResult, IPAPronunciationResult, SimplifiedSentenceResult, WordEquivalentResult, TatoebaSentence, TatoebaStatus } from './ai.types';
+import type { WordDefinitionResult, IPAPronunciationResult, SimplifiedSentenceResult, WordEquivalentResult, PhraseMeaningResult, TatoebaSentence, TatoebaStatus } from './ai.types';
 
 // IPC API exposed to renderer
 export interface ElectronAPI {
@@ -32,6 +32,7 @@ export interface ElectronAPI {
     simplifySentence: (sentence: string) => Promise<SimplifiedSentenceResult>;
     getWordEquivalent: (word: string, originalSentence: string, simplifiedSentence: string) => Promise<WordEquivalentResult>;
     resimplifyWithWord: (originalSentence: string, originalWord: string, equivalentWord: string) => Promise<SimplifiedSentenceResult>;
+    getPhraseMeaning: (phrase: string, context: string) => Promise<PhraseMeaningResult>;
     testConnection: () => Promise<LMStudioConnectionResult>;
   };
   tatoeba: {

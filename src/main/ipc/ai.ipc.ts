@@ -91,6 +91,26 @@ export function registerAIHandlers(): void {
     }
   );
 
+  ipcMain.handle(
+    IPC_CHANNELS.AI_GET_PHRASE_MEANING,
+    async (_, phrase: string, context: string) => {
+      console.log('[PHRASE IPC] getPhraseMeaning request:', { phrase, context });
+      try {
+        const service = await getService();
+        const meaning = await service.getPhraseMeaning(phrase, context);
+        console.log('[PHRASE IPC] getPhraseMeaning response:', { phrase, meaning });
+        return { phrase, meaning, context };
+      } catch (error) {
+        console.error('Failed to get phrase meaning:', error);
+        return {
+          phrase,
+          meaning: 'Unable to get phrase meaning. Please check your LM Studio connection.',
+          context,
+        };
+      }
+    }
+  );
+
   ipcMain.handle(IPC_CHANNELS.AI_TEST_CONNECTION, async () => {
     try {
       const service = await getService();

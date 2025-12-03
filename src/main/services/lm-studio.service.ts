@@ -113,7 +113,7 @@ Answer:`;
     console.log('[DEBUG main] AI raw response for word equivalent:', JSON.stringify(response));
 
     // Clean the response: remove quotes, trim, punctuation, and common prefixes
-    let cleaned = response.trim()
+    const cleaned = response.trim()
       .replace(/^["'`]|["'`]$/g, '')  // Remove surrounding quotes/backticks
       .replace(/\.+$/, '')             // Remove trailing periods
       .replace(/^answer:\s*/i, '')     // Remove "Answer:" prefix (case-insensitive)
@@ -145,6 +145,22 @@ Answer:`;
 
     console.log('[DEBUG main] Returning:', cleaned);
     return { equivalent: cleaned, needsRegeneration: false };
+  }
+
+  /**
+   * Get the meaning of a phrase (phrasal verb, collocation, idiom) in context
+   */
+  async getPhraseMeaning(phrase: string, context: string): Promise<string> {
+    const prompt = `Explain the meaning of the phrase "${phrase}" as it is used in the following context. Focus on:
+- Idiomatic meaning (if it's an idiom or phrasal verb)
+- How the words work together as a unit
+- A clear, simple explanation for a language learner (2-3 sentences)
+
+Context: "${context}"
+
+Meaning:`;
+
+    return this.chat(prompt);
   }
 
   /**

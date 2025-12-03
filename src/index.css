@@ -185,6 +185,37 @@
   }
 }
 
+/* Phrase selection styles */
+.word-phrase-selected {
+  @apply bg-blue-200/40 rounded;
+}
+
+:is(html.dark .word-phrase-selected) {
+  @apply bg-blue-500/30;
+}
+
+/* Shift key held - selection mode cursor */
+.word-shift-mode {
+  cursor: pointer !important;
+}
+
+.word-shift-mode:hover {
+  @apply bg-blue-100;
+}
+
+:is(html.dark .word-shift-mode:hover) {
+  @apply bg-blue-600/40;
+}
+
+/* Phrase selection active indicator - subtle border */
+.word-phrase-selecting {
+  @apply ring-2 ring-blue-400 ring-offset-1;
+}
+
+:is(html.dark .word-phrase-selecting) {
+  @apply ring-blue-500 ring-offset-gray-900;
+}
+
 /* Side panel animation */
 .slide-panel {
   @apply fixed top-0 right-0 h-full bg-white shadow-2xl z-50
