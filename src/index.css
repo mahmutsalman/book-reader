@@ -1,0 +1,71 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom base styles */
+@layer base {
+  html {
+    @apply h-full;
+  }
+
+  body {
+    @apply h-full bg-gray-50 text-gray-900 antialiased;
+  }
+
+  #root {
+    @apply h-full;
+  }
+}
+
+/* Custom component styles */
+@layer components {
+  .btn-primary {
+    @apply px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700
+           transition-colors duration-200 font-medium;
+  }
+
+  .btn-secondary {
+    @apply px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300
+           transition-colors duration-200 font-medium;
+  }
+
+  .card {
+    @apply bg-white rounded-xl shadow-sm border border-gray-200 p-6;
+  }
+}
+
+/* Reader-specific styles */
+.reader-text {
+  font-family: Georgia, 'Times New Roman', serif;
+  line-height: 1.8;
+}
+
+.word-clickable {
+  @apply cursor-pointer hover:bg-yellow-100 rounded px-0.5 transition-colors duration-150;
+}
+
+.word-clickable:hover {
+  @apply underline decoration-yellow-400;
+}
+
+/* Side panel animation */
+.slide-panel {
+  @apply fixed top-0 right-0 h-full bg-white shadow-2xl z-50
+         transform transition-transform duration-300 ease-out;
+}
+
+.slide-panel-enter {
+  @apply translate-x-full;
+}
+
+.slide-panel-enter-active {
+  @apply translate-x-0;
+}
+
+.slide-panel-exit {
+  @apply translate-x-0;
+}
+
+.slide-panel-exit-active {
+  @apply translate-x-full;
+}

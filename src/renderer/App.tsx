@@ -1,0 +1,29 @@
+import React from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { SettingsProvider } from './context/SettingsContext';
+import { BookProvider } from './context/BookContext';
+import MainLayout from './components/layout/MainLayout';
+import LibraryPage from './pages/LibraryPage';
+import ReaderPage from './pages/ReaderPage';
+import VocabularyPage from './pages/VocabularyPage';
+import SettingsPage from './pages/SettingsPage';
+
+const App: React.FC = () => {
+  return (
+    <SettingsProvider>
+      <BookProvider>
+        <Routes>
+          <Route path="/" element={<MainLayout />}>
+            <Route index element={<Navigate to="/library" replace />} />
+            <Route path="library" element={<LibraryPage />} />
+            <Route path="reader/:bookId" element={<ReaderPage />} />
+            <Route path="vocabulary" element={<VocabularyPage />} />
+            <Route path="settings" element={<SettingsPage />} />
+          </Route>
+        </Routes>
+      </BookProvider>
+    </SettingsProvider>
+  );
+};
+
+export default App;
