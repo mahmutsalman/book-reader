@@ -172,6 +172,7 @@ export const DeferredWordProvider: React.FC<DeferredWordProviderProps> = ({ chil
         }
         if (ipaResult.status === 'fulfilled') {
           results.ipa = ipaResult.value.ipa;
+          results.syllables = ipaResult.value.syllables;
         }
         if (simplifyResult.status === 'fulfilled') {
           results.simplifiedSentence = simplifyResult.value.simplified;

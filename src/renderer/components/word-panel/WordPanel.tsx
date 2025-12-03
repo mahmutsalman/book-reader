@@ -22,6 +22,7 @@ interface WordPanelProps {
 interface WordData {
   definition?: string;
   ipa?: string;
+  syllables?: string;
   simplifiedSentence?: string;
   wordEquivalent?: string;
   occurrences?: { page: number; sentence: string }[];
@@ -100,6 +101,7 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
         loading: false,
         definition: preloadedData.definition,
         ipa: preloadedData.ipa,
+        syllables: preloadedData.syllables,
         simplifiedSentence: preloadedData.simplifiedSentence,
         wordEquivalent: preloadedData.wordEquivalent,
         occurrences: preloadedData.occurrences,
@@ -130,6 +132,7 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
           }
           if (ipaResult.status === 'fulfilled') {
             results.ipa = ipaResult.value.ipa;
+            results.syllables = ipaResult.value.syllables;
           }
           if (simplifyResult.status === 'fulfilled') {
             results.simplifiedSentence = simplifyResult.value.simplified;
@@ -248,11 +251,20 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
         <div className="bg-primary-600 text-white px-4 py-3 flex items-center justify-between">
           <div>
             <h2 className="text-xl font-semibold">{selectedWord.word}</h2>
-            {/* Only show IPA for single words, not phrases */}
-            {!selectedWord.isPhrase && wordData.ipa && (
-              <span className="text-primary-100 font-mono text-sm">
-                /{wordData.ipa}/
-              </span>
+            {/* Only show IPA and syllables for single words, not phrases */}
+            {!selectedWord.isPhrase && (wordData.ipa || wordData.syllables) && (
+              <div className="flex items-center gap-2 text-sm">
+                {wordData.ipa && (
+                  <span className="text-primary-100 font-mono">
+                    /{wordData.ipa}/
+                  </span>
+                )}
+                {wordData.syllables && (
+                  <span className="text-primary-200">
+                    {wordData.syllables}
+                  </span>
+                )}
+              </div>
             )}
             {selectedWord.isPhrase && (
               <span className="text-primary-200 text-xs">

@@ -9,6 +9,7 @@ export interface WordDefinitionResult {
 export interface IPAPronunciationResult {
   word: string;
   ipa: string;
+  syllables: string;
 }
 
 export interface SimplifiedSentenceResult {

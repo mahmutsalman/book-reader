@@ -40,11 +40,11 @@ export function registerAIHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.AI_GET_IPA, async (_, word: string) => {
     try {
       const service = await getService();
-      const ipa = await service.getIPAPronunciation(word);
-      return { word, ipa };
+      const { ipa, syllables } = await service.getIPAPronunciation(word);
+      return { word, ipa, syllables };
     } catch (error) {
       console.error('Failed to get IPA:', error);
-      return { word, ipa: '' };
+      return { word, ipa: '', syllables: '' };
     }
   });
 

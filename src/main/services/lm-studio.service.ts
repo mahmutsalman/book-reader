@@ -36,13 +36,34 @@ Definition:`;
     return this.chat(prompt);
   }
 
-  async getIPAPronunciation(word: string): Promise<string> {
-    const prompt = `Provide the IPA (International Phonetic Alphabet) pronunciation for the English word "${word}". Return ONLY the IPA notation enclosed in slashes, like /example/. Do not include any other text or explanation.`;
+  async getIPAPronunciation(word: string): Promise<{ ipa: string; syllables: string }> {
+    const prompt = `For the English word "${word}", provide:
+1. IPA pronunciation in slashes (e.g., /ˈeksæmpəl/)
+2. Syllable breakdown with dots (e.g., ex·am·ple)
+
+Format your response EXACTLY like this:
+IPA: /pronunciation/
+SYLLABLES: syl·la·bles
+
+Do not include any other text.`;
 
     const response = await this.chat(prompt);
+
     // Extract IPA from response (between slashes)
-    const match = response.match(/\/([^/]+)\//);
-    return match ? match[1] : response.replace(/[/]/g, '').trim();
+    const ipaMatch = response.match(/\/([^/]+)\//);
+    const ipa = ipaMatch ? ipaMatch[1] : '';
+
+    // Extract syllables from response (after SYLLABLES:)
+    const syllablesMatch = response.match(/SYLLABLES:\s*([^\n]+)/i);
+    let syllables = syllablesMatch ? syllablesMatch[1].trim() : '';
+
+    // If no syllables found, try to extract any word with dots or middle dots
+    if (!syllables) {
+      const dotMatch = response.match(/([a-zA-Z]+[·.][a-zA-Z·.]+)/);
+      syllables = dotMatch ? dotMatch[1].replace(/\./g, '·') : '';
+    }
+
+    return { ipa, syllables };
   }
 
   async simplifySentence(sentence: string): Promise<string> {

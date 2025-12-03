@@ -39,6 +39,7 @@ export type QueuedWordStatus = 'pending' | 'fetching' | 'ready' | 'error';
 export interface CachedWordData {
   definition?: string;
   ipa?: string;
+  syllables?: string;
   simplifiedSentence?: string;
   wordEquivalent?: string;
   occurrences?: { page: number; sentence: string }[];
