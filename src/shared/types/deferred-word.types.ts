@@ -2,6 +2,33 @@
 // Manages background word fetching and caching for seamless reading experience
 
 /**
+ * Generate a simple hash from a string
+ * Uses djb2 algorithm - fast and produces good distribution
+ */
+export function hashString(str: string): string {
+  let hash = 5381;
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) + hash) + str.charCodeAt(i);
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  // Convert to positive hex string, take first 8 chars for brevity
+  return Math.abs(hash).toString(16).padStart(8, '0').substring(0, 8);
+}
+
+/**
+ * Normalize a sentence for consistent hashing
+ * - Lowercase
+ * - Remove extra whitespace
+ * - Trim
+ */
+export function normalizeSentence(sentence: string): string {
+  return sentence
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
  * Status of a queued word's AI fetch
  */
 export type QueuedWordStatus = 'pending' | 'fetching' | 'ready' | 'error';
@@ -24,8 +51,7 @@ export interface CachedWordData {
  */
 export interface QueuedWordEntry {
   word: string;           // Clean lowercase word
-  sentence: string;       // Context sentence for AI
-  pageNumber: number;     // Original book page where word was clicked
+  sentence: string;       // Context sentence for AI and cache key
   bookId: number;
   status: QueuedWordStatus;
   data?: CachedWordData;
@@ -45,12 +71,15 @@ export interface DeferredWordState {
 }
 
 /**
- * Generate a unique key for a word in a specific book and page
- * Key format: `${bookId}-${cleanWord}-p${pageNumber}`
- * Each occurrence on different pages gets its own cache entry for context-specific translations
+ * Generate a unique key for a word in a specific book and sentence context
+ * Key format: `${bookId}-${cleanWord}-s${sentenceHash}`
+ * Each unique sentence context gets its own cache entry for context-specific translations
+ * This makes caching zoom-independent: same word + same sentence = same cache entry
  */
-export function generateWordKey(bookId: number, word: string, pageNumber: number): string {
-  return `${bookId}-${word.toLowerCase()}-p${pageNumber}`;
+export function generateWordKey(bookId: number, word: string, sentence: string): string {
+  const normalizedSentence = normalizeSentence(sentence);
+  const sentenceHash = hashString(normalizedSentence);
+  return `${bookId}-${word.toLowerCase()}-s${sentenceHash}`;
 }
 
 /**

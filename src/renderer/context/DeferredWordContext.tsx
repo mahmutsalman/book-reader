@@ -15,14 +15,14 @@ const MAX_CONCURRENT_FETCHES = 3;
 const CACHE_EXPIRATION_MS = 30 * 60 * 1000; // 30 minutes
 
 interface DeferredWordContextType {
-  // Queue a word for background fetching
-  queueWord: (word: string, sentence: string, pageNumber: number, bookId: number) => void;
-  // Check if a word has ready data (page-specific)
-  isWordReady: (word: string, bookId: number, pageNumber: number) => boolean;
-  // Get the status of a word (page-specific)
-  getWordStatus: (word: string, bookId: number, pageNumber: number) => QueuedWordStatus | null;
-  // Get cached data for a word (page-specific)
-  getWordData: (word: string, bookId: number, pageNumber: number) => CachedWordData | null;
+  // Queue a word for background fetching (sentence is now the key identifier)
+  queueWord: (word: string, sentence: string, bookId: number) => void;
+  // Check if a word has ready data (sentence-specific)
+  isWordReady: (word: string, sentence: string, bookId: number) => boolean;
+  // Get the status of a word (sentence-specific)
+  getWordStatus: (word: string, sentence: string, bookId: number) => QueuedWordStatus | null;
+  // Get cached data for a word (sentence-specific)
+  getWordData: (word: string, sentence: string, bookId: number) => CachedWordData | null;
   // Clear all words for a specific book
   clearBookWords: (bookId: number) => void;
   // Get count of words currently being fetched
@@ -265,17 +265,17 @@ export const DeferredWordProvider: React.FC<DeferredWordProviderProps> = ({ chil
     }
   };
 
-  // Queue a word or phrase for background fetching
-  const queueWord = useCallback((word: string, sentence: string, pageNumber: number, bookId: number) => {
+  // Queue a word or phrase for background fetching (sentence-based caching)
+  const queueWord = useCallback((word: string, sentence: string, bookId: number) => {
     // For phrases, preserve spaces; for single words, clean normally
     const cleanText = isPhrase(word)
       ? word.toLowerCase().trim()
       : word.replace(/[^\w'-]/g, '').toLowerCase();
 
-    // Use appropriate key generator (include pageNumber for page-specific caching)
+    // Use appropriate key generator (sentence hash for zoom-independent caching)
     const key = isPhrase(word)
       ? generatePhraseKey(bookId, cleanText)
-      : generateWordKey(bookId, cleanText, pageNumber);
+      : generateWordKey(bookId, cleanText, sentence);
 
     setQueuedWords(prev => {
       // Don't re-queue if already exists
@@ -300,7 +300,6 @@ export const DeferredWordProvider: React.FC<DeferredWordProviderProps> = ({ chil
       newMap.set(key, {
         word: cleanText,
         sentence,
-        pageNumber,
         bookId,
         status: 'pending',
         queuedAt: Date.now(),
@@ -309,38 +308,38 @@ export const DeferredWordProvider: React.FC<DeferredWordProviderProps> = ({ chil
     });
   }, []);
 
-  // Check if a word or phrase has ready data (page-specific for words)
-  const isWordReady = useCallback((word: string, bookId: number, pageNumber: number): boolean => {
+  // Check if a word or phrase has ready data (sentence-specific for words)
+  const isWordReady = useCallback((word: string, sentence: string, bookId: number): boolean => {
     const cleanText = isPhrase(word)
       ? word.toLowerCase().trim()
       : word.replace(/[^\w'-]/g, '').toLowerCase();
     const key = isPhrase(word)
       ? generatePhraseKey(bookId, cleanText)
-      : generateWordKey(bookId, cleanText, pageNumber);
+      : generateWordKey(bookId, cleanText, sentence);
     const entry = queuedWords.get(key);
     return entry?.status === 'ready';
   }, [queuedWords]);
 
-  // Get the status of a word or phrase (page-specific for words)
-  const getWordStatus = useCallback((word: string, bookId: number, pageNumber: number): QueuedWordStatus | null => {
+  // Get the status of a word or phrase (sentence-specific for words)
+  const getWordStatus = useCallback((word: string, sentence: string, bookId: number): QueuedWordStatus | null => {
     const cleanText = isPhrase(word)
       ? word.toLowerCase().trim()
       : word.replace(/[^\w'-]/g, '').toLowerCase();
     const key = isPhrase(word)
       ? generatePhraseKey(bookId, cleanText)
-      : generateWordKey(bookId, cleanText, pageNumber);
+      : generateWordKey(bookId, cleanText, sentence);
     const entry = queuedWords.get(key);
     return entry?.status ?? null;
   }, [queuedWords]);
 
-  // Get cached data for a word or phrase (page-specific for words)
-  const getWordData = useCallback((word: string, bookId: number, pageNumber: number): CachedWordData | null => {
+  // Get cached data for a word or phrase (sentence-specific for words)
+  const getWordData = useCallback((word: string, sentence: string, bookId: number): CachedWordData | null => {
     const cleanText = isPhrase(word)
       ? word.toLowerCase().trim()
       : word.replace(/[^\w'-]/g, '').toLowerCase();
     const key = isPhrase(word)
       ? generatePhraseKey(bookId, cleanText)
-      : generateWordKey(bookId, cleanText, pageNumber);
+      : generateWordKey(bookId, cleanText, sentence);
     const entry = queuedWords.get(key);
     return entry?.data ?? null;
   }, [queuedWords]);
