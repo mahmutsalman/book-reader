@@ -84,6 +84,8 @@
 
 .word-clickable {
   @apply cursor-pointer hover:bg-yellow-100 rounded px-0.5 transition-colors duration-150;
+  position: relative;
+  display: inline;
 }
 
 .word-clickable:hover {
@@ -97,6 +99,90 @@
 
 :is(html.dark .word-clickable:hover) {
   @apply decoration-primary-400;
+}
+
+/* Word ready indicator - red dot */
+.word-ready-dot {
+  position: absolute;
+  bottom: -3px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 5px;
+  height: 5px;
+  background-color: #ef4444; /* red-500 */
+  border-radius: 50%;
+  pointer-events: none;
+  animation: dot-appear 0.3s ease-out;
+}
+
+/* Word loading indicator - yellow dot */
+.word-loading-dot {
+  position: absolute;
+  bottom: -3px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 5px;
+  height: 5px;
+  background-color: #eab308; /* yellow-500 */
+  border-radius: 50%;
+  pointer-events: none;
+  animation: loading-dot-pulse 1s ease-in-out infinite;
+}
+
+@keyframes loading-dot-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: translateX(-50%) scale(0.8);
+  }
+}
+
+@keyframes dot-appear {
+  from {
+    transform: translateX(-50%) scale(0);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(-50%) scale(1);
+    opacity: 1;
+  }
+}
+
+/* Pulse animation when word is queued */
+@keyframes word-queued-pulse {
+  0% {
+    background-color: transparent;
+  }
+  50% {
+    background-color: rgba(59, 130, 246, 0.4); /* blue-500/40 */
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.word-queued-pulse {
+  animation: word-queued-pulse 0.4s ease-out;
+}
+
+/* Dark mode pulse animation */
+:is(html.dark .word-queued-pulse) {
+  animation: word-queued-pulse-dark 0.4s ease-out;
+}
+
+@keyframes word-queued-pulse-dark {
+  0% {
+    background-color: transparent;
+  }
+  50% {
+    background-color: rgba(96, 165, 250, 0.4); /* blue-400/40 */
+  }
+  100% {
+    background-color: transparent;
+  }
 }
 
 /* Side panel animation */

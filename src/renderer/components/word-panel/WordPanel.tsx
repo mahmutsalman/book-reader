@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSettings } from '../../context/SettingsContext';
+import type { CachedWordData } from '../../../shared/types/deferred-word.types';
 
 interface SelectedWord {
   word: string;
@@ -13,6 +14,7 @@ interface WordPanelProps {
   selectedWord: SelectedWord | null;
   bookId: number;
   onNavigateToPage?: (page: number) => void;
+  preloadedData?: CachedWordData | null;
 }
 
 interface WordData {
@@ -26,7 +28,7 @@ interface WordData {
   error?: string;
 }
 
-const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bookId, onNavigateToPage }) => {
+const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bookId, onNavigateToPage, preloadedData }) => {
   const { settings } = useSettings();
   const [wordData, setWordData] = useState<WordData>({ loading: false });
   const [saved, setSaved] = useState(false);
@@ -86,10 +88,26 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
     );
   }, []);
 
-  // Fetch word data when word changes
+  // Fetch word data when word changes (or use preloaded data)
   useEffect(() => {
     if (!selectedWord || !isOpen) return;
 
+    // If we have preloaded data, use it immediately
+    if (preloadedData) {
+      setWordData({
+        loading: false,
+        definition: preloadedData.definition,
+        ipa: preloadedData.ipa,
+        simplifiedSentence: preloadedData.simplifiedSentence,
+        wordEquivalent: preloadedData.wordEquivalent,
+        occurrences: preloadedData.occurrences,
+        tatoebaExamples: preloadedData.tatoebaExamples,
+      });
+      setSaved(false);
+      return;
+    }
+
+    // Otherwise fetch as before (fallback for direct panel opens)
     const fetchWordData = async () => {
       setWordData({ loading: true });
       setSaved(false);
@@ -191,7 +209,7 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
     };
 
     fetchWordData();
-  }, [selectedWord, isOpen, bookId, settings.tatoeba_enabled, settings.tatoeba_language]);
+  }, [selectedWord, isOpen, bookId, settings.tatoeba_enabled, settings.tatoeba_language, preloadedData]);
 
   // Save to vocabulary
   const handleSave = useCallback(async () => {

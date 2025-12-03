@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBooks } from '../../context/BookContext';
+import { useDeferredWords } from '../../context/DeferredWordContext';
 import { useTextReflow } from '../../hooks/useTextReflow';
 import { ZOOM_LEVELS, REFLOW_SETTINGS } from '../../../shared/constants';
 import type { Book, BookData, ReadingProgress } from '../../../shared/types';
+import type { CachedWordData } from '../../../shared/types/deferred-word.types';
 import WordPanel from '../word-panel/WordPanel';
 
 interface DynamicReaderViewProps {
@@ -26,12 +28,23 @@ interface Chapter {
 const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, initialProgress }) => {
   const navigate = useNavigate();
   const { updateProgress } = useBooks();
+  const { queueWord, isWordReady, getWordData, getWordStatus } = useDeferredWords();
   const containerRef = useRef<HTMLDivElement>(null);
 
   const [zoom, setZoom] = useState(initialProgress?.zoom_level || ZOOM_LEVELS.DEFAULT);
   const [selectedWord, setSelectedWord] = useState<SelectedWord | null>(null);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [showChapterMenu, setShowChapterMenu] = useState(false);
+  const [preloadedData, setPreloadedData] = useState<CachedWordData | null>(null);
+
+  // Track pulsing words for animation
+  const [pulsingWords, setPulsingWords] = useState<Set<string>>(new Set());
+
+  // Track loading word positions (specific indices that are currently fetching)
+  const [loadingPositions, setLoadingPositions] = useState<Set<number>>(new Set());
+
+  // Map to track which word each loading position corresponds to
+  const loadingWordsMapRef = useRef<Map<number, string>>(new Map());
 
   // Use the text reflow hook
   const {
@@ -155,17 +168,51 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
     return sentence || reflowState.currentText.substring(0, 200);
   }, [bookData.pages, reflowState.currentText]);
 
-  // Handle word click
-  const handleWordClick = useCallback((word: string) => {
+  // Handle word click with deferred lookup behavior
+  const handleWordClick = useCallback((word: string, wordIndex: number) => {
+    const cleanWord = word.replace(/[^\w'-]/g, '').toLowerCase();
     const fullSentence = extractFullSentence(word, reflowState.originalPage);
 
-    setSelectedWord({
-      word: word.replace(/[^\w'-]/g, ''), // Clean punctuation
-      sentence: fullSentence,
-      pageNumber: reflowState.originalPage,
-    });
-    setIsPanelOpen(true);
-  }, [extractFullSentence, reflowState.originalPage]);
+    // Check if word is ready (has cached data)
+    if (isWordReady(cleanWord, book.id)) {
+      // Word is ready - open panel with cached data
+      setSelectedWord({
+        word: cleanWord,
+        sentence: fullSentence,
+        pageNumber: reflowState.originalPage,
+      });
+      setPreloadedData(getWordData(cleanWord, book.id));
+      setIsPanelOpen(true);
+      // Remove from loading positions if it was there
+      setLoadingPositions(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(wordIndex);
+        return newSet;
+      });
+    } else {
+      // Queue word for background fetch
+      const status = getWordStatus(cleanWord, book.id);
+
+      // Only queue if not already pending or fetching
+      if (!status || status === 'error') {
+        queueWord(cleanWord, fullSentence, reflowState.originalPage, book.id);
+
+        // Add this position to loading positions (for yellow dot)
+        setLoadingPositions(prev => new Set(prev).add(wordIndex));
+        loadingWordsMapRef.current.set(wordIndex, cleanWord);
+
+        // Add pulse animation
+        setPulsingWords(prev => new Set(prev).add(cleanWord));
+        setTimeout(() => {
+          setPulsingWords(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(cleanWord);
+            return newSet;
+          });
+        }, 400);
+      }
+    }
+  }, [extractFullSentence, reflowState.originalPage, book.id, isWordReady, getWordData, getWordStatus, queueWord]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -185,7 +232,37 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [goToNextPage, goToPrevPage]);
 
-  // Render text with clickable words
+  // Clear loading positions when words become ready
+  useEffect(() => {
+    if (loadingPositions.size === 0) return;
+
+    const positionsToRemove: number[] = [];
+    loadingPositions.forEach(pos => {
+      const word = loadingWordsMapRef.current.get(pos);
+      if (word && isWordReady(word, book.id)) {
+        positionsToRemove.push(pos);
+      }
+    });
+
+    if (positionsToRemove.length > 0) {
+      setLoadingPositions(prev => {
+        const newSet = new Set(prev);
+        positionsToRemove.forEach(pos => {
+          newSet.delete(pos);
+          loadingWordsMapRef.current.delete(pos);
+        });
+        return newSet;
+      });
+    }
+  }, [loadingPositions, isWordReady, book.id]);
+
+  // Clear loading positions when page changes
+  useEffect(() => {
+    setLoadingPositions(new Set());
+    loadingWordsMapRef.current.clear();
+  }, [reflowState.currentPageIndex]);
+
+  // Render text with clickable words and ready indicators
   const renderText = (text: string) => {
     if (!text) return <span className="text-gray-400 dark:text-gray-500 italic">Empty page</span>;
 
@@ -200,14 +277,23 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
         }
         return <span key={index}>{part}</span>;
       }
-      // Word - make it clickable
+
+      // Check if this word has ready data
+      const cleanWord = part.replace(/[^\w'-]/g, '').toLowerCase();
+      const wordIsReady = isWordReady(cleanWord, book.id);
+      const isPulsing = pulsingWords.has(cleanWord);
+      const isLoading = loadingPositions.has(index);
+
+      // Word - make it clickable with optional ready/loading indicator
       return (
         <span
           key={index}
-          onClick={() => handleWordClick(part)}
-          className="word-clickable"
+          onClick={() => handleWordClick(part, index)}
+          className={`word-clickable ${wordIsReady ? 'word-ready' : ''} ${isPulsing ? 'word-queued-pulse' : ''}`}
         >
           {part}
+          {wordIsReady && <span className="word-ready-dot" />}
+          {isLoading && !wordIsReady && <span className="word-loading-dot" />}
         </span>
       );
     });
@@ -358,10 +444,14 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
       {/* Word Panel */}
       <WordPanel
         isOpen={isPanelOpen}
-        onClose={() => setIsPanelOpen(false)}
+        onClose={() => {
+          setIsPanelOpen(false);
+          setPreloadedData(null);
+        }}
         selectedWord={selectedWord}
         bookId={book.id}
         onNavigateToPage={goToOriginalPage}
+        preloadedData={preloadedData}
       />
     </div>
   );
