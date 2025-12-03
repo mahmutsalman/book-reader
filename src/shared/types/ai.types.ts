@@ -16,6 +16,12 @@ export interface SimplifiedSentenceResult {
   simplified: string;
 }
 
+export interface WordEquivalentResult {
+  word: string;
+  equivalent: string;
+  needsRegeneration: boolean;
+}
+
 // Tatoeba sentence
 export interface TatoebaSentence {
   id: number;

@@ -46,13 +46,129 @@ Definition:`;
   }
 
   async simplifySentence(sentence: string): Promise<string> {
-    const prompt = `Rewrite this sentence in simpler English for a language learner. Keep the same meaning but use easier words and shorter sentences:
+    const prompt = `Rewrite this sentence using simpler words for a language learner.
+
+Rules:
+- Replace difficult words with easier synonyms (e.g., "passion" → "strong love", "peculiar" → "strange", "departed" → "left")
+- Keep the SAME sentence structure as much as possible
+- Do NOT remove any concepts or meanings - every idea in the original must appear in the simplified version
+- Do NOT add new ideas or change the meaning
+- Keep names and places unchanged
 
 Original: "${sentence}"
 
 Simplified:`;
 
     return this.chat(prompt);
+  }
+
+  async resimplifyWithWord(
+    originalSentence: string,
+    originalWord: string,
+    equivalentWord: string
+  ): Promise<string> {
+    const prompt = `Rewrite this sentence using simpler words for a language learner.
+
+IMPORTANT: You MUST use the word "${equivalentWord}" as the replacement for "${originalWord}".
+
+Rules:
+- Replace difficult words with easier synonyms
+- Keep the SAME sentence structure as much as possible
+- Do NOT remove any concepts or meanings
+- The word "${equivalentWord}" MUST appear in your simplified version as the replacement for "${originalWord}"
+- Keep names and places unchanged
+
+Original: "${originalSentence}"
+
+Simplified:`;
+
+    return this.chat(prompt);
+  }
+
+  async getWordEquivalent(
+    originalWord: string,
+    originalSentence: string,
+    simplifiedSentence: string
+  ): Promise<{ equivalent: string; needsRegeneration: boolean }> {
+    const prompt = `Example:
+Original: "The man departed hastily"
+Simplified: "The man left quickly"
+Word: "departed"
+Answer: left
+
+Example:
+Original: "She had great fortune"
+Simplified: "She had good luck"
+Word: "fortune"
+Answer: luck
+
+Now your turn:
+Original: "${originalSentence}"
+Simplified: "${simplifiedSentence}"
+Word: "${originalWord}"
+Answer:`;
+
+    const response = await this.chat(prompt);
+
+    console.log('[DEBUG main] AI raw response for word equivalent:', JSON.stringify(response));
+
+    // Clean the response: remove quotes, trim, punctuation, and common prefixes
+    let cleaned = response.trim()
+      .replace(/^["'`]|["'`]$/g, '')  // Remove surrounding quotes/backticks
+      .replace(/\.+$/, '')             // Remove trailing periods
+      .replace(/^answer:\s*/i, '')     // Remove "Answer:" prefix (case-insensitive)
+      .replace(/^equivalent:\s*/i, '') // Remove "Equivalent:" prefix
+      .replace(/^the answer is:?\s*/i, '') // Remove "The answer is:" prefix
+      .replace(/^["'`]|["'`]$/g, '')  // Remove quotes again after stripping prefix
+      .trim();
+
+    console.log('[DEBUG main] After cleaning:', JSON.stringify(cleaned));
+
+    // Check for NONE variations
+    if (cleaned.toUpperCase().startsWith('NONE') || cleaned === '') {
+      console.log('[DEBUG main] Returning empty (was NONE or empty)');
+      return { equivalent: '', needsRegeneration: false };
+    }
+
+    // Validate that the equivalent actually exists in the simplified sentence
+    // This prevents AI hallucination where it returns words not in the sentence
+    const simplifiedLower = simplifiedSentence.toLowerCase();
+    const cleanedLower = cleaned.toLowerCase();
+
+    if (!simplifiedLower.includes(cleanedLower)) {
+      console.log('[DEBUG main] Equivalent not found in simplified sentence, needs regeneration');
+      console.log('[DEBUG main] Looking for:', cleanedLower);
+      console.log('[DEBUG main] In sentence:', simplifiedLower);
+      // Return the equivalent word anyway - caller will use it to regenerate
+      return { equivalent: cleaned, needsRegeneration: true };
+    }
+
+    console.log('[DEBUG main] Returning:', cleaned);
+    return { equivalent: cleaned, needsRegeneration: false };
+  }
+
+  /**
+   * Strip thinking model content (e.g., DeepSeek R1 wraps reasoning in <think> tags)
+   * This removes the thinking process and returns only the actual answer
+   */
+  private stripThinkingContent(response: string): string {
+    // Check if response contains <think> tags (thinking model like DeepSeek R1)
+    if (response.includes('<think>')) {
+      console.log('[DEBUG main] Detected thinking model response, stripping <think> tags');
+
+      // Remove everything between <think> and </think> tags (including the tags)
+      let cleaned = response.replace(/<think>[\s\S]*?<\/think>/gi, '');
+
+      // Also handle case where </think> might be missing (incomplete response)
+      cleaned = cleaned.replace(/<think>[\s\S]*/gi, '');
+
+      // Trim and return
+      cleaned = cleaned.trim();
+      console.log('[DEBUG main] After stripping thinking:', JSON.stringify(cleaned));
+      return cleaned;
+    }
+
+    return response;
   }
 
   private async chat(content: string): Promise<string> {
@@ -82,7 +198,10 @@ Simplified:`;
       }
 
       const data = await response.json() as ChatResponse;
-      return data.choices[0]?.message?.content?.trim() || '';
+      const rawContent = data.choices[0]?.message?.content?.trim() || '';
+
+      // Strip thinking content if present (for thinking models like DeepSeek R1)
+      return this.stripThinkingContent(rawContent);
     } finally {
       clearTimeout(timeoutId);
     }

@@ -54,6 +54,10 @@ const electronAPI: ElectronAPI = {
       ipcRenderer.invoke(IPC_CHANNELS.AI_GET_IPA, word),
     simplifySentence: (sentence) =>
       ipcRenderer.invoke(IPC_CHANNELS.AI_SIMPLIFY_SENTENCE, sentence),
+    getWordEquivalent: (word, originalSentence, simplifiedSentence) =>
+      ipcRenderer.invoke(IPC_CHANNELS.AI_GET_WORD_EQUIVALENT, word, originalSentence, simplifiedSentence),
+    resimplifyWithWord: (originalSentence, originalWord, equivalentWord) =>
+      ipcRenderer.invoke(IPC_CHANNELS.AI_RESIMPLIFY_WITH_WORD, originalSentence, originalWord, equivalentWord),
     testConnection: () =>
       ipcRenderer.invoke(IPC_CHANNELS.AI_TEST_CONNECTION),
   },

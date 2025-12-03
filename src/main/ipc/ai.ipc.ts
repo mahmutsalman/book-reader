@@ -59,6 +59,38 @@ export function registerAIHandlers(): void {
     }
   });
 
+  ipcMain.handle(
+    IPC_CHANNELS.AI_GET_WORD_EQUIVALENT,
+    async (_, word: string, originalSentence: string, simplifiedSentence: string) => {
+      try {
+        const service = await getService();
+        const result = await service.getWordEquivalent(word, originalSentence, simplifiedSentence);
+        return {
+          word,
+          equivalent: result.equivalent.trim(),
+          needsRegeneration: result.needsRegeneration,
+        };
+      } catch (error) {
+        console.error('Failed to get word equivalent:', error);
+        return { word, equivalent: '', needsRegeneration: false };
+      }
+    }
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.AI_RESIMPLIFY_WITH_WORD,
+    async (_, originalSentence: string, originalWord: string, equivalentWord: string) => {
+      try {
+        const service = await getService();
+        const simplified = await service.resimplifyWithWord(originalSentence, originalWord, equivalentWord);
+        return { original: originalSentence, simplified };
+      } catch (error) {
+        console.error('Failed to resimplify sentence:', error);
+        return { original: originalSentence, simplified: originalSentence };
+      }
+    }
+  );
+
   ipcMain.handle(IPC_CHANNELS.AI_TEST_CONNECTION, async () => {
     try {
       const service = await getService();

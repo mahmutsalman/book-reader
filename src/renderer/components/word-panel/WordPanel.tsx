@@ -19,6 +19,7 @@ interface WordData {
   definition?: string;
   ipa?: string;
   simplifiedSentence?: string;
+  wordEquivalent?: string;
   occurrences?: { page: number; sentence: string }[];
   tatoebaExamples?: { sentence: string; translation?: string }[];
   loading: boolean;
@@ -30,25 +31,57 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
   const [wordData, setWordData] = useState<WordData>({ loading: false });
   const [saved, setSaved] = useState(false);
 
-  // Helper function to highlight the selected word in a sentence
+  // Helper function to highlight the selected word/phrase in a sentence
   const highlightWord = useCallback((sentence: string, word: string) => {
-    if (!word) return <>{sentence}</>;
+    if (!word || !sentence) return <>{sentence}</>;
 
-    // Create a case-insensitive regex to find the word
-    const regex = new RegExp(`(\\b${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b)`, 'gi');
+    // Try to find the word in the sentence, with some flexibility for contractions
+    let searchWord = word;
+
+    // If exact match not found, try common variations
+    if (!sentence.toLowerCase().includes(word.toLowerCase())) {
+      // Try replacing doesn't with don't, etc.
+      const variations = [
+        word.replace(/doesn't/gi, "don't"),
+        word.replace(/don't/gi, "doesn't"),
+        word.replace(/isn't/gi, "aren't"),
+        word.replace(/aren't/gi, "isn't"),
+        word.replace(/won't/gi, "will not"),
+        word.replace(/can't/gi, "cannot"),
+      ];
+
+      for (const variation of variations) {
+        if (sentence.toLowerCase().includes(variation.toLowerCase())) {
+          searchWord = variation;
+          console.log('[DEBUG] Using variation:', variation, 'instead of:', word);
+          break;
+        }
+      }
+    }
+
+    // Escape special regex characters in the word/phrase
+    const escaped = searchWord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    // Create a case-insensitive regex to find the word/phrase
+    const isPhrase = searchWord.includes(' ');
+    const pattern = isPhrase ? `(${escaped})` : `(\\b${escaped}\\b)`;
+    const regex = new RegExp(pattern, 'gi');
+
     const parts = sentence.split(regex);
 
     return (
       <>
-        {parts.map((part, index) =>
-          regex.test(part) ? (
+        {parts.map((part, index) => {
+          // Check if this part matches (case-insensitive)
+          const isMatch = part.toLowerCase() === searchWord.toLowerCase();
+          return isMatch ? (
             <span key={index} className="text-red-600 font-semibold not-italic">
               {part}
             </span>
           ) : (
             <span key={index}>{part}</span>
-          )
-        )}
+          );
+        })}
       </>
     );
   }, []);
@@ -80,6 +113,47 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
           }
           if (simplifyResult.status === 'fulfilled') {
             results.simplifiedSentence = simplifyResult.value.simplified;
+
+            // Get word equivalent in simplified sentence (separate AI call for accuracy)
+            try {
+              console.log('[DEBUG] Calling getWordEquivalent with:', {
+                word: selectedWord.word,
+                original: selectedWord.sentence,
+                simplified: simplifyResult.value.simplified
+              });
+
+              const equivalentResult = await window.electronAPI.ai.getWordEquivalent(
+                selectedWord.word,
+                selectedWord.sentence,
+                simplifyResult.value.simplified
+              );
+
+              console.log('[DEBUG] getWordEquivalent response:', equivalentResult);
+
+              if (equivalentResult.equivalent) {
+                // Check if we need to regenerate the simplified sentence
+                if (equivalentResult.needsRegeneration) {
+                  console.log('[DEBUG] Equivalent not found in sentence, regenerating with:', equivalentResult.equivalent);
+
+                  // Regenerate simplified sentence with the equivalent word included
+                  const resimplifyResult = await window.electronAPI.ai.resimplifyWithWord(
+                    selectedWord.sentence,
+                    selectedWord.word,
+                    equivalentResult.equivalent
+                  );
+
+                  console.log('[DEBUG] Resimplified sentence:', resimplifyResult.simplified);
+                  results.simplifiedSentence = resimplifyResult.simplified;
+                }
+
+                results.wordEquivalent = equivalentResult.equivalent;
+                console.log('[DEBUG] Set wordEquivalent to:', equivalentResult.equivalent);
+              } else {
+                console.log('[DEBUG] No equivalent found (empty response)');
+              }
+            } catch (err) {
+              console.error('[DEBUG] getWordEquivalent error:', err);
+            }
           }
 
           // Search for other occurrences
@@ -202,7 +276,9 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
                 <section>
                   <h3 className="font-semibold text-gray-700 mb-2">✨ Simplified</h3>
                   <p className="text-gray-600 bg-green-50 p-3 rounded-lg">
-                    {wordData.simplifiedSentence}
+                    {wordData.wordEquivalent
+                      ? highlightWord(wordData.simplifiedSentence, wordData.wordEquivalent)
+                      : wordData.simplifiedSentence}
                   </p>
                 </section>
               )}
