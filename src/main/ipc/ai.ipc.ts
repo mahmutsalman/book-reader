@@ -7,8 +7,13 @@ let lmService: LMStudioService | null = null;
 
 async function getService(): Promise<LMStudioService> {
   const url = await settingsRepository.get('lm_studio_url');
+  const model = await settingsRepository.get('lm_studio_model');
+
   if (!lmService || lmService.baseUrl !== url) {
-    lmService = new LMStudioService(url);
+    lmService = new LMStudioService(url, model);
+  } else if (lmService.model !== model) {
+    // Update model if it changed
+    lmService.setModel(model);
   }
   return lmService;
 }

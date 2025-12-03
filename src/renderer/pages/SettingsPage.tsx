@@ -5,6 +5,7 @@ const SettingsPage: React.FC = () => {
   const { settings, updateSetting, loading } = useSettings();
   const [testingConnection, setTestingConnection] = useState(false);
   const [connectionResult, setConnectionResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
 
   const handleTestConnection = async () => {
     if (!window.electronAPI) return;
@@ -14,10 +15,17 @@ const SettingsPage: React.FC = () => {
 
     try {
       const result = await window.electronAPI.ai.testConnection();
+      if (result.success && result.models && result.models.length > 0) {
+        setAvailableModels(result.models);
+        // Auto-select first model if current model is 'default' or not in list
+        if (settings.lm_studio_model === 'default' || !result.models.includes(settings.lm_studio_model)) {
+          updateSetting('lm_studio_model', result.models[0]);
+        }
+      }
       setConnectionResult({
         success: result.success,
         message: result.success
-          ? `Connected! Models: ${result.models?.join(', ') || 'None'}`
+          ? `Connected! Found ${result.models?.length || 0} model(s)`
           : `Failed: ${result.error || 'Unknown error'}`,
       });
     } catch (error) {
@@ -83,6 +91,37 @@ const SettingsPage: React.FC = () => {
               </span>
             )}
           </div>
+
+          {/* Model Selection */}
+          {availableModels.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                AI Model
+              </label>
+              <select
+                value={settings.lm_studio_model}
+                onChange={(e) => updateSetting('lm_studio_model', e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              >
+                {availableModels.map((model) => (
+                  <option key={model} value={model}>
+                    {model}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                Select the model to use for word definitions and sentence simplification
+              </p>
+            </div>
+          )}
+
+          {settings.lm_studio_model !== 'default' && availableModels.length === 0 && (
+            <div className="text-sm text-gray-500">
+              Current model: <span className="font-medium">{settings.lm_studio_model}</span>
+              <br />
+              <span className="text-xs">Test connection to see available models</span>
+            </div>
+          )}
         </div>
       </div>
 

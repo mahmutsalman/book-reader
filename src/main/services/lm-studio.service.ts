@@ -13,11 +13,17 @@ interface ChatResponse {
 
 export class LMStudioService {
   public readonly baseUrl: string;
+  public model: string;
   private timeout: number;
 
-  constructor(baseUrl = 'http://localhost:1234', timeout = 30000) {
+  constructor(baseUrl = 'http://localhost:1234', model = 'default', timeout = 30000) {
     this.baseUrl = baseUrl;
+    this.model = model;
     this.timeout = timeout;
+  }
+
+  setModel(model: string): void {
+    this.model = model;
   }
 
   async getWordDefinition(word: string, context: string): Promise<string> {
@@ -60,6 +66,7 @@ Simplified:`;
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          model: this.model,
           messages: [
             { role: 'user', content } as ChatMessage,
           ],
