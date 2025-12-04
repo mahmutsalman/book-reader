@@ -2,6 +2,8 @@
 export const IPC_CHANNELS = {
   // Book operations
   BOOK_IMPORT: 'book:import',
+  BOOK_IMPORT_PDF: 'book:import-pdf',
+  BOOK_PDF_STATUS: 'book:pdf-status',
   BOOK_GET_ALL: 'book:get-all',
   BOOK_GET_BY_ID: 'book:get-by-id',
   BOOK_DELETE: 'book:delete',

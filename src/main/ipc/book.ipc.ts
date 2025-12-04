@@ -1,11 +1,21 @@
 import { ipcMain } from 'electron';
 import { IPC_CHANNELS } from '../../shared/constants';
 import { bookRepository } from '../../database/repositories';
+import { pdfImportService } from '../services/pdf-import.service';
 import type { BookLanguage } from '../../shared/types';
 
 export function registerBookHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.BOOK_IMPORT, async (_, filePath: string, language: BookLanguage = 'en') => {
     return bookRepository.import(filePath, language);
+  });
+
+  // PDF Import handlers
+  ipcMain.handle(IPC_CHANNELS.BOOK_IMPORT_PDF, async (_, pdfPath: string, language: BookLanguage = 'en', useOcr = true) => {
+    return pdfImportService.importPdf(pdfPath, language, useOcr);
+  });
+
+  ipcMain.handle(IPC_CHANNELS.BOOK_PDF_STATUS, async () => {
+    return pdfImportService.checkStatus();
   });
 
   ipcMain.handle(IPC_CHANNELS.BOOK_GET_ALL, async () => {

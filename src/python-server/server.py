@@ -1,8 +1,9 @@
 """
 FastAPI Pronunciation Server for BookReader.
 
-Provides TTS (Text-to-Speech) and IPA transcription services.
-Uses Edge TTS for neural voice synthesis and gruut for IPA generation.
+Provides TTS (Text-to-Speech), IPA transcription, and PDF extraction services.
+Uses Edge TTS for neural voice synthesis, gruut for IPA generation,
+and PyMuPDF/pytesseract for PDF text extraction.
 
 Default port: 8766
 """
@@ -10,7 +11,9 @@ import os
 import asyncio
 import subprocess
 import sys
+import shutil
 from typing import Optional, List, Dict
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,6 +21,23 @@ from pydantic import BaseModel
 
 from generators.tts import generate_audio
 from generators.ipa import generate_ipa
+
+# PDF processing imports (lazy loaded to handle missing dependencies)
+try:
+    import fitz  # PyMuPDF
+    PDF_AVAILABLE = True
+except ImportError:
+    PDF_AVAILABLE = False
+    fitz = None
+
+try:
+    import pytesseract
+    from PIL import Image
+    OCR_AVAILABLE = True
+except ImportError:
+    OCR_AVAILABLE = False
+    pytesseract = None
+    Image = None
 
 # Server configuration
 VERSION = "1.0.0"
@@ -91,6 +111,146 @@ class InstallLanguageResponse(BaseModel):
     success: bool
     message: str
     error: Optional[str] = None
+
+
+# PDF Extraction Models
+class PdfPageResult(BaseModel):
+    page_num: int
+    text: str
+    extraction_method: str  # 'text' or 'ocr'
+    confidence: Optional[float] = None
+
+
+class PdfMetadata(BaseModel):
+    title: str
+    author: Optional[str] = None
+    page_count: int
+
+
+class PdfExtractRequest(BaseModel):
+    pdf_path: str
+    language: str = "en"
+    use_ocr: bool = True  # If true, use OCR for pages without text
+
+
+class PdfExtractResponse(BaseModel):
+    success: bool
+    pdf_type: str = ""  # 'text', 'scanned', 'mixed'
+    pages: List[PdfPageResult] = []
+    metadata: Optional[PdfMetadata] = None
+    error: Optional[str] = None
+
+
+class TesseractStatusResponse(BaseModel):
+    available: bool
+    pdf_available: bool
+    ocr_available: bool
+    tesseract_path: Optional[str] = None
+    error: Optional[str] = None
+
+
+# Tesseract language mapping
+TESSERACT_LANGS = {
+    "en": "eng",
+    "de": "deu",
+    "ru": "rus",
+    "fr": "fra",
+    "es": "spa",
+    "it": "ita",
+    "pt": "por",
+    "ja": "jpn",
+    "zh": "chi_sim",
+    "ko": "kor",
+}
+
+
+def check_tesseract_installed() -> tuple[bool, Optional[str]]:
+    """Check if Tesseract OCR is installed and return its path."""
+    tesseract_path = shutil.which("tesseract")
+    if tesseract_path:
+        return True, tesseract_path
+    # Check common installation paths
+    common_paths = [
+        "/usr/local/bin/tesseract",
+        "/opt/homebrew/bin/tesseract",
+        "C:\\Program Files\\Tesseract-OCR\\tesseract.exe",
+        "C:\\Program Files (x86)\\Tesseract-OCR\\tesseract.exe",
+    ]
+    for path in common_paths:
+        if os.path.exists(path):
+            return True, path
+    return False, None
+
+
+def detect_pdf_type(doc) -> str:
+    """Detect if PDF is text-based, scanned, or mixed."""
+    text_pages = 0
+    image_pages = 0
+
+    for page in doc:
+        text = page.get_text().strip()
+        if len(text) > 50:  # Has meaningful text
+            text_pages += 1
+        else:
+            image_pages += 1
+
+    if image_pages == 0:
+        return "text"
+    elif text_pages == 0:
+        return "scanned"
+    else:
+        return "mixed"
+
+
+def extract_text_from_page(page, use_ocr: bool, language: str) -> tuple[str, str, Optional[float]]:
+    """
+    Extract text from a PDF page.
+    Returns: (text, extraction_method, confidence)
+    """
+    # Try text extraction first
+    text = page.get_text().strip()
+
+    if len(text) > 50:
+        return text, "text", None
+
+    # If no text and OCR is enabled, try OCR
+    if use_ocr and OCR_AVAILABLE:
+        try:
+            # Render page to image
+            mat = fitz.Matrix(2.0, 2.0)  # 2x zoom for better OCR
+            pix = page.get_pixmap(matrix=mat)
+            img_data = pix.tobytes("png")
+
+            # Convert to PIL Image
+            import io
+            img = Image.open(io.BytesIO(img_data))
+
+            # Get Tesseract language code
+            tess_lang = TESSERACT_LANGS.get(language, "eng")
+
+            # Run OCR with confidence data
+            ocr_data = pytesseract.image_to_data(img, lang=tess_lang, output_type=pytesseract.Output.DICT)
+
+            # Extract text and calculate average confidence
+            words = []
+            confidences = []
+            for i, word in enumerate(ocr_data["text"]):
+                if word.strip():
+                    words.append(word)
+                    conf = ocr_data["conf"][i]
+                    if conf > 0:  # -1 means no confidence
+                        confidences.append(conf)
+
+            ocr_text = " ".join(words)
+            avg_confidence = sum(confidences) / len(confidences) if confidences else 0
+
+            if ocr_text.strip():
+                return ocr_text, "ocr", avg_confidence / 100.0  # Normalize to 0-1
+        except Exception as e:
+            print(f"[PDF] OCR failed for page: {e}")
+
+    # Return whatever text we have (might be empty)
+    return text if text else "", "text", None
 
 
 # Track ongoing installations
@@ -344,6 +504,112 @@ async def install_ipa_language(request: InstallLanguageRequest):
             return InstallLanguageResponse(success=False, message="Installation failed", error=message)
     finally:
         _installing_languages[lang] = False
+
+
+# PDF Extraction Endpoints
+@app.get("/api/pdf/status", response_model=TesseractStatusResponse)
+async def get_pdf_status():
+    """
+    Check PDF extraction and OCR availability.
+
+    Returns:
+        TesseractStatusResponse with availability info
+    """
+    tesseract_installed, tesseract_path = check_tesseract_installed()
+
+    return TesseractStatusResponse(
+        available=PDF_AVAILABLE or OCR_AVAILABLE,
+        pdf_available=PDF_AVAILABLE,
+        ocr_available=OCR_AVAILABLE and tesseract_installed,
+        tesseract_path=tesseract_path,
+        error=None if PDF_AVAILABLE else "PyMuPDF not installed"
+    )
+
+
+@app.post("/api/pdf/extract", response_model=PdfExtractResponse)
+async def extract_pdf(request: PdfExtractRequest):
+    """
+    Extract text from a PDF file.
+
+    Args:
+        request: PdfExtractRequest with pdf_path, language, and use_ocr flag
+
+    Returns:
+        PdfExtractResponse with extracted pages and metadata
+    """
+    if not PDF_AVAILABLE:
+        return PdfExtractResponse(
+            success=False,
+            error="PDF processing not available. PyMuPDF is not installed."
+        )
+
+    pdf_path = request.pdf_path
+
+    # Validate file exists
+    if not os.path.exists(pdf_path):
+        return PdfExtractResponse(
+            success=False,
+            error=f"PDF file not found: {pdf_path}"
+        )
+
+    # Check if OCR is requested but not available
+    if request.use_ocr and not OCR_AVAILABLE:
+        print("[PDF] OCR requested but pytesseract not available, falling back to text extraction only")
+
+    try:
+        print(f"[PDF] Opening: {pdf_path}")
+        doc = fitz.open(pdf_path)
+
+        # Get metadata
+        title = doc.metadata.get("title", "") or Path(pdf_path).stem
+        author = doc.metadata.get("author", "")
+        page_count = len(doc)
+
+        metadata = PdfMetadata(
+            title=title,
+            author=author if author else None,
+            page_count=page_count
+        )
+
+        # Detect PDF type
+        pdf_type = detect_pdf_type(doc)
+        print(f"[PDF] Detected type: {pdf_type}, pages: {page_count}")
+
+        # Extract text from each page
+        pages: List[PdfPageResult] = []
+        for page_num, page in enumerate(doc, start=1):
+            text, method, confidence = extract_text_from_page(
+                page,
+                use_ocr=request.use_ocr,
+                language=request.language
+            )
+
+            pages.append(PdfPageResult(
+                page_num=page_num,
+                text=text,
+                extraction_method=method,
+                confidence=confidence
+            ))
+
+            if page_num % 10 == 0:
+                print(f"[PDF] Processed page {page_num}/{page_count}")
+
+        doc.close()
+        print(f"[PDF] Extraction complete: {len(pages)} pages")
+
+        return PdfExtractResponse(
+            success=True,
+            pdf_type=pdf_type,
+            pages=pages,
+            metadata=metadata
+        )
+
+    except Exception as e:
+        print(f"[PDF] Extraction failed: {e}")
+        return PdfExtractResponse(
+            success=False,
+            error=f"Failed to extract PDF: {str(e)}"
+        )
 
 
 # Main entry point

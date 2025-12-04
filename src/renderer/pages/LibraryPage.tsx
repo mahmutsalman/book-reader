@@ -8,7 +8,9 @@ const LibraryPage: React.FC = () => {
   const { books, loading, error, loadBooks, importBook, deleteBook } = useBooks();
   const navigate = useNavigate();
   const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState<string>('');
   const [pendingFilePath, setPendingFilePath] = useState<string | null>(null);
+  const [isPdfFile, setIsPdfFile] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState<BookLanguage>('en');
 
   useEffect(() => {
@@ -23,11 +25,17 @@ const LibraryPage: React.FC = () => {
 
     try {
       const filePath = await window.electronAPI.dialog.openFile({
-        filters: [{ name: 'JSON Books', extensions: ['json'] }],
+        filters: [
+          { name: 'Books', extensions: ['json', 'pdf'] },
+          { name: 'JSON Books', extensions: ['json'] },
+          { name: 'PDF Documents', extensions: ['pdf'] },
+        ],
       });
 
       if (filePath) {
-        // Show language selection dialog
+        // Detect if PDF file
+        const isPdf = filePath.toLowerCase().endsWith('.pdf');
+        setIsPdfFile(isPdf);
         setPendingFilePath(filePath);
         setSelectedLanguage('en');
       }
@@ -41,18 +49,34 @@ const LibraryPage: React.FC = () => {
 
     try {
       setImporting(true);
-      await importBook(pendingFilePath, selectedLanguage);
+      setImportProgress('');
+
+      if (isPdfFile) {
+        // PDF import
+        setImportProgress('Extracting text from PDF...');
+        await window.electronAPI.book.importPdf(pendingFilePath, selectedLanguage, true);
+        // Reload books to show the new import
+        await loadBooks();
+        setImportProgress('');
+      } else {
+        // JSON import
+        await importBook(pendingFilePath, selectedLanguage);
+      }
       setPendingFilePath(null);
+      setIsPdfFile(false);
     } catch (err) {
       console.error('Import failed:', err);
-      alert('Failed to import book');
+      const message = err instanceof Error ? err.message : 'Failed to import book';
+      alert(message);
     } finally {
       setImporting(false);
+      setImportProgress('');
     }
   };
 
   const handleCancelImport = () => {
     setPendingFilePath(null);
+    setIsPdfFile(false);
   };
 
   const handleOpenBook = (book: Book) => {
@@ -110,7 +134,7 @@ const LibraryPage: React.FC = () => {
             No books yet
           </h3>
           <p className="text-gray-500 dark:text-gray-400 mb-4">
-            Import a JSON book to start reading
+            Import a JSON or PDF book to start reading
           </p>
           <button onClick={handleImportBook} className="btn-primary">
             Import Your First Book
@@ -149,19 +173,26 @@ const LibraryPage: React.FC = () => {
         <>
           <div
             className="fixed inset-0 bg-black/50 z-40"
-            onClick={handleCancelImport}
+            onClick={!importing ? handleCancelImport : undefined}
           />
           <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-gray-800 rounded-lg shadow-xl z-50 p-6 w-96">
             <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">
-              Import Book
+              Import {isPdfFile ? 'PDF' : 'Book'}
             </h3>
+            {isPdfFile && (
+              <div className="bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 p-3 rounded-lg mb-4 text-sm">
+                <span className="font-medium">PDF Import:</span> Text will be extracted from the PDF.
+                {' '}OCR will be used for scanned pages if available.
+              </div>
+            )}
             <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
               Select the language of the book:
             </p>
             <select
               value={selectedLanguage}
               onChange={(e) => setSelectedLanguage(e.target.value as BookLanguage)}
-              className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-white mb-4"
+              disabled={importing}
+              className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-white mb-4 disabled:opacity-50"
             >
               {BOOK_LANGUAGES.map((lang) => (
                 <option key={lang.code} value={lang.code}>
@@ -177,10 +208,19 @@ const LibraryPage: React.FC = () => {
                 <>Standard English word lookup will be used.</>
               )}
             </p>
+            {importing && importProgress && (
+              <div className="bg-gray-100 dark:bg-gray-700 p-3 rounded-lg mb-4">
+                <div className="flex items-center gap-2">
+                  <span className="animate-spin text-lg">⏳</span>
+                  <span className="text-sm text-gray-600 dark:text-gray-300">{importProgress}</span>
+                </div>
+              </div>
+            )}
             <div className="flex justify-end gap-3">
               <button
                 onClick={handleCancelImport}
-                className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+                disabled={importing}
+                className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg disabled:opacity-50"
               >
                 Cancel
               </button>

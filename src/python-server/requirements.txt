@@ -8,3 +8,8 @@ edge-tts>=6.1.0
 
 # IPA Transcription
 gruut>=2.3.0
+
+# PDF Processing
+PyMuPDF>=1.23.0
+pytesseract>=0.3.10
+Pillow>=10.0.0

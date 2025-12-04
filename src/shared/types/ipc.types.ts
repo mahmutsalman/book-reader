@@ -5,10 +5,21 @@ import type { WordDefinitionResult, IPAPronunciationResult, BatchIPAResult, Simp
 import type { TTSResponse, IPAResponse, PronunciationServerStatus, IPALanguagesResponse, InstallLanguageResponse } from './pronunciation.types';
 import type { PreStudyNotesRequest, PreStudyNotesResult, PreStudyProgress } from './pre-study-notes.types';
 
+// PDF Status response type
+export interface PdfStatusResponse {
+  available: boolean;
+  pdf_available: boolean;
+  ocr_available: boolean;
+  tesseract_path: string | null;
+  error: string | null;
+}
+
 // IPC API exposed to renderer
 export interface ElectronAPI {
   book: {
     import: (filePath: string, language?: BookLanguage) => Promise<Book>;
+    importPdf: (pdfPath: string, language?: BookLanguage, useOcr?: boolean) => Promise<Book>;
+    getPdfStatus: () => Promise<PdfStatusResponse>;
     getAll: () => Promise<Book[]>;
     getById: (id: number) => Promise<Book | null>;
     delete: (id: number) => Promise<void>;

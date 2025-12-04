@@ -9,6 +9,10 @@ const electronAPI: ElectronAPI = {
   book: {
     import: (filePath: string, language?: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.BOOK_IMPORT, filePath, language || 'en'),
+    importPdf: (pdfPath: string, language?: string, useOcr?: boolean) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BOOK_IMPORT_PDF, pdfPath, language || 'en', useOcr ?? true),
+    getPdfStatus: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.BOOK_PDF_STATUS),
     getAll: () =>
       ipcRenderer.invoke(IPC_CHANNELS.BOOK_GET_ALL),
     getById: (id: number) =>
