@@ -50,26 +50,32 @@ class PythonManager {
       // Kill any existing process on the port
       await this.killExistingProcess();
 
-      // Determine the Python script path
-      const scriptPath = this.getScriptPath();
-      console.log(`[PythonManager] Starting server from: ${scriptPath}`);
-
       // Check if we're in development or production
       const isDev = !app.isPackaged;
 
       if (isDev) {
-        // Development: Run Python script directly
-        this.process = spawn('python3', [scriptPath], {
-          cwd: path.dirname(scriptPath),
+        // Development: Use venv Python to run the script
+        const scriptPath = this.getScriptPath();
+        const serverDir = path.dirname(scriptPath);
+        const pythonPath = this.getVenvPythonPath(serverDir);
+
+        console.log(`[PythonManager] Development mode - using venv Python`);
+        console.log(`[PythonManager] Python: ${pythonPath}`);
+        console.log(`[PythonManager] Script: ${scriptPath}`);
+
+        this.process = spawn(pythonPath, [scriptPath], {
+          cwd: serverDir,
           env: { ...process.env, PORT: String(this.port) },
           stdio: ['ignore', 'pipe', 'pipe'],
         });
       } else {
-        // Production: Run bundled binary
-        // TODO: Implement PyInstaller binary execution for production
-        // For now, fall back to Python script
-        this.process = spawn('python3', [scriptPath], {
-          cwd: path.dirname(scriptPath),
+        // Production: Run bundled PyInstaller binary
+        const binaryPath = this.getBinaryPath();
+        console.log(`[PythonManager] Production mode - using bundled binary`);
+        console.log(`[PythonManager] Binary: ${binaryPath}`);
+
+        this.process = spawn(binaryPath, [], {
+          cwd: path.dirname(binaryPath),
           env: { ...process.env, PORT: String(this.port) },
           stdio: ['ignore', 'pipe', 'pipe'],
         });
@@ -221,16 +227,32 @@ class PythonManager {
   }
 
   /**
-   * Get the path to the Python server script.
+   * Get the path to the Python server script (development only).
    */
   private getScriptPath(): string {
-    if (app.isPackaged) {
-      // Production: Look in resources
-      return path.join(process.resourcesPath, 'python-server', 'server.py');
-    } else {
-      // Development: Look in src directory
-      return path.join(app.getAppPath(), 'src', 'python-server', 'server.py');
+    // Development: Look in src directory
+    return path.join(app.getAppPath(), 'src', 'python-server', 'server.py');
+  }
+
+  /**
+   * Get the path to the venv Python interpreter (development only).
+   */
+  private getVenvPythonPath(serverDir: string): string {
+    if (process.platform === 'win32') {
+      return path.join(serverDir, 'venv', 'Scripts', 'python.exe');
     }
+    return path.join(serverDir, 'venv', 'bin', 'python');
+  }
+
+  /**
+   * Get the path to the bundled binary (production only).
+   * extraResource places the binary at the root of resourcesPath.
+   */
+  private getBinaryPath(): string {
+    const binaryName = process.platform === 'win32'
+      ? 'pronunciation-server.exe'
+      : 'pronunciation-server';
+    return path.join(process.resourcesPath, binaryName);
   }
 
   /**

@@ -9,6 +9,8 @@ const SettingsPage: React.FC = () => {
   const [testingConnection, setTestingConnection] = useState(false);
   const [connectionResult, setConnectionResult] = useState<{ success: boolean; message: string } | null>(null);
   const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [pythonStatus, setPythonStatus] = useState<{ running: boolean; ready: boolean; url: string } | null>(null);
+  const [testingPython, setTestingPython] = useState(false);
 
   const handleTestConnection = async () => {
     if (!window.electronAPI) return;
@@ -38,6 +40,20 @@ const SettingsPage: React.FC = () => {
       });
     } finally {
       setTestingConnection(false);
+    }
+  };
+
+  const handleTestPythonServer = async () => {
+    if (!window.electronAPI) return;
+
+    setTestingPython(true);
+    try {
+      const status = await window.electronAPI.pronunciation.getServerStatus();
+      setPythonStatus(status);
+    } catch {
+      setPythonStatus({ running: false, ready: false, url: 'N/A' });
+    } finally {
+      setTestingPython(false);
     }
   };
 
@@ -163,6 +179,47 @@ const SettingsPage: React.FC = () => {
               Current model: <span className="font-medium">{settings.lm_studio_model}</span>
               <br />
               <span className="text-xs">Test connection to see available models</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Python Server Settings */}
+      <div className="card mb-6">
+        <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">
+          🔊 Pronunciation Server
+        </h3>
+
+        <div className="space-y-4">
+          <div>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
+              Python server for text-to-speech and IPA transcription
+            </p>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <button
+              onClick={handleTestPythonServer}
+              disabled={testingPython}
+              className="btn-secondary"
+            >
+              {testingPython ? 'Checking...' : 'Check Status'}
+            </button>
+            {pythonStatus && (
+              <span
+                className={`text-sm ${
+                  pythonStatus.ready ? 'text-green-600' : 'text-red-600'
+                }`}
+              >
+                {pythonStatus.ready ? '✓ Server Ready' : '✗ Server Not Ready'}
+              </span>
+            )}
+          </div>
+
+          {pythonStatus && (
+            <div className="text-sm text-gray-500 dark:text-gray-400">
+              <div>Status: {pythonStatus.running ? 'Running' : 'Stopped'}</div>
+              <div>URL: {pythonStatus.url}</div>
             </div>
           )}
         </div>

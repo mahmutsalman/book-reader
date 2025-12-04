@@ -12,6 +12,13 @@ const config: ForgeConfig = {
     asar: {
       unpack: '**/node_modules/better-sqlite3/**',
     },
+    // Include bundled Python server binary in resources
+    extraResource: [
+      // macOS/Linux binary
+      ...(process.platform !== 'win32' ? ['src/python-server/dist/pronunciation-server'] : []),
+      // Windows binary
+      ...(process.platform === 'win32' ? ['src/python-server/dist/pronunciation-server.exe'] : []),
+    ].filter(Boolean),
   },
   rebuildConfig: {
     force: true,

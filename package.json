@@ -10,7 +10,10 @@
     "make": "electron-forge make",
     "publish": "electron-forge publish",
     "lint": "eslint --ext .ts,.tsx .",
-    "postinstall": "electron-rebuild"
+    "postinstall": "electron-rebuild",
+    "python:setup": "cd src/python-server && ./build.sh --dev",
+    "python:build": "cd src/python-server && ./build.sh",
+    "python:build:win": "cd src/python-server && build.bat"
   },
   "keywords": [
     "book-reader",
