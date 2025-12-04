@@ -170,9 +170,14 @@ SIMPLIFIED_ENGLISH: [English translation of simplified]`;
     const origEngMatch = response.match(/ORIGINAL_ENGLISH:\s*(.+?)(?=SIMPLIFIED_ENGLISH:|$)/is);
     const simpEngMatch = response.match(/SIMPLIFIED_ENGLISH:\s*(.+?)$/is);
 
-    const simplified = simpMatch ? simpMatch[1].trim() : response;
+    let simplified = simpMatch ? simpMatch[1].trim() : response;
     const sentenceTranslation = origEngMatch ? origEngMatch[1].trim() : undefined;
     const simplifiedTranslation = simpEngMatch ? simpEngMatch[1].trim() : undefined;
+
+    // If parsing failed (no match), try to extract the non-English sentence
+    if (!simpMatch) {
+      simplified = this.extractNonEnglishSentence(response, language);
+    }
 
     return { simplified, sentenceTranslation, simplifiedTranslation };
   }
@@ -186,26 +191,88 @@ SIMPLIFIED_ENGLISH: [English translation of simplified]`;
     const languageName = this.getLanguageName(language);
 
     // For non-English, explicitly specify to keep in source language
-    const languageInstruction = language === 'en'
-      ? ''
-      : `\n- Keep the output in ${languageName} (do NOT translate to English)`;
+    const outputInstruction = language === 'en'
+      ? 'Output ONLY the simplified sentence, nothing else.'
+      : `Output ONLY the simplified ${languageName} sentence, nothing else. Do NOT translate to English.`;
 
-    const prompt = `Rewrite this ${languageName} sentence using simpler words for a language learner.
+    const prompt = `Rewrite this ${languageName} sentence using simpler words.
 
-IMPORTANT: You MUST use the word "${equivalentWord}" as the replacement for "${originalWord}".
+CRITICAL RULES:
+1. You MUST use the word "${equivalentWord}" as the replacement for "${originalWord}"
+2. Replace difficult words with easier ${languageName} synonyms
+3. Keep the sentence in ${languageName} (do NOT translate to English)
+4. Keep the SAME sentence structure as much as possible
+5. Keep names and places unchanged
 
-Rules:
-- Replace difficult words with easier ${languageName} synonyms
-- Keep the SAME sentence structure as much as possible
-- Do NOT remove any concepts or meanings
-- The word "${equivalentWord}" MUST appear in your simplified version as the replacement for "${originalWord}"
-- Keep names and places unchanged${languageInstruction}
+${outputInstruction}
 
 Original: "${originalSentence}"
 
-Simplified:`;
+Simplified ${languageName} sentence:`;
 
-    return this.chat(prompt);
+    const response = await this.chat(prompt);
+
+    // Extra cleaning for non-English: remove any English explanatory text
+    if (language !== 'en') {
+      return this.extractNonEnglishSentence(response, language);
+    }
+
+    return response;
+  }
+
+  /**
+   * Extract the non-English sentence from potentially mixed response.
+   * Helps when AI adds English explanations before/after the actual sentence.
+   */
+  private extractNonEnglishSentence(response: string, language: string): string {
+    const lines = response.split('\n').map(l => l.trim()).filter(l => l);
+
+    // If only one line, return it
+    if (lines.length === 1) {
+      return lines[0];
+    }
+
+    // For languages with non-Latin scripts, find line with those characters
+    const scriptPatterns: Record<string, RegExp> = {
+      ru: /[\u0400-\u04FF]/,  // Cyrillic
+      zh: /[\u4E00-\u9FFF]/,  // Chinese
+      ja: /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/,  // Japanese
+      ko: /[\uAC00-\uD7AF]/,  // Korean
+      ar: /[\u0600-\u06FF]/,  // Arabic
+      fa: /[\u0600-\u06FF]/,  // Persian (uses Arabic script)
+    };
+
+    const scriptPattern = scriptPatterns[language];
+    if (scriptPattern) {
+      for (const line of lines) {
+        if (scriptPattern.test(line)) {
+          return line;
+        }
+      }
+    }
+
+    // For Latin-script languages (de, fr, es, etc.), look for:
+    // 1. Lines with special characters (ö, ü, ä, é, ñ, etc.)
+    // 2. Lines that don't start with English words like "The", "Here", "This"
+    const latinNonEnglishPattern = /[äöüßéèêëàâçñíóúý]/i;
+    const englishStartPattern = /^(the|here|this|that|note|simplified|translation|answer|result|output)/i;
+
+    for (const line of lines) {
+      // Prefer lines with non-English Latin characters
+      if (latinNonEnglishPattern.test(line) && !englishStartPattern.test(line)) {
+        return line;
+      }
+    }
+
+    // Fallback: return line that doesn't look like English explanation
+    for (const line of lines) {
+      if (!englishStartPattern.test(line) && line.length > 10) {
+        return line;
+      }
+    }
+
+    // Ultimate fallback: return first line
+    return lines[0] || response;
   }
 
   async getWordEquivalent(
