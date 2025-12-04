@@ -44,11 +44,18 @@ TYPE: [part of speech: noun, verb, adjective, adverb, preposition, conjunction, 
 
       const response = await this.chat(prompt);
 
-      // Parse the response
+      // Parse the response - handle both orders (DEFINITION first or TYPE first)
       const defMatch = response.match(/DEFINITION:\s*(.+?)(?=TYPE:|$)/is);
-      const typeMatch = response.match(/TYPE:\s*(.+?)$/is);
+      const typeMatch = response.match(/TYPE:\s*([^\n]+)/i);
 
-      const definition = defMatch ? defMatch[1].trim() : response;
+      // Extract definition, with fallback that removes TYPE: line
+      let definition = defMatch ? defMatch[1].trim() : response;
+      if (!defMatch) {
+        // Remove TYPE: line from fallback to avoid showing "TYPE: adjective" as definition
+        definition = definition.replace(/^TYPE:\s*[^\n]+\n?/im, '').trim();
+        // Also remove DEFINITION: prefix if it exists but wasn't captured
+        definition = definition.replace(/^DEFINITION:\s*/i, '').trim();
+      }
       const wordType = typeMatch ? this.normalizeWordType(typeMatch[1].trim()) : undefined;
 
       return { definition, wordType };
@@ -73,12 +80,19 @@ ARTICLE: [der/die/das - ONLY if it's a noun, otherwise leave empty or omit]`;
       const response = await this.chat(prompt);
 
       // Parse the response
-      const defMatch = response.match(/DEFINITION:\s*(.+?)(?=ENGLISH:|$)/is);
-      const engMatch = response.match(/ENGLISH:\s*(.+?)(?=TYPE:|$)/is);
-      const typeMatch = response.match(/TYPE:\s*(.+?)(?=ARTICLE:|$)/is);
-      const articleMatch = response.match(/ARTICLE:\s*(.+?)$/is);
+      const defMatch = response.match(/DEFINITION:\s*(.+?)(?=ENGLISH:|TYPE:|ARTICLE:|$)/is);
+      const engMatch = response.match(/ENGLISH:\s*(.+?)(?=TYPE:|ARTICLE:|$)/is);
+      const typeMatch = response.match(/TYPE:\s*([^\n]+)/i);
+      const articleMatch = response.match(/ARTICLE:\s*([^\n]+)/i);
 
-      const definition = defMatch ? defMatch[1].trim() : response;
+      // Extract definition, with fallback that removes other labels
+      let definition = defMatch ? defMatch[1].trim() : response;
+      if (!defMatch) {
+        // Remove labeled lines from fallback
+        definition = definition
+          .replace(/^(DEFINITION|ENGLISH|TYPE|ARTICLE):\s*[^\n]*\n?/gim, '')
+          .trim();
+      }
       const wordTranslation = engMatch ? engMatch[1].trim() : undefined;
       const wordType = typeMatch ? this.normalizeWordType(typeMatch[1].trim()) : undefined;
       const germanArticle = articleMatch ? this.normalizeGermanArticle(articleMatch[1].trim()) : undefined;
@@ -103,11 +117,18 @@ TYPE: [part of speech]`;
     const response = await this.chat(prompt);
 
     // Parse the response
-    const defMatch = response.match(/DEFINITION:\s*(.+?)(?=ENGLISH:|$)/is);
+    const defMatch = response.match(/DEFINITION:\s*(.+?)(?=ENGLISH:|TYPE:|$)/is);
     const engMatch = response.match(/ENGLISH:\s*(.+?)(?=TYPE:|$)/is);
-    const typeMatch = response.match(/TYPE:\s*(.+?)$/is);
+    const typeMatch = response.match(/TYPE:\s*([^\n]+)/i);
 
-    const definition = defMatch ? defMatch[1].trim() : response;
+    // Extract definition, with fallback that removes other labels
+    let definition = defMatch ? defMatch[1].trim() : response;
+    if (!defMatch) {
+      // Remove labeled lines from fallback
+      definition = definition
+        .replace(/^(DEFINITION|ENGLISH|TYPE):\s*[^\n]*\n?/gim, '')
+        .trim();
+    }
     const wordTranslation = engMatch ? engMatch[1].trim() : undefined;
     const wordType = typeMatch ? this.normalizeWordType(typeMatch[1].trim()) : undefined;
 
