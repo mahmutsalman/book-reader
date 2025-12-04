@@ -8,8 +8,9 @@ export class PreStudyHtmlService {
    * Generate complete HTML document for pre-study notes
    * @param result - The pre-study notes result data
    * @param slowPlaybackSpeed - Speed for slow audio playback (0.25 to 2.0)
+   * @param theme - App theme setting ('light', 'dark', or 'system')
    */
-  generateHtml(result: PreStudyNotesResult, slowPlaybackSpeed: number = 0.6): string {
+  generateHtml(result: PreStudyNotesResult, slowPlaybackSpeed: number = 0.6, theme: string = 'light'): string {
     const languageNames: Record<string, string> = {
       en: 'English',
       de: 'German',
@@ -19,6 +20,16 @@ export class PreStudyHtmlService {
     };
 
     const languageName = languageNames[result.language] || result.language;
+
+    // Determine body class and theme script based on theme setting
+    const bodyClass = theme === 'dark' ? 'class="dark"' : '';
+    const systemThemeScript = theme === 'system' ? `
+      // Apply dark mode if system prefers it
+      if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+        document.querySelector('.theme-btn').textContent = '☀️ Theme';
+      }
+    ` : '';
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -30,7 +41,7 @@ export class PreStudyHtmlService {
     ${this.getStyles()}
   </style>
 </head>
-<body>
+<body ${bodyClass}>
   <header class="header">
     <h1>Pre-Study Notes</h1>
     <div class="book-info">
@@ -49,7 +60,7 @@ export class PreStudyHtmlService {
     </div>
     <div class="controls">
       <button onclick="window.print()" class="print-btn">🖨️ Print</button>
-      <button onclick="toggleTheme()" class="theme-btn">🌙 Theme</button>
+      <button onclick="toggleTheme()" class="theme-btn">${theme === 'dark' ? '☀️ Theme' : '🌙 Theme'}</button>
     </div>
   </header>
 
@@ -58,6 +69,8 @@ export class PreStudyHtmlService {
   </main>
 
   <script>
+    ${systemThemeScript}
+
     function toggleTheme() {
       document.body.classList.toggle('dark');
       const btn = document.querySelector('.theme-btn');

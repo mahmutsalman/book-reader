@@ -1,4 +1,6 @@
-import { BrowserWindow } from 'electron';
+import { BrowserWindow, app } from 'electron';
+import * as fs from 'fs';
+import * as path from 'path';
 
 /**
  * Service for managing additional Electron windows
@@ -6,6 +8,7 @@ import { BrowserWindow } from 'electron';
 export class WindowManagerService {
   private static instance: WindowManagerService;
   private preStudyWindow: BrowserWindow | null = null;
+  private tempHtmlPath: string | null = null;
 
   private constructor() {
     // Singleton pattern - prevent external instantiation
@@ -27,6 +30,21 @@ export class WindowManagerService {
       this.preStudyWindow.close();
     }
 
+    // Clean up previous temp file
+    this.cleanupTempFile();
+
+    // Write HTML to temp file (data URLs have size limits with large base64 audio)
+    const tempDir = app.getPath('temp');
+    this.tempHtmlPath = path.join(tempDir, `pre-study-${Date.now()}.html`);
+
+    try {
+      fs.writeFileSync(this.tempHtmlPath, htmlContent, 'utf-8');
+      console.log('[WindowManager] HTML written to temp file:', this.tempHtmlPath, 'size:', htmlContent.length);
+    } catch (err) {
+      console.error('[WindowManager] Failed to write temp file:', err);
+      return;
+    }
+
     // Create new window
     this.preStudyWindow = new BrowserWindow({
       width: 1100,
@@ -46,20 +64,45 @@ export class WindowManagerService {
     // Remove menu bar
     this.preStudyWindow.setMenuBarVisibility(false);
 
-    // Load HTML content using data URL
-    const encodedHtml = encodeURIComponent(htmlContent);
-    this.preStudyWindow.loadURL(`data:text/html;charset=utf-8,${encodedHtml}`);
+    // Load HTML from temp file (avoids data URL size limits)
+    this.preStudyWindow.loadFile(this.tempHtmlPath).catch((err) => {
+      console.error('[WindowManager] Failed to load HTML file:', err);
+    });
 
     // Show window when ready
     this.preStudyWindow.once('ready-to-show', () => {
+      console.log('[WindowManager] Window ready to show');
       this.preStudyWindow?.show();
       this.preStudyWindow?.focus();
+    });
+
+    // Handle load failures
+    this.preStudyWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+      console.error('[WindowManager] Load failed:', errorCode, errorDescription);
     });
 
     // Handle window close
     this.preStudyWindow.on('closed', () => {
       this.preStudyWindow = null;
+      this.cleanupTempFile();
     });
+  }
+
+  /**
+   * Clean up temporary HTML file
+   */
+  private cleanupTempFile(): void {
+    if (this.tempHtmlPath) {
+      try {
+        if (fs.existsSync(this.tempHtmlPath)) {
+          fs.unlinkSync(this.tempHtmlPath);
+          console.log('[WindowManager] Temp file cleaned up:', this.tempHtmlPath);
+        }
+      } catch (err) {
+        console.error('[WindowManager] Failed to clean up temp file:', err);
+      }
+      this.tempHtmlPath = null;
+    }
   }
 
   /**

@@ -35,14 +35,18 @@ export function registerPreStudyHandlers(): void {
           uniqueWords: result.uniqueWords,
         });
 
-        // Get slow playback speed setting
+        // Get settings for HTML generation
         const slowPlaybackSpeed = await settingsRepository.get('slow_playback_speed') || 0.6;
+        const theme = await settingsRepository.get('theme') || 'light';
 
         // Generate HTML
-        const html = preStudyHtmlService.generateHtml(result, slowPlaybackSpeed);
+        const html = preStudyHtmlService.generateHtml(result, slowPlaybackSpeed, theme);
+        console.log('[PreStudy IPC] HTML generated, size:', html.length, 'bytes');
 
         // Open in new window
+        console.log('[PreStudy IPC] Opening HTML window...');
         windowManagerService.openHtmlWindow(html, `Pre-Study Notes - ${result.bookTitle}`);
+        console.log('[PreStudy IPC] Window open called');
 
         return result;
       } catch (error) {
