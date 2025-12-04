@@ -6,6 +6,7 @@ export interface WordDefinitionResult {
   context: string;
   wordTranslation?: string; // English translation of the word (for non-English books)
   wordType?: string;        // Part of speech (noun, verb, adjective, etc.)
+  germanArticle?: string;   // German definite article (der, die, das) - only for German nouns
 }
 
 export interface IPAPronunciationResult {

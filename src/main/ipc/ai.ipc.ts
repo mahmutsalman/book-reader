@@ -31,6 +31,7 @@ export function registerAIHandlers(): void {
           context,
           wordTranslation: result.wordTranslation,
           wordType: result.wordType,
+          germanArticle: result.germanArticle,
         };
       } catch (error) {
         console.error('Failed to get definition:', error);

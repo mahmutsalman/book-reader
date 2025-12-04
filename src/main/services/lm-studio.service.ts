@@ -30,6 +30,7 @@ export class LMStudioService {
     definition: string;
     wordTranslation?: string;
     wordType?: string;
+    germanArticle?: string;
   }> {
     if (language === 'en') {
       // English: get definition and word type
@@ -53,7 +54,39 @@ TYPE: [part of speech: noun, verb, adjective, adverb, preposition, conjunction, 
       return { definition, wordType };
     }
 
-    // Non-English: get English definition + English translation of the word + word type
+    // German: get definition + translation + type + article (for nouns)
+    if (language === 'de') {
+      const prompt = `For the German word "${word}" in this context, provide:
+1. A definition in English explaining what this word means (2-3 sentences, write the definition in ENGLISH)
+2. The English translation of the word (single word or short phrase)
+3. The part of speech (noun, verb, adjective, adverb, preposition, conjunction, interjection, pronoun, article, phrasal verb, idiom, or collocation)
+4. If it's a noun, provide the definite article (der, die, or das)
+
+Context: "${context}"
+
+Format your response EXACTLY like this:
+DEFINITION: [definition in English]
+ENGLISH: [English translation of the word]
+TYPE: [part of speech]
+ARTICLE: [der/die/das - ONLY if it's a noun, otherwise leave empty or omit]`;
+
+      const response = await this.chat(prompt);
+
+      // Parse the response
+      const defMatch = response.match(/DEFINITION:\s*(.+?)(?=ENGLISH:|$)/is);
+      const engMatch = response.match(/ENGLISH:\s*(.+?)(?=TYPE:|$)/is);
+      const typeMatch = response.match(/TYPE:\s*(.+?)(?=ARTICLE:|$)/is);
+      const articleMatch = response.match(/ARTICLE:\s*(.+?)$/is);
+
+      const definition = defMatch ? defMatch[1].trim() : response;
+      const wordTranslation = engMatch ? engMatch[1].trim() : undefined;
+      const wordType = typeMatch ? this.normalizeWordType(typeMatch[1].trim()) : undefined;
+      const germanArticle = articleMatch ? this.normalizeGermanArticle(articleMatch[1].trim()) : undefined;
+
+      return { definition, wordTranslation, wordType, germanArticle };
+    }
+
+    // Other non-English languages: get English definition + English translation of the word + word type
     const languageName = this.getLanguageName(language);
     const prompt = `For the ${languageName} word "${word}" in this context, provide:
 1. A definition in English explaining what this word means (2-3 sentences, write the definition in ENGLISH)
@@ -79,6 +112,30 @@ TYPE: [part of speech]`;
     const wordType = typeMatch ? this.normalizeWordType(typeMatch[1].trim()) : undefined;
 
     return { definition, wordTranslation, wordType };
+  }
+
+  /**
+   * Normalize German article to a consistent format.
+   * Handles variations like "Der", "DER", "der." -> "der"
+   */
+  private normalizeGermanArticle(article: string): string | undefined {
+    const cleaned = article.toLowerCase()
+      .replace(/[.,;:!?]+$/, '')  // Remove trailing punctuation
+      .replace(/\s+/g, ' ')       // Normalize whitespace
+      .trim();
+
+    // Only return valid German articles
+    if (['der', 'die', 'das'].includes(cleaned)) {
+      return cleaned;
+    }
+
+    // Handle edge cases where AI might add extra text
+    if (cleaned.startsWith('der ') || cleaned === 'der') return 'der';
+    if (cleaned.startsWith('die ') || cleaned === 'die') return 'die';
+    if (cleaned.startsWith('das ') || cleaned === 'das') return 'das';
+
+    // Return undefined if not a valid article (e.g., "none", "n/a", empty)
+    return undefined;
   }
 
   /**

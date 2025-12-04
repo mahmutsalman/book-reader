@@ -51,6 +51,8 @@ export interface CachedWordData {
   phraseTranslation?: string;      // English translation of phrase (for phrases)
   // Word type/part of speech (noun, verb, adjective, etc.)
   wordType?: string;
+  // German definite article (der, die, das) - only for German nouns
+  germanArticle?: string;
   fetchedAt: number;
 }
 

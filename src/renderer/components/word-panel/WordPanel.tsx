@@ -39,9 +39,17 @@ interface WordData {
   phraseTranslation?: string;
   // Word type/part of speech
   wordType?: string;
+  // German article (der, die, das)
+  germanArticle?: string;
   loading: boolean;
   error?: string;
 }
+
+// Helper to capitalize German nouns properly (e.g., "mädchen" -> "Mädchen")
+const capitalizeGermanNoun = (word: string): string => {
+  if (!word) return word;
+  return word.charAt(0).toUpperCase() + word.slice(1);
+};
 
 const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bookId, bookLanguage = 'en', onNavigateToPage, preloadedData }) => {
   const { settings } = useSettings();
@@ -106,18 +114,24 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
   }, []);
 
   // Preload audio when panel opens (background fetch)
+  // Note: For German nouns with articles, we re-preload when article becomes available
   useEffect(() => {
     if (!isOpen || !selectedWord) return;
 
+    // For German nouns with articles, include article in pronunciation
+    const wordText = wordData.germanArticle
+      ? `${wordData.germanArticle} ${capitalizeGermanNoun(selectedWord.word)}`
+      : selectedWord.word;
+
     // Build list of audio to preload
     const preloadItems = [
-      { text: selectedWord.word, language: bookLanguage, type: AudioType.WORD },
+      { text: wordText, language: bookLanguage, type: AudioType.WORD },
       { text: selectedWord.sentence, language: bookLanguage, type: AudioType.SENTENCE },
     ];
 
     // Preload in background (non-blocking)
     preloadAudio(preloadItems);
-  }, [isOpen, selectedWord?.word, selectedWord?.sentence, bookLanguage, preloadAudio]);
+  }, [isOpen, selectedWord?.word, selectedWord?.sentence, bookLanguage, preloadAudio, wordData.germanArticle]);
 
   // Preload simplified sentence audio when it becomes available
   useEffect(() => {
@@ -150,6 +164,8 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
         phraseTranslation: preloadedData.phraseTranslation,
         // Word type
         wordType: preloadedData.wordType,
+        // German article
+        germanArticle: preloadedData.germanArticle,
       });
       setSaved(false);
       return;
@@ -296,11 +312,18 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
           <div className="flex items-center gap-2">
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-xl font-semibold">{selectedWord.word}</h2>
-                {/* Word pronunciation button */}
+                {/* Display word with German article if available */}
+                <h2 className="text-xl font-semibold">
+                  {wordData.germanArticle
+                    ? `${wordData.germanArticle} ${capitalizeGermanNoun(selectedWord.word)}`
+                    : selectedWord.word}
+                </h2>
+                {/* Word pronunciation button - include article for German nouns */}
                 {!selectedWord.isPhrase && (
                   <PronunciationButton
-                    text={selectedWord.word}
+                    text={wordData.germanArticle
+                      ? `${wordData.germanArticle} ${capitalizeGermanNoun(selectedWord.word)}`
+                      : selectedWord.word}
                     language={bookLanguage}
                     audioType={AudioType.WORD}
                     size="sm"

@@ -181,6 +181,9 @@ export const DeferredWordProvider: React.FC<DeferredWordProviderProps> = ({ chil
           if (defResult.value.wordType) {
             results.wordType = defResult.value.wordType;
           }
+          if (defResult.value.germanArticle) {
+            results.germanArticle = defResult.value.germanArticle;
+          }
         }
 
         // Try Python server for IPA first, fall back to AI
