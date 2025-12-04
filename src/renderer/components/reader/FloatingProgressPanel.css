@@ -1,0 +1,363 @@
+.floating-progress-panel {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 280px;
+  background: rgba(255, 255, 255, 0.98);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15), 0 2px 8px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  z-index: 1000;
+  animation: slideIn 0.3s ease-out;
+  backdrop-filter: blur(10px);
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Minimized state */
+.floating-progress-panel.minimized {
+  width: auto;
+  min-width: 160px;
+}
+
+.minimized-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+}
+
+.minimized-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: #4a90d9;
+  min-width: 32px;
+}
+
+.progress-bar-mini {
+  flex: 1;
+  height: 6px;
+  background: rgba(74, 144, 217, 0.15);
+  border-radius: 3px;
+  overflow: hidden;
+  min-width: 60px;
+}
+
+.progress-fill-mini {
+  height: 100%;
+  background: linear-gradient(90deg, #4a90d9, #64b5f6);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.expand-btn {
+  padding: 4px;
+  background: transparent;
+  border: none;
+  color: #666;
+  cursor: pointer;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, color 0.2s;
+}
+
+.expand-btn:hover {
+  background: rgba(74, 144, 217, 0.1);
+  color: #4a90d9;
+}
+
+/* Panel Header */
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.panel-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+}
+
+.panel-title svg {
+  color: #4a90d9;
+}
+
+.minimize-btn {
+  padding: 4px;
+  background: transparent;
+  border: none;
+  color: #999;
+  cursor: pointer;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, color 0.2s;
+}
+
+.minimize-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: #666;
+}
+
+/* Panel Body */
+.panel-body {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.phase-row {
+  display: flex;
+  align-items: center;
+}
+
+.phase-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.phase-extracting {
+  background: rgba(255, 193, 7, 0.15);
+  color: #f57c00;
+}
+
+.phase-processing {
+  background: rgba(74, 144, 217, 0.15);
+  color: #1976d2;
+}
+
+.phase-generating {
+  background: rgba(76, 175, 80, 0.15);
+  color: #388e3c;
+}
+
+.current-word {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.current-word .label {
+  font-size: 12px;
+  color: #888;
+}
+
+.current-word .word {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  font-family: 'SF Mono', 'Consolas', monospace;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.progress-count {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.progress-count .label {
+  font-size: 12px;
+  color: #888;
+}
+
+.progress-count .count {
+  font-size: 13px;
+  color: #555;
+}
+
+.progress-bar-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.progress-bar {
+  flex: 1;
+  height: 8px;
+  background: rgba(74, 144, 217, 0.12);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4a90d9, #64b5f6);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+  position: relative;
+}
+
+.progress-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.3) 50%,
+    transparent 100%
+  );
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.progress-percent {
+  font-size: 13px;
+  font-weight: 600;
+  color: #4a90d9;
+  min-width: 36px;
+  text-align: right;
+}
+
+.time-remaining {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #888;
+}
+
+.time-remaining svg {
+  color: #aaa;
+}
+
+/* Panel Footer */
+.panel-footer {
+  padding: 10px 14px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.cancel-btn {
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #666;
+  background: transparent;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.cancel-btn:hover {
+  background: #f5f5f5;
+  border-color: #ccc;
+  color: #d32f2f;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .floating-progress-panel {
+    background: rgba(30, 30, 40, 0.98);
+    border-color: rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  }
+
+  .panel-header {
+    border-bottom-color: rgba(255, 255, 255, 0.08);
+  }
+
+  .panel-title {
+    color: #e0e0e0;
+  }
+
+  .minimize-btn {
+    color: #888;
+  }
+
+  .minimize-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #aaa;
+  }
+
+  .expand-btn {
+    color: #888;
+  }
+
+  .expand-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #64b5f6;
+  }
+
+  .minimized-text {
+    color: #64b5f6;
+  }
+
+  .progress-bar-mini,
+  .progress-bar {
+    background: rgba(100, 181, 246, 0.2);
+  }
+
+  .current-word .label,
+  .progress-count .label,
+  .time-remaining {
+    color: #888;
+  }
+
+  .current-word .word {
+    color: #e0e0e0;
+  }
+
+  .progress-count .count {
+    color: #bbb;
+  }
+
+  .progress-percent {
+    color: #64b5f6;
+  }
+
+  .panel-footer {
+    border-top-color: rgba(255, 255, 255, 0.08);
+  }
+
+  .cancel-btn {
+    color: #aaa;
+    border-color: rgba(255, 255, 255, 0.15);
+  }
+
+  .cancel-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.2);
+    color: #ef5350;
+  }
+}

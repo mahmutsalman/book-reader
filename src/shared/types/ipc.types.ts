@@ -3,6 +3,7 @@ import type { VocabularyEntry, CreateVocabularyEntry, VocabularyFilters, StoredW
 import type { AppSettings, LMStudioConnectionResult } from './settings.types';
 import type { WordDefinitionResult, IPAPronunciationResult, BatchIPAResult, SimplifiedSentenceResult, WordEquivalentResult, PhraseMeaningResult, TatoebaSentence, TatoebaStatus } from './ai.types';
 import type { TTSResponse, IPAResponse, PronunciationServerStatus, IPALanguagesResponse, InstallLanguageResponse } from './pronunciation.types';
+import type { PreStudyNotesRequest, PreStudyNotesResult, PreStudyProgress } from './pre-study-notes.types';
 
 // IPC API exposed to renderer
 export interface ElectronAPI {
@@ -56,6 +57,14 @@ export interface ElectronAPI {
     getServerStatus: () => Promise<PronunciationServerStatus>;
     getIPALanguages: () => Promise<IPALanguagesResponse>;
     installIPALanguage: (language: string) => Promise<InstallLanguageResponse>;
+  };
+  preStudy: {
+    generateNotes: (request: PreStudyNotesRequest) => Promise<PreStudyNotesResult>;
+    onProgress: (callback: (progress: PreStudyProgress) => void) => () => void;
+    cancel: () => Promise<void>;
+  };
+  window: {
+    openHtml: (htmlContent: string, title: string) => Promise<void>;
   };
 }
 

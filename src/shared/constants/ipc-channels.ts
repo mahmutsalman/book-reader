@@ -50,6 +50,12 @@ export const IPC_CHANNELS = {
   PRONUNCIATION_SERVER_STATUS: 'pronunciation:server-status',
   PRONUNCIATION_GET_IPA_LANGUAGES: 'pronunciation:get-ipa-languages',
   PRONUNCIATION_INSTALL_IPA_LANGUAGE: 'pronunciation:install-ipa-language',
+
+  // Pre-Study Notes
+  PRE_STUDY_GENERATE_NOTES: 'pre-study:generate-notes',
+  PRE_STUDY_PROGRESS: 'pre-study:progress',
+  PRE_STUDY_CANCEL: 'pre-study:cancel',
+  WINDOW_OPEN_HTML: 'window:open-html',
 } as const;
 
 export type IPCChannel = typeof IPC_CHANNELS[keyof typeof IPC_CHANNELS];

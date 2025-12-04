@@ -1,0 +1,112 @@
+.pre-study-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid #4a90d9;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #4a90d9 0%, #357abd 100%);
+  color: white;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.pre-study-button:hover:not(.disabled):not(.generating) {
+  background: linear-gradient(135deg, #5a9ee9 0%, #4588cd 100%);
+  box-shadow: 0 2px 8px rgba(74, 144, 217, 0.3);
+  transform: translateY(-1px);
+}
+
+.pre-study-button:active:not(.disabled):not(.generating) {
+  transform: translateY(0);
+  box-shadow: 0 1px 4px rgba(74, 144, 217, 0.2);
+}
+
+.pre-study-button.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: linear-gradient(135deg, #888 0%, #666 100%);
+  border-color: #666;
+}
+
+.pre-study-button.generating {
+  cursor: wait;
+  background: linear-gradient(135deg, #5a9ee9 0%, #4588cd 100%);
+}
+
+.button-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.button-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.button-icon .spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.button-text {
+  white-space: nowrap;
+}
+
+.progress-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.2);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: rgba(255, 255, 255, 0.8);
+  transition: width 0.3s ease;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .pre-study-button {
+    background: linear-gradient(135deg, #5a9ee9 0%, #4588cd 100%);
+    border-color: #5a9ee9;
+  }
+
+  .pre-study-button:hover:not(.disabled):not(.generating) {
+    background: linear-gradient(135deg, #6aaeF9 0%, #5598dd 100%);
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .pre-study-button {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  .button-text {
+    display: none;
+  }
+
+  .pre-study-button .button-icon svg {
+    width: 18px;
+    height: 18px;
+  }
+}

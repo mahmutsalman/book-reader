@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { IPC_CHANNELS } from './shared/constants/ipc-channels';
 import type { ElectronAPI } from './shared/types/ipc.types';
+import type { PreStudyNotesRequest, PreStudyProgress } from './shared/types/pre-study-notes.types';
 
 // Create the API object to expose to the renderer
 const electronAPI: ElectronAPI = {
@@ -104,6 +105,27 @@ const electronAPI: ElectronAPI = {
       ipcRenderer.invoke(IPC_CHANNELS.PRONUNCIATION_GET_IPA_LANGUAGES),
     installIPALanguage: (language: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.PRONUNCIATION_INSTALL_IPA_LANGUAGE, language),
+  },
+
+  // Pre-Study Notes
+  preStudy: {
+    generateNotes: (request: PreStudyNotesRequest) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PRE_STUDY_GENERATE_NOTES, request),
+    onProgress: (callback: (progress: PreStudyProgress) => void) => {
+      const handler = (_: unknown, progress: PreStudyProgress) => callback(progress);
+      ipcRenderer.on(IPC_CHANNELS.PRE_STUDY_PROGRESS, handler);
+      return () => {
+        ipcRenderer.removeListener(IPC_CHANNELS.PRE_STUDY_PROGRESS, handler);
+      };
+    },
+    cancel: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.PRE_STUDY_CANCEL),
+  },
+
+  // Window management
+  window: {
+    openHtml: (htmlContent: string, title: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.WINDOW_OPEN_HTML, htmlContent, title),
   },
 };
 

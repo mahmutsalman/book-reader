@@ -392,7 +392,7 @@ const SettingsPage: React.FC = () => {
       </div>
 
       {/* Reading Settings */}
-      <div className="card">
+      <div className="card mb-6">
         <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">
           📖 Reading Preferences
         </h3>
@@ -442,6 +442,51 @@ const SettingsPage: React.FC = () => {
               onChange={(e) => updateSetting('line_height', parseFloat(e.target.value))}
               className="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer accent-primary-600"
             />
+          </div>
+        </div>
+      </div>
+
+      {/* Pre-Study Notes Settings */}
+      <div className="card">
+        <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">
+          📚 Pre-Study Notes
+        </h3>
+
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Views to Process: {settings.pre_study_view_count}
+            </label>
+            <input
+              type="range"
+              min="1"
+              max="20"
+              step="1"
+              value={settings.pre_study_view_count}
+              onChange={(e) => updateSetting('pre_study_view_count', parseInt(e.target.value))}
+              className="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer accent-primary-600"
+            />
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              How many views ahead to include in pre-study notes
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Sentences per View
+            </label>
+            <select
+              value={settings.pre_study_sentence_limit}
+              onChange={(e) => updateSetting('pre_study_sentence_limit', parseInt(e.target.value))}
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+            >
+              <option value="0">All sentences</option>
+              <option value="1">First sentence only (fastest)</option>
+              <option value="2">First 2 sentences</option>
+            </select>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              Limit sentences for faster testing or quick previews
+            </p>
           </div>
         </div>
       </div>

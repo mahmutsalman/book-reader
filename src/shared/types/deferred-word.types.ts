@@ -104,11 +104,14 @@ export interface SelectedPhrase {
 }
 
 /**
- * Generate a unique key for a phrase in a specific book
- * Key format: `${bookId}-phrase-${normalizedPhrase}`
+ * Generate a unique key for a phrase in a specific book and sentence context
+ * Key format: `${bookId}-phrase-${normalizedPhrase}-s${sentenceHash}`
+ * Each unique sentence context gets its own cache entry for context-specific meanings
  */
-export function generatePhraseKey(bookId: number, phrase: string): string {
-  return `${bookId}-phrase-${phrase.toLowerCase().replace(/\s+/g, '-')}`;
+export function generatePhraseKey(bookId: number, phrase: string, sentence: string): string {
+  const normalizedSentence = normalizeSentence(sentence);
+  const sentenceHash = hashString(normalizedSentence);
+  return `${bookId}-phrase-${phrase.toLowerCase().replace(/\s+/g, '-')}-s${sentenceHash}`;
 }
 
 /**

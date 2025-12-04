@@ -1,3 +1,5 @@
+import type { PreStudyWordEntry, GrammarTopic, GrammarLevel } from '../../shared/types/pre-study-notes.types';
+
 interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
@@ -557,41 +559,38 @@ Answer:`;
     meaning: string;
     phraseTranslation?: string;
   }> {
-    if (language === 'en') {
-      const prompt = `Explain the meaning of the phrase "${phrase}" as it is used in the following context. Focus on:
-- Idiomatic meaning (if it's an idiom or phrasal verb)
-- How the words work together as a unit
-- A clear, simple explanation for a language learner (2-3 sentences)
+    const isEnglish = language === 'en';
+    const languageName = isEnglish ? 'English' : this.getLanguageName(language);
 
-Context: "${context}"
-
-Meaning:`;
-      const meaning = await this.chat(prompt);
-      return { meaning };
-    }
-
-    // Non-English: explain in English + provide English translation of phrase
-    const languageName = this.getLanguageName(language);
+    // Use structured format for all languages to ensure consistent parsing
     const prompt = `For the ${languageName} phrase "${phrase}" in this context, provide:
-1. An explanation in English of what this phrase means (write the explanation in ENGLISH)
-2. The English translation of the phrase (how you would say it in English)
-
-Focus on idiomatic meaning if applicable.
+1. A clear explanation of what this phrase means (focus on idiomatic usage if applicable)
+${!isEnglish ? '2. The English translation of the phrase' : ''}
 
 Context: "${context}"
 
 Format your response EXACTLY like this:
-MEANING: [explanation in English]
-ENGLISH: [English translation of the phrase]`;
+MEANING: [explanation of the phrase meaning]${!isEnglish ? '\nENGLISH: [English translation]' : ''}`;
 
     const response = await this.chat(prompt);
 
-    // Parse the response
+    // Parse the response - look for MEANING: label first
     const meaningMatch = response.match(/MEANING:\s*(.+?)(?=ENGLISH:|$)/is);
     const engMatch = response.match(/ENGLISH:\s*(.+?)$/is);
 
-    const meaning = meaningMatch ? meaningMatch[1].trim() : response;
+    // Fallback: if no MEANING: label, use full response (trimmed)
+    let meaning = meaningMatch ? meaningMatch[1].trim() : response.trim();
     const phraseTranslation = engMatch ? engMatch[1].trim() : undefined;
+
+    // If still empty after parsing, log warning for debugging
+    if (!meaning) {
+      console.warn('[PHRASE] Empty meaning returned for phrase:', phrase);
+      console.warn('[PHRASE] Raw response was:', response.substring(0, 200));
+      // Last resort: use the raw response if it has content
+      if (response.trim()) {
+        meaning = response.trim();
+      }
+    }
 
     return { meaning, phraseTranslation };
   }
@@ -830,5 +829,98 @@ ENGLISH: [English translation of the phrase]`;
         error: error instanceof Error ? error.message : 'Connection failed',
       };
     }
+  }
+
+  /**
+   * Generate a pre-study entry for a word with IPA, syllables, definition, and grammar analysis.
+   * Used by the pre-study notes feature.
+   */
+  async generatePreStudyEntry(
+    word: string,
+    sentence: string,
+    language: string,
+    grammarTopicsByLevel: { a1: string; a2: string; b1: string; b2: string }
+  ): Promise<PreStudyWordEntry> {
+    const languageName = this.getLanguageName(language);
+    const isEnglish = language === 'en';
+
+    // Build grammar topics section for prompt
+    const grammarSection = `
+Grammar topics for ${languageName} (by CEFR level):
+A1: ${grammarTopicsByLevel.a1 || 'none'}
+A2: ${grammarTopicsByLevel.a2 || 'none'}
+B1: ${grammarTopicsByLevel.b1 || 'none'}
+B2: ${grammarTopicsByLevel.b2 || 'none'}`;
+
+    const prompt = `Analyze this ${languageName} word for a language learner.
+
+Word: "${word}"
+Sentence: "${sentence}"
+${grammarSection}
+
+Provide:
+1. IPA pronunciation (in slashes like /example/)
+2. Syllable breakdown with dots (like ex·am·ple)
+3. Part of speech (noun, verb, adjective, adverb, preposition, conjunction, pronoun, article)
+4. Brief definition (1-2 sentences explaining meaning in this context)${!isEnglish ? '\n5. English translation of the word' : ''}${language === 'de' ? '\n6. German article if noun (der/die/das)' : ''}
+7. Which grammar topic from the list above applies to this word in this sentence? Pick the MOST relevant one. Explain briefly why.
+
+Format your response EXACTLY like this:
+IPA: /pronunciation/
+SYLLABLES: syl·la·bles
+TYPE: part of speech${!isEnglish ? '\nENGLISH: translation' : ''}${language === 'de' ? '\nARTICLE: der/die/das' : ''}
+DEFINITION: brief definition
+GRAMMAR_TOPIC: [topic name] (level)
+GRAMMAR_EXPLANATION: why this topic applies`;
+
+    const response = await this.chat(prompt);
+
+    // Parse the response
+    const ipaMatch = response.match(/IPA:\s*\/([^/]+)\//i);
+    const syllablesMatch = response.match(/SYLLABLES:\s*([^\n]+)/i);
+    const typeMatch = response.match(/TYPE:\s*([^\n]+)/i);
+    const engMatch = response.match(/ENGLISH:\s*([^\n]+)/i);
+    const articleMatch = response.match(/ARTICLE:\s*([^\n]+)/i);
+    const defMatch = response.match(/DEFINITION:\s*(.+?)(?=GRAMMAR_TOPIC:|$)/is);
+    const topicMatch = response.match(/GRAMMAR_TOPIC:\s*(.+?)(?:\(([^)]+)\))?/i);
+    const explanationMatch = response.match(/GRAMMAR_EXPLANATION:\s*(.+?)$/is);
+
+    // Extract values with fallbacks
+    const ipa = ipaMatch ? ipaMatch[1].trim() : '';
+    const syllables = syllablesMatch ? syllablesMatch[1].trim().replace(/\./g, '·') : '';
+    const wordType = typeMatch ? this.normalizeWordType(typeMatch[1].trim()) : undefined;
+    const wordTranslation = engMatch ? engMatch[1].trim() : undefined;
+    const germanArticle = articleMatch ? this.normalizeGermanArticle(articleMatch[1].trim()) : undefined;
+    const definition = defMatch ? defMatch[1].trim() : 'Definition not available';
+
+    // Parse grammar topic
+    let grammarTopics: GrammarTopic[] | undefined;
+    if (topicMatch) {
+      const topicName = topicMatch[1].trim();
+      const levelRaw = topicMatch[2]?.trim().toUpperCase() || 'A1';
+      const level = (['A1', 'A2', 'B1', 'B2'].includes(levelRaw) ? levelRaw : 'A1') as GrammarLevel;
+      const explanation = explanationMatch ? explanationMatch[1].trim() : '';
+
+      if (topicName && topicName.toLowerCase() !== 'none' && topicName !== '-') {
+        grammarTopics = [{
+          name: topicName,
+          explanation,
+          level,
+        }];
+      }
+    }
+
+    return {
+      word,
+      cleanWord: word.toLowerCase(),
+      ipa,
+      syllables,
+      definition,
+      wordType,
+      wordTranslation,
+      germanArticle,
+      contextSentence: sentence,
+      grammarTopics,
+    };
   }
 }

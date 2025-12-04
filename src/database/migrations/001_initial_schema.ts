@@ -117,5 +117,8 @@ export const migration001 = {
     insertSetting.run('font_family', 'Georgia, serif');
     insertSetting.run('line_height', '1.8');
     insertSetting.run('page_margin', '40');
+    // Pre-Study Notes settings
+    insertSetting.run('pre_study_view_count', '10');
+    insertSetting.run('pre_study_sentence_limit', '0');
   },
 };

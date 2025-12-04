@@ -13,7 +13,9 @@ import type { BookLanguage } from '../../shared/types';
 const isPhrase = (text: string): boolean => text.trim().includes(' ');
 
 // Configuration
-const MAX_CONCURRENT_FETCHES = 3;
+// Using 1 concurrent fetch for better compatibility with weak/local AI models
+// Sequential processing prevents overwhelming the model and improves reliability
+const MAX_CONCURRENT_FETCHES = 1;
 const CACHE_EXPIRATION_MS = 30 * 60 * 1000; // 30 minutes
 
 interface DeferredWordContextType {
@@ -326,8 +328,9 @@ export const DeferredWordProvider: React.FC<DeferredWordProviderProps> = ({ chil
       : cleanWord(word);
 
     // Use appropriate key generator (sentence hash for zoom-independent caching)
+    // Both words and phrases now include sentence context for proper context-specific caching
     const key = isPhrase(word)
-      ? generatePhraseKey(bookId, cleanText)
+      ? generatePhraseKey(bookId, cleanText, sentence)
       : generateWordKey(bookId, cleanText, sentence);
 
     setQueuedWords(prev => {
@@ -362,37 +365,37 @@ export const DeferredWordProvider: React.FC<DeferredWordProviderProps> = ({ chil
     });
   }, []);
 
-  // Check if a word or phrase has ready data (sentence-specific for words)
+  // Check if a word or phrase has ready data (sentence-specific for both)
   const isWordReady = useCallback((word: string, sentence: string, bookId: number): boolean => {
     const cleanText = isPhrase(word)
       ? word.toLowerCase().trim()
       : cleanWord(word);
     const key = isPhrase(word)
-      ? generatePhraseKey(bookId, cleanText)
+      ? generatePhraseKey(bookId, cleanText, sentence)
       : generateWordKey(bookId, cleanText, sentence);
     const entry = queuedWords.get(key);
     return entry?.status === 'ready';
   }, [queuedWords]);
 
-  // Get the status of a word or phrase (sentence-specific for words)
+  // Get the status of a word or phrase (sentence-specific for both)
   const getWordStatus = useCallback((word: string, sentence: string, bookId: number): QueuedWordStatus | null => {
     const cleanText = isPhrase(word)
       ? word.toLowerCase().trim()
       : cleanWord(word);
     const key = isPhrase(word)
-      ? generatePhraseKey(bookId, cleanText)
+      ? generatePhraseKey(bookId, cleanText, sentence)
       : generateWordKey(bookId, cleanText, sentence);
     const entry = queuedWords.get(key);
     return entry?.status ?? null;
   }, [queuedWords]);
 
-  // Get cached data for a word or phrase (sentence-specific for words)
+  // Get cached data for a word or phrase (sentence-specific for both)
   const getWordData = useCallback((word: string, sentence: string, bookId: number): CachedWordData | null => {
     const cleanText = isPhrase(word)
       ? word.toLowerCase().trim()
       : cleanWord(word);
     const key = isPhrase(word)
-      ? generatePhraseKey(bookId, cleanText)
+      ? generatePhraseKey(bookId, cleanText, sentence)
       : generateWordKey(bookId, cleanText, sentence);
     const entry = queuedWords.get(key);
     return entry?.data ?? null;

@@ -2,13 +2,17 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom';
 import { useBooks } from '../../context/BookContext';
 import { useDeferredWords } from '../../context/DeferredWordContext';
+import { useSettings } from '../../context/SettingsContext';
 import { useTextReflow } from '../../hooks/useTextReflow';
 import { ZOOM_LEVELS, REFLOW_SETTINGS } from '../../../shared/constants';
 import type { Book, BookData, ReadingProgress } from '../../../shared/types';
 import type { CachedWordData } from '../../../shared/types/deferred-word.types';
+import type { PreStudyProgress } from '../../../shared/types/pre-study-notes.types';
 import { calculateMiddleIndex, isWithinAdjacency } from '../../../shared/types/deferred-word.types';
 import { cleanWord, createWordBoundaryRegex } from '../../../shared/utils/text-utils';
 import WordPanel from '../word-panel/WordPanel';
+import PreStudyNotesButton from './PreStudyNotesButton';
+import { FloatingProgressPanel } from './FloatingProgressPanel';
 
 const MAX_PHRASE_WORDS = 10;
 
@@ -42,6 +46,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
   const navigate = useNavigate();
   const { updateProgress } = useBooks();
   const { queueWord, isWordReady, getWordData, getWordStatus, fetchingCount, pendingCount } = useDeferredWords();
+  const { settings } = useSettings();
   const containerRef = useRef<HTMLDivElement>(null);
 
   const [zoom, setZoom] = useState(initialProgress?.zoom_level || ZOOM_LEVELS.DEFAULT);
@@ -67,6 +72,10 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
   // Track words that have been looked up before (across all pages in this book)
   // Used to show gray dots for known words that haven't been fetched for current page
   const [knownWords, setKnownWords] = useState<Set<string>>(new Set());
+
+  // Pre-study notes state
+  const [isGeneratingNotes, setIsGeneratingNotes] = useState(false);
+  const [notesProgress, setNotesProgress] = useState<PreStudyProgress | null>(null);
 
   // Map word indices to their actual words for phrase construction
   const wordIndexMapRef = useRef<Map<number, string>>(new Map());
@@ -144,23 +153,63 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
     saveProgress();
   }, [reflowState.characterOffset, reflowState.originalPage, zoom, updateProgress]);
 
+  // Helper to normalize quotes in text for consistent matching
+  // Comprehensive apostrophe normalization covering:
+  // - ' ' (U+2018, U+2019) curly quotes
+  // - ` ´ (U+0060, U+00B4) grave/acute accents
+  // - ʼ ʻ (U+02BC, U+02BB) modifier letters
+  // - ′ (U+2032) prime
+  // - ‛ (U+201B) reversed quote
+  const normalizeQuotes = useCallback((str: string): string => {
+    return str.replace(/[''`´ʼʻ′‛]/g, "'");
+  }, []);
+
   // Extract sentence from current view text ONLY (not across pages)
   // This ensures we get the sentence from the actual displayed text
   const extractSentenceFromCurrentView = useCallback((word: string): string => {
     const text = reflowState.currentText;
     if (!text) return '';
 
-    // Find the word in current view text (Unicode-aware for Russian, etc.)
-    const cleanedWord = cleanWord(word);
-    const wordRegex = createWordBoundaryRegex(cleanedWord, 'i');
-    const wordMatch = text.match(wordRegex);
+    // Normalize both text and word for consistent quote matching
+    const normalizedText = normalizeQuotes(text);
+    const normalizedWord = normalizeQuotes(word);
 
-    if (!wordMatch || wordMatch.index === undefined) {
-      // Fallback: return a portion of current view text
-      return text.substring(0, 200);
+    // Check if this is a phrase (multiple words)
+    const isPhrase = normalizedWord.trim().includes(' ');
+
+    let wordPosition: number;
+
+    if (isPhrase) {
+      // For phrases, use simple case-insensitive substring search
+      // This is more reliable than regex for multi-word phrases
+      const lowerText = normalizedText.toLowerCase();
+      const lowerPhrase = normalizedWord.toLowerCase().trim();
+      wordPosition = lowerText.indexOf(lowerPhrase);
+
+      if (wordPosition === -1) {
+        // Try finding first word of phrase as fallback
+        const firstWord = lowerPhrase.split(/\s+/)[0];
+        wordPosition = lowerText.indexOf(firstWord);
+      }
+    } else {
+      // For single words, use word boundary regex (Unicode-aware for Russian, etc.)
+      const cleanedWord = cleanWord(normalizedWord);
+      const wordRegex = createWordBoundaryRegex(cleanedWord, 'i');
+      const wordMatch = normalizedText.match(wordRegex);
+      wordPosition = wordMatch?.index ?? -1;
+
+      // Fallback: simple case-insensitive search if regex fails
+      // This handles edge cases with apostrophe character mismatches
+      if (wordPosition === -1) {
+        wordPosition = normalizedText.toLowerCase().indexOf(cleanedWord.toLowerCase());
+      }
     }
 
-    const wordPosition = wordMatch.index;
+    if (wordPosition === -1) {
+      // Fallback: return a portion of current view text
+      console.warn('[Context] Word/phrase not found in current view:', word);
+      return text.substring(0, 200);
+    }
 
     // Find sentence start: look backwards for . ! ? or start of text
     let sentenceStart = 0;
@@ -202,7 +251,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
     }
 
     return sentence || text.substring(0, 200);
-  }, [reflowState.currentText]);
+  }, [reflowState.currentText, normalizeQuotes]);
 
   // Pre-compute sentences for each word position (memoized per view change)
   // This is used for efficient cache lookups without re-extracting sentences
@@ -609,6 +658,111 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
     return () => clearTimeout(timer);
   }, [reflowState.currentText, knownWords, book.id, isWordReady, getWordStatus, queueWord, extractSentenceFromCurrentView]);
 
+  // Pre-study notes: Extract text from next N views
+  const extractNextViewsText = useCallback((viewCount: number = 10): string => {
+    const fullText = bookData.pages.map(p => p.text || '').join('\n\n');
+    const currentText = reflowState.currentText?.trim();
+
+    if (!currentText || !fullText) return '';
+
+    // Use character offset as a hint for search area
+    // The offset might be off due to trimming in pagination, but should be in the right ballpark
+    const hintOffset = reflowState.characterOffset;
+
+    // Search for current text starting from a bit before the hint offset
+    // to account for any drift from trimming
+    const searchStart = Math.max(0, hintOffset - 1000);
+    let position = fullText.indexOf(currentText, searchStart);
+
+    // Fallback: search from beginning if not found
+    if (position === -1) {
+      position = fullText.indexOf(currentText);
+    }
+
+    if (position === -1) {
+      console.error('[PreStudy] Could not locate current view text in book');
+      return '';
+    }
+
+    // Start extraction from the current view (include current view in pre-study)
+    const startOffset = position;
+    const avgCharsPerView = currentText.length || 2000;
+    const charsToExtract = avgCharsPerView * viewCount;
+    const endOffset = Math.min(startOffset + charsToExtract, fullText.length);
+
+    return fullText.substring(startOffset, endOffset);
+  }, [bookData.pages, reflowState.currentText, reflowState.characterOffset]);
+
+  // Pre-study notes: Handle generate button click
+  const handleGeneratePreStudyNotes = useCallback(async () => {
+    // Don't start if already generating or if queue is busy
+    if (isGeneratingNotes) {
+      console.log('[PreStudy] Already generating, ignoring click');
+      return;
+    }
+
+    if (fetchingCount + pendingCount > 0) {
+      console.log('[PreStudy] Queue is busy, please wait');
+      // Could show a toast here
+      return;
+    }
+
+    setIsGeneratingNotes(true);
+    setNotesProgress({ current: 0, total: 0, phase: 'extracting' });
+
+    try {
+      const viewCount = settings.pre_study_view_count;
+      const textContent = extractNextViewsText(viewCount);
+
+      if (!textContent || textContent.trim().length === 0) {
+        console.log('[PreStudy] No text to process (might be at end of book)');
+        setIsGeneratingNotes(false);
+        setNotesProgress(null);
+        return;
+      }
+
+      console.log(`[PreStudy] Starting generation with ${textContent.length} characters from ${viewCount} views`);
+
+      await window.electronAPI.preStudy.generateNotes({
+        bookId: book.id,
+        bookTitle: book.title,
+        language: book.language,
+        textContent,
+        startViewIndex: reflowState.currentPageIndex + 1,  // 1-based for display
+        endViewIndex: Math.min(reflowState.currentPageIndex + viewCount, reflowState.totalPages),  // Current view + (viewCount-1) more
+      });
+
+      console.log('[PreStudy] Generation complete');
+    } catch (error) {
+      console.error('[PreStudy] Error generating notes:', error);
+    } finally {
+      setIsGeneratingNotes(false);
+      setNotesProgress(null);
+    }
+  }, [isGeneratingNotes, fetchingCount, pendingCount, extractNextViewsText, book.id, book.title, book.language, reflowState.currentPageIndex, reflowState.totalPages, settings.pre_study_view_count]);
+
+  // Pre-study notes: Listen for progress updates
+  useEffect(() => {
+    const unsubscribe = window.electronAPI.preStudy.onProgress((progress) => {
+      setNotesProgress(progress);
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
+  // Pre-study notes: Cancel handler
+  const handleCancelPreStudyNotes = useCallback(async () => {
+    try {
+      await window.electronAPI.preStudy.cancel();
+      setIsGeneratingNotes(false);
+      setNotesProgress(null);
+    } catch (error) {
+      console.error('[PreStudy] Error cancelling:', error);
+    }
+  }, []);
+
   // Helper to check if an index is part of any phrase range
   const getPhraseInfoForIndex = useCallback((index: number): { isInPhrase: boolean; isMiddle: boolean; status: 'loading' | 'ready' | null } => {
     for (const [, range] of phraseRanges) {
@@ -787,6 +941,14 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
             {fetchingCount + pendingCount} in queue
           </span>
 
+          {/* Pre-Study Notes button */}
+          <PreStudyNotesButton
+            onClick={handleGeneratePreStudyNotes}
+            isGenerating={isGeneratingNotes}
+            progress={notesProgress}
+            disabled={fetchingCount + pendingCount > 0}
+          />
+
           {/* Zoom control */}
           <div className="flex items-center gap-2">
             <span className="text-xs text-gray-500 dark:text-gray-400">Zoom:</span>
@@ -875,6 +1037,13 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
         bookLanguage={book.language}
         onNavigateToPage={goToOriginalPage}
         preloadedData={preloadedData}
+      />
+
+      {/* Floating Progress Panel for Pre-Study Notes */}
+      <FloatingProgressPanel
+        progress={notesProgress}
+        isVisible={isGeneratingNotes}
+        onCancel={handleCancelPreStudyNotes}
       />
     </div>
   );

@@ -11,6 +11,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   font_family: 'Georgia, serif',
   line_height: 1.8,
   page_margin: 40,
+  // Pre-Study Notes settings
+  pre_study_view_count: 10,      // Default: 10 views
+  pre_study_sentence_limit: 0,   // Default: 0 = all sentences
 };
 
 // Zoom level constraints

@@ -11,11 +11,33 @@
  * - \p{L} matches any Unicode letter (Latin, Cyrillic, Greek, etc.)
  * - \p{N} matches any Unicode number
  *
+ * Normalizes various apostrophe-like characters to straight apostrophe:
+ * - ' ' (U+2018, U+2019) curly/smart quotes
+ * - ` ´ (U+0060, U+00B4) grave/acute accents
+ * - ʼ ʻ (U+02BC, U+02BB) modifier letters
+ * - ′ (U+2032) prime
+ * - ‛ (U+201B) reversed quote
+ *
+ * Also strips leading/trailing non-letters to handle:
+ * - Opening quotes: 'Don't → Don't (dialogue start)
+ * - Closing quotes: hello' → hello
+ * - Other punctuation: hello, → hello
+ *
  * @param word - The word to clean
- * @returns Cleaned lowercase word with only letters, numbers, hyphens, and apostrophes
+ * @returns Cleaned lowercase word with only letters, numbers, hyphens, and internal apostrophes
  */
 export function cleanWord(word: string): string {
-  return word.replace(/[^\p{L}\p{N}'-]/gu, '').toLowerCase();
+  // Normalize various apostrophe-like characters to straight apostrophe
+  const normalized = word.replace(/[''`´ʼʻ′‛]/g, "'");
+
+  // Strip leading/trailing non-letters (removes opening/closing quotes, punctuation)
+  // This handles "'Don't" → "Don't" and "hello," → "hello"
+  const stripped = normalized
+    .replace(/^[^\p{L}]+/u, '')  // Remove leading non-letters
+    .replace(/[^\p{L}]+$/u, ''); // Remove trailing non-letters
+
+  // Keep internal letters, numbers, hyphens, and apostrophes
+  return stripped.replace(/[^\p{L}\p{N}'-]/gu, '').toLowerCase();
 }
 
 /**
