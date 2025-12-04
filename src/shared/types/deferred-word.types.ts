@@ -44,6 +44,11 @@ export interface CachedWordData {
   wordEquivalent?: string;
   occurrences?: { page: number; sentence: string }[];
   tatoebaExamples?: { sentence: string; translation?: string }[];
+  // Translation fields (for non-English books)
+  wordTranslation?: string;        // English translation of the word
+  sentenceTranslation?: string;    // English translation of original sentence
+  simplifiedTranslation?: string;  // English translation of simplified sentence
+  phraseTranslation?: string;      // English translation of phrase (for phrases)
   fetchedAt: number;
 }
 
@@ -54,6 +59,7 @@ export interface QueuedWordEntry {
   word: string;           // Clean lowercase word
   sentence: string;       // Context sentence for AI and cache key
   bookId: number;
+  language: string;       // Book language for AI prompts
   status: QueuedWordStatus;
   data?: CachedWordData;
   error?: string;

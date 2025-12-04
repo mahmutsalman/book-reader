@@ -4,6 +4,7 @@ export interface WordDefinitionResult {
   word: string;
   definition: string;
   context: string;
+  wordTranslation?: string; // English translation of the word (for non-English books)
 }
 
 export interface IPAPronunciationResult {
@@ -15,6 +16,8 @@ export interface IPAPronunciationResult {
 export interface SimplifiedSentenceResult {
   original: string;
   simplified: string;
+  sentenceTranslation?: string;   // English translation of original sentence
+  simplifiedTranslation?: string; // English translation of simplified sentence
 }
 
 export interface WordEquivalentResult {
@@ -27,6 +30,7 @@ export interface PhraseMeaningResult {
   phrase: string;
   meaning: string;
   context: string;
+  phraseTranslation?: string; // English translation of the phrase (for non-English books)
 }
 
 // Tatoeba sentence

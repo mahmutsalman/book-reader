@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSettings } from '../../context/SettingsContext';
 import type { CachedWordData } from '../../../shared/types/deferred-word.types';
+import type { BookLanguage } from '../../../shared/types';
 
 interface SelectedWord {
   word: string;
@@ -15,6 +16,7 @@ interface WordPanelProps {
   onClose: () => void;
   selectedWord: SelectedWord | null;
   bookId: number;
+  bookLanguage?: BookLanguage;
   onNavigateToPage?: (page: number) => void;
   preloadedData?: CachedWordData | null;
 }
@@ -27,13 +29,19 @@ interface WordData {
   wordEquivalent?: string;
   occurrences?: { page: number; sentence: string }[];
   tatoebaExamples?: { sentence: string; translation?: string }[];
+  // Translation fields (for non-English books)
+  wordTranslation?: string;
+  sentenceTranslation?: string;
+  simplifiedTranslation?: string;
+  phraseTranslation?: string;
   loading: boolean;
   error?: string;
 }
 
-const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bookId, onNavigateToPage, preloadedData }) => {
+const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bookId, bookLanguage = 'en', onNavigateToPage, preloadedData }) => {
   const { settings } = useSettings();
   const [wordData, setWordData] = useState<WordData>({ loading: false });
+  const isNonEnglish = bookLanguage !== 'en';
   const [saved, setSaved] = useState(false);
 
   // Helper function to highlight the selected word/phrase in a sentence
@@ -106,6 +114,11 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
         wordEquivalent: preloadedData.wordEquivalent,
         occurrences: preloadedData.occurrences,
         tatoebaExamples: preloadedData.tatoebaExamples,
+        // Translation fields
+        wordTranslation: preloadedData.wordTranslation,
+        sentenceTranslation: preloadedData.sentenceTranslation,
+        simplifiedTranslation: preloadedData.simplifiedTranslation,
+        phraseTranslation: preloadedData.phraseTranslation,
       });
       setSaved(false);
       return;
@@ -303,6 +316,13 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
                 <p className="text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
                   {wordData.definition || (selectedWord.isPhrase ? 'No phrase meaning available' : 'No definition available')}
                 </p>
+                {/* English translation of word/phrase (for non-English books) */}
+                {isNonEnglish && (wordData.wordTranslation || wordData.phraseTranslation) && (
+                  <p className="text-sm text-blue-600 dark:text-blue-400 mt-2 flex items-center gap-1">
+                    <span>🇬🇧</span>
+                    <span>{selectedWord.isPhrase ? wordData.phraseTranslation : wordData.wordTranslation}</span>
+                  </p>
+                )}
               </section>
 
               {/* Original Sentence */}
@@ -311,6 +331,13 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
                 <p className="text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 p-3 rounded-lg italic">
                   "{highlightWord(selectedWord.sentence, selectedWord.word)}"
                 </p>
+                {/* English translation of sentence (for non-English books) */}
+                {isNonEnglish && wordData.sentenceTranslation && (
+                  <p className="text-sm text-blue-600 dark:text-blue-400 mt-2 flex items-start gap-1">
+                    <span>🇬🇧</span>
+                    <span>"{wordData.sentenceTranslation}"</span>
+                  </p>
+                )}
               </section>
 
               {/* Simplified Sentence - only for single words */}
@@ -322,6 +349,13 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
                       ? highlightWord(wordData.simplifiedSentence, wordData.wordEquivalent)
                       : wordData.simplifiedSentence}
                   </p>
+                  {/* English translation of simplified sentence (for non-English books) */}
+                  {isNonEnglish && wordData.simplifiedTranslation && (
+                    <p className="text-sm text-blue-600 dark:text-blue-400 mt-2 flex items-start gap-1">
+                      <span>🇬🇧</span>
+                      <span>"{wordData.simplifiedTranslation}"</span>
+                    </p>
+                  )}
                 </section>
               )}
 

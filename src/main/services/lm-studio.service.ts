@@ -26,20 +26,72 @@ export class LMStudioService {
     this.model = model;
   }
 
-  async getWordDefinition(word: string, context: string): Promise<string> {
-    const prompt = `Define the word "${word}" as it is used in the following context. Provide a clear, concise definition suitable for a language learner (2-3 sentences max).
+  async getWordDefinition(word: string, context: string, language = 'en'): Promise<{
+    definition: string;
+    wordTranslation?: string;
+  }> {
+    if (language === 'en') {
+      // English: just get the definition
+      const prompt = `Define the word "${word}" as it is used in the following context. Provide a clear, concise definition suitable for a language learner (2-3 sentences max).
 
 Context: "${context}"
 
 Definition:`;
+      const definition = await this.chat(prompt);
+      return { definition };
+    }
 
-    return this.chat(prompt);
+    // Non-English: get definition in source language + English translation
+    const languageName = this.getLanguageName(language);
+    const prompt = `For the ${languageName} word "${word}" in this context, provide:
+1. A definition in ${languageName} (2-3 sentences, keep it in ${languageName}, do NOT translate to English)
+2. The English translation of the word
+
+Context: "${context}"
+
+Format your response EXACTLY like this:
+DEFINITION: [definition in ${languageName}]
+ENGLISH: [English translation of the word]`;
+
+    const response = await this.chat(prompt);
+
+    // Parse the response
+    const defMatch = response.match(/DEFINITION:\s*(.+?)(?=ENGLISH:|$)/is);
+    const engMatch = response.match(/ENGLISH:\s*(.+?)$/is);
+
+    const definition = defMatch ? defMatch[1].trim() : response;
+    const wordTranslation = engMatch ? engMatch[1].trim() : undefined;
+
+    return { definition, wordTranslation };
   }
 
-  async getIPAPronunciation(word: string): Promise<{ ipa: string; syllables: string }> {
-    const prompt = `For the English word "${word}", provide:
+  private getLanguageName(code: string): string {
+    const names: Record<string, string> = {
+      en: 'English',
+      de: 'German',
+      ru: 'Russian',
+      fr: 'French',
+      es: 'Spanish',
+      it: 'Italian',
+      pt: 'Portuguese',
+      ja: 'Japanese',
+      zh: 'Chinese',
+      ko: 'Korean',
+    };
+    return names[code] || 'the source';
+  }
+
+  async getIPAPronunciation(word: string, language = 'en'): Promise<{ ipa: string; syllables: string }> {
+    const languageName = this.getLanguageName(language);
+
+    // For non-Latin scripts, use native script for syllables
+    const syllableNote = ['ru', 'ja', 'zh', 'ko'].includes(language)
+      ? `Use · as separator. Use the native script (do NOT romanize).`
+      : `Use · as separator.`;
+
+    const prompt = `For the ${languageName} word "${word}", provide:
 1. IPA pronunciation in slashes (e.g., /ˈeksæmpəl/)
-2. Syllable breakdown with dots (e.g., ex·am·ple)
+2. Syllable breakdown with dots (e.g., ex·am·ple). ${syllableNote}
 
 Format your response EXACTLY like this:
 IPA: /pronunciation/
@@ -59,15 +111,22 @@ Do not include any other text.`;
 
     // If no syllables found, try to extract any word with dots or middle dots
     if (!syllables) {
-      const dotMatch = response.match(/([a-zA-Z]+[·.][a-zA-Z·.]+)/);
+      // Match any characters with dots (including Cyrillic, CJK, etc.)
+      const dotMatch = response.match(/(\S+[·.]\S+)/);
       syllables = dotMatch ? dotMatch[1].replace(/\./g, '·') : '';
     }
 
     return { ipa, syllables };
   }
 
-  async simplifySentence(sentence: string): Promise<string> {
-    const prompt = `Rewrite this sentence using simpler words for a language learner.
+  async simplifySentence(sentence: string, language = 'en'): Promise<{
+    simplified: string;
+    simplifiedTranslation?: string;
+    sentenceTranslation?: string;
+  }> {
+    if (language === 'en') {
+      // English: just simplify
+      const prompt = `Rewrite this sentence using simpler words for a language learner.
 
 Rules:
 - Replace difficult words with easier synonyms (e.g., "passion" → "strong love", "peculiar" → "strange", "departed" → "left")
@@ -80,7 +139,42 @@ Original: "${sentence}"
 
 Simplified:`;
 
-    return this.chat(prompt);
+      const simplified = await this.chat(prompt);
+      return { simplified };
+    }
+
+    // Non-English: simplify in source language AND provide English translations
+    const languageName = this.getLanguageName(language);
+    const prompt = `For this ${languageName} sentence, provide:
+1. A simplified version in ${languageName} using easier words (keep it in ${languageName}, do NOT translate to English)
+2. English translation of the original sentence
+3. English translation of the simplified sentence
+
+Rules for simplification:
+- Replace difficult words with easier ${languageName} synonyms
+- Keep the SAME sentence structure as much as possible
+- Do NOT remove any concepts or meanings
+- Keep names and places unchanged
+
+Original: "${sentence}"
+
+Format your response EXACTLY like this:
+SIMPLIFIED: [simplified version in ${languageName}]
+ORIGINAL_ENGLISH: [English translation of original]
+SIMPLIFIED_ENGLISH: [English translation of simplified]`;
+
+    const response = await this.chat(prompt);
+
+    // Parse the response
+    const simpMatch = response.match(/SIMPLIFIED:\s*(.+?)(?=ORIGINAL_ENGLISH:|$)/is);
+    const origEngMatch = response.match(/ORIGINAL_ENGLISH:\s*(.+?)(?=SIMPLIFIED_ENGLISH:|$)/is);
+    const simpEngMatch = response.match(/SIMPLIFIED_ENGLISH:\s*(.+?)$/is);
+
+    const simplified = simpMatch ? simpMatch[1].trim() : response;
+    const sentenceTranslation = origEngMatch ? origEngMatch[1].trim() : undefined;
+    const simplifiedTranslation = simpEngMatch ? simpEngMatch[1].trim() : undefined;
+
+    return { simplified, sentenceTranslation, simplifiedTranslation };
   }
 
   async resimplifyWithWord(
@@ -171,8 +265,12 @@ Answer:`;
   /**
    * Get the meaning of a phrase (phrasal verb, collocation, idiom) in context
    */
-  async getPhraseMeaning(phrase: string, context: string): Promise<string> {
-    const prompt = `Explain the meaning of the phrase "${phrase}" as it is used in the following context. Focus on:
+  async getPhraseMeaning(phrase: string, context: string, language = 'en'): Promise<{
+    meaning: string;
+    phraseTranslation?: string;
+  }> {
+    if (language === 'en') {
+      const prompt = `Explain the meaning of the phrase "${phrase}" as it is used in the following context. Focus on:
 - Idiomatic meaning (if it's an idiom or phrasal verb)
 - How the words work together as a unit
 - A clear, simple explanation for a language learner (2-3 sentences)
@@ -180,8 +278,34 @@ Answer:`;
 Context: "${context}"
 
 Meaning:`;
+      const meaning = await this.chat(prompt);
+      return { meaning };
+    }
 
-    return this.chat(prompt);
+    // Non-English: explain in source language + English translation
+    const languageName = this.getLanguageName(language);
+    const prompt = `For the ${languageName} phrase "${phrase}" in this context, provide:
+1. An explanation in ${languageName} of what this phrase means (keep it in ${languageName}, do NOT translate to English)
+2. The English translation of the phrase
+
+Focus on idiomatic meaning if applicable.
+
+Context: "${context}"
+
+Format your response EXACTLY like this:
+MEANING: [explanation in ${languageName}]
+ENGLISH: [English translation of the phrase]`;
+
+    const response = await this.chat(prompt);
+
+    // Parse the response
+    const meaningMatch = response.match(/MEANING:\s*(.+?)(?=ENGLISH:|$)/is);
+    const engMatch = response.match(/ENGLISH:\s*(.+?)$/is);
+
+    const meaning = meaningMatch ? meaningMatch[1].trim() : response;
+    const phraseTranslation = engMatch ? engMatch[1].trim() : undefined;
+
+    return { meaning, phraseTranslation };
   }
 
   /**

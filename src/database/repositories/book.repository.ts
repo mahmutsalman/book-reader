@@ -1,13 +1,13 @@
 import fs from 'fs';
 import { getDatabase } from '../index';
-import type { Book, BookData } from '../../shared/types';
+import type { Book, BookData, BookLanguage } from '../../shared/types';
 
 export class BookRepository {
   private get db() {
     return getDatabase();
   }
 
-  async import(jsonPath: string): Promise<Book> {
+  async import(jsonPath: string, language: BookLanguage = 'en'): Promise<Book> {
     // Read and parse the JSON file
     const content = fs.readFileSync(jsonPath, 'utf-8');
     const bookData: BookData = JSON.parse(content);
@@ -20,14 +20,15 @@ export class BookRepository {
 
     // Insert book into database
     const result = this.db.prepare(`
-      INSERT INTO books (title, json_path, total_pages, total_words, total_chars)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO books (title, json_path, total_pages, total_words, total_chars, language)
+      VALUES (?, ?, ?, ?, ?, ?)
     `).run(
       bookData.title,
       jsonPath,
       bookData.total_pages,
       totalWords,
-      totalChars
+      totalChars,
+      language
     );
 
     // Create initial reading progress

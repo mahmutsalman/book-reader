@@ -242,7 +242,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
       setIsPanelOpen(true);
     } else {
       // Queue phrase for background fetch
-      queueWord(phrase, fullSentence, book.id);
+      queueWord(phrase, fullSentence, book.id, book.language);
 
       // Add to phrase ranges for dot display
       setPhraseRanges(prev => {
@@ -357,7 +357,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
 
       // Only queue if not already pending or fetching
       if (!status || status === 'error') {
-        queueWord(cleanWord, fullSentence, book.id);
+        queueWord(cleanWord, fullSentence, book.id, book.language);
 
         // Add to known words (for gray dot on other pages)
         setKnownWords(prev => new Set(prev).add(cleanWord));
@@ -424,7 +424,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
             } else {
               const status = getWordStatus(word, fullSentence, book.id);
               if (!status || status === 'error') {
-                queueWord(word, fullSentence, book.id);
+                queueWord(word, fullSentence, book.id, book.language);
                 setLoadingPositions(prev => new Set(prev).add(wordIndex));
                 loadingWordsMapRef.current.set(wordIndex, word);
                 wordSentenceMapRef.current.set(wordIndex, fullSentence);
@@ -537,7 +537,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
 
       // Queue words for background fetch (limit to avoid overload)
       wordsToQueue.slice(0, 5).forEach(({ word, index, sentence }) => {
-        queueWord(word, sentence, book.id);
+        queueWord(word, sentence, book.id, book.language);
         setLoadingPositions(prev => new Set(prev).add(index));
         loadingWordsMapRef.current.set(index, word);
         wordSentenceMapRef.current.set(index, sentence);
@@ -806,6 +806,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
         }}
         selectedWord={selectedWord}
         bookId={book.id}
+        bookLanguage={book.language}
         onNavigateToPage={goToOriginalPage}
         preloadedData={preloadedData}
       />

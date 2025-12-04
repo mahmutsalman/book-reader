@@ -21,11 +21,16 @@ async function getService(): Promise<LMStudioService> {
 export function registerAIHandlers(): void {
   ipcMain.handle(
     IPC_CHANNELS.AI_GET_DEFINITION,
-    async (_, word: string, context: string) => {
+    async (_, word: string, context: string, language = 'en') => {
       try {
         const service = await getService();
-        const definition = await service.getWordDefinition(word, context);
-        return { word, definition, context };
+        const result = await service.getWordDefinition(word, context, language);
+        return {
+          word,
+          definition: result.definition,
+          context,
+          wordTranslation: result.wordTranslation,
+        };
       } catch (error) {
         console.error('Failed to get definition:', error);
         return {
@@ -37,10 +42,10 @@ export function registerAIHandlers(): void {
     }
   );
 
-  ipcMain.handle(IPC_CHANNELS.AI_GET_IPA, async (_, word: string) => {
+  ipcMain.handle(IPC_CHANNELS.AI_GET_IPA, async (_, word: string, language = 'en') => {
     try {
       const service = await getService();
-      const { ipa, syllables } = await service.getIPAPronunciation(word);
+      const { ipa, syllables } = await service.getIPAPronunciation(word, language);
       return { word, ipa, syllables };
     } catch (error) {
       console.error('Failed to get IPA:', error);
@@ -48,11 +53,16 @@ export function registerAIHandlers(): void {
     }
   });
 
-  ipcMain.handle(IPC_CHANNELS.AI_SIMPLIFY_SENTENCE, async (_, sentence: string) => {
+  ipcMain.handle(IPC_CHANNELS.AI_SIMPLIFY_SENTENCE, async (_, sentence: string, language = 'en') => {
     try {
       const service = await getService();
-      const simplified = await service.simplifySentence(sentence);
-      return { original: sentence, simplified };
+      const result = await service.simplifySentence(sentence, language);
+      return {
+        original: sentence,
+        simplified: result.simplified,
+        sentenceTranslation: result.sentenceTranslation,
+        simplifiedTranslation: result.simplifiedTranslation,
+      };
     } catch (error) {
       console.error('Failed to simplify sentence:', error);
       return { original: sentence, simplified: sentence };
@@ -93,13 +103,18 @@ export function registerAIHandlers(): void {
 
   ipcMain.handle(
     IPC_CHANNELS.AI_GET_PHRASE_MEANING,
-    async (_, phrase: string, context: string) => {
-      console.log('[PHRASE IPC] getPhraseMeaning request:', { phrase, context });
+    async (_, phrase: string, context: string, language = 'en') => {
+      console.log('[PHRASE IPC] getPhraseMeaning request:', { phrase, context, language });
       try {
         const service = await getService();
-        const meaning = await service.getPhraseMeaning(phrase, context);
-        console.log('[PHRASE IPC] getPhraseMeaning response:', { phrase, meaning });
-        return { phrase, meaning, context };
+        const result = await service.getPhraseMeaning(phrase, context, language);
+        console.log('[PHRASE IPC] getPhraseMeaning response:', { phrase, meaning: result.meaning });
+        return {
+          phrase,
+          meaning: result.meaning,
+          context,
+          phraseTranslation: result.phraseTranslation,
+        };
       } catch (error) {
         console.error('Failed to get phrase meaning:', error);
         return {

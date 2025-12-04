@@ -6,8 +6,8 @@ import type { ElectronAPI } from './shared/types/ipc.types';
 const electronAPI: ElectronAPI = {
   // Book operations
   book: {
-    import: (filePath: string) =>
-      ipcRenderer.invoke(IPC_CHANNELS.BOOK_IMPORT, filePath),
+    import: (filePath: string, language?: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BOOK_IMPORT, filePath, language || 'en'),
     getAll: () =>
       ipcRenderer.invoke(IPC_CHANNELS.BOOK_GET_ALL),
     getById: (id: number) =>
@@ -48,18 +48,18 @@ const electronAPI: ElectronAPI = {
 
   // AI Services
   ai: {
-    getDefinition: (word, context) =>
-      ipcRenderer.invoke(IPC_CHANNELS.AI_GET_DEFINITION, word, context),
-    getIPA: (word) =>
-      ipcRenderer.invoke(IPC_CHANNELS.AI_GET_IPA, word),
-    simplifySentence: (sentence) =>
-      ipcRenderer.invoke(IPC_CHANNELS.AI_SIMPLIFY_SENTENCE, sentence),
+    getDefinition: (word, context, language?) =>
+      ipcRenderer.invoke(IPC_CHANNELS.AI_GET_DEFINITION, word, context, language || 'en'),
+    getIPA: (word, language?) =>
+      ipcRenderer.invoke(IPC_CHANNELS.AI_GET_IPA, word, language || 'en'),
+    simplifySentence: (sentence, language?) =>
+      ipcRenderer.invoke(IPC_CHANNELS.AI_SIMPLIFY_SENTENCE, sentence, language || 'en'),
     getWordEquivalent: (word, originalSentence, simplifiedSentence) =>
       ipcRenderer.invoke(IPC_CHANNELS.AI_GET_WORD_EQUIVALENT, word, originalSentence, simplifiedSentence),
     resimplifyWithWord: (originalSentence, originalWord, equivalentWord) =>
       ipcRenderer.invoke(IPC_CHANNELS.AI_RESIMPLIFY_WITH_WORD, originalSentence, originalWord, equivalentWord),
-    getPhraseMeaning: (phrase, context) =>
-      ipcRenderer.invoke(IPC_CHANNELS.AI_GET_PHRASE_MEANING, phrase, context),
+    getPhraseMeaning: (phrase, context, language?) =>
+      ipcRenderer.invoke(IPC_CHANNELS.AI_GET_PHRASE_MEANING, phrase, context, language || 'en'),
     testConnection: () =>
       ipcRenderer.invoke(IPC_CHANNELS.AI_TEST_CONNECTION),
   },

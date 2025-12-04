@@ -1,12 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBooks } from '../context/BookContext';
-import type { Book } from '../../shared/types';
+import type { Book, BookLanguage } from '../../shared/types';
+import { BOOK_LANGUAGES } from '../../shared/types';
 
 const LibraryPage: React.FC = () => {
   const { books, loading, error, loadBooks, importBook, deleteBook } = useBooks();
   const navigate = useNavigate();
   const [importing, setImporting] = useState(false);
+  const [pendingFilePath, setPendingFilePath] = useState<string | null>(null);
+  const [selectedLanguage, setSelectedLanguage] = useState<BookLanguage>('en');
 
   useEffect(() => {
     loadBooks();
@@ -19,20 +22,37 @@ const LibraryPage: React.FC = () => {
     }
 
     try {
-      setImporting(true);
       const filePath = await window.electronAPI.dialog.openFile({
         filters: [{ name: 'JSON Books', extensions: ['json'] }],
       });
 
       if (filePath) {
-        await importBook(filePath);
+        // Show language selection dialog
+        setPendingFilePath(filePath);
+        setSelectedLanguage('en');
       }
+    } catch (err) {
+      console.error('File selection failed:', err);
+    }
+  };
+
+  const handleConfirmImport = async () => {
+    if (!pendingFilePath) return;
+
+    try {
+      setImporting(true);
+      await importBook(pendingFilePath, selectedLanguage);
+      setPendingFilePath(null);
     } catch (err) {
       console.error('Import failed:', err);
       alert('Failed to import book');
     } finally {
       setImporting(false);
     }
+  };
+
+  const handleCancelImport = () => {
+    setPendingFilePath(null);
   };
 
   const handleOpenBook = (book: Book) => {
@@ -122,6 +142,58 @@ const LibraryPage: React.FC = () => {
             </div>
           ))}
         </div>
+      )}
+
+      {/* Language Selection Dialog */}
+      {pendingFilePath && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/50 z-40"
+            onClick={handleCancelImport}
+          />
+          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-gray-800 rounded-lg shadow-xl z-50 p-6 w-96">
+            <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">
+              Import Book
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
+              Select the language of the book:
+            </p>
+            <select
+              value={selectedLanguage}
+              onChange={(e) => setSelectedLanguage(e.target.value as BookLanguage)}
+              className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-white mb-4"
+            >
+              {BOOK_LANGUAGES.map((lang) => (
+                <option key={lang.code} value={lang.code}>
+                  {lang.name}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+              {selectedLanguage !== 'en' && (
+                <>English translations will be shown for definitions and sentences.</>
+              )}
+              {selectedLanguage === 'en' && (
+                <>Standard English word lookup will be used.</>
+              )}
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={handleCancelImport}
+                className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmImport}
+                disabled={importing}
+                className="btn-primary"
+              >
+                {importing ? 'Importing...' : 'Import'}
+              </button>
+            </div>
+          </div>
+        </>
       )}
     </div>
   );

@@ -1,10 +1,11 @@
 import { ipcMain } from 'electron';
 import { IPC_CHANNELS } from '../../shared/constants';
 import { bookRepository } from '../../database/repositories';
+import type { BookLanguage } from '../../shared/types';
 
 export function registerBookHandlers(): void {
-  ipcMain.handle(IPC_CHANNELS.BOOK_IMPORT, async (_, filePath: string) => {
-    return bookRepository.import(filePath);
+  ipcMain.handle(IPC_CHANNELS.BOOK_IMPORT, async (_, filePath: string, language: BookLanguage = 'en') => {
+    return bookRepository.import(filePath, language);
   });
 
   ipcMain.handle(IPC_CHANNELS.BOOK_GET_ALL, async () => {

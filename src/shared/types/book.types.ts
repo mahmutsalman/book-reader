@@ -17,6 +17,22 @@ export interface BookData {
   total_chars?: number;
 }
 
+// Supported book languages
+export type BookLanguage = 'en' | 'de' | 'ru' | 'fr' | 'es' | 'it' | 'pt' | 'ja' | 'zh' | 'ko';
+
+export const BOOK_LANGUAGES: { code: BookLanguage; name: string }[] = [
+  { code: 'en', name: 'English' },
+  { code: 'de', name: 'German' },
+  { code: 'ru', name: 'Russian' },
+  { code: 'fr', name: 'French' },
+  { code: 'es', name: 'Spanish' },
+  { code: 'it', name: 'Italian' },
+  { code: 'pt', name: 'Portuguese' },
+  { code: 'ja', name: 'Japanese' },
+  { code: 'zh', name: 'Chinese' },
+  { code: 'ko', name: 'Korean' },
+];
+
 // Database entity for books
 export interface Book {
   id: number;
@@ -26,6 +42,7 @@ export interface Book {
   total_words?: number;
   total_chars?: number;
   cover_image?: string;
+  language: BookLanguage;
   created_at: string;
   updated_at?: string;
 }

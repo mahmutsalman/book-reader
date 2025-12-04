@@ -6,6 +6,7 @@ import type {
   CachedWordData,
 } from '../../shared/types/deferred-word.types';
 import { generateWordKey, generatePhraseKey } from '../../shared/types/deferred-word.types';
+import type { BookLanguage } from '../../shared/types';
 
 // Helper to check if a string is a phrase (multiple words)
 const isPhrase = (text: string): boolean => text.trim().includes(' ');
@@ -16,7 +17,7 @@ const CACHE_EXPIRATION_MS = 30 * 60 * 1000; // 30 minutes
 
 interface DeferredWordContextType {
   // Queue a word for background fetching (sentence is now the key identifier)
-  queueWord: (word: string, sentence: string, bookId: number) => void;
+  queueWord: (word: string, sentence: string, bookId: number, language?: BookLanguage) => void;
   // Check if a word has ready data (sentence-specific)
   isWordReady: (word: string, sentence: string, bookId: number) => boolean;
   // Get the status of a word (sentence-specific)
@@ -140,15 +141,19 @@ export const DeferredWordProvider: React.FC<DeferredWordProviderProps> = ({ chil
 
       if (isPhraseEntry) {
         // Phrase handling: get phrase meaning instead of word definition
-        console.log('[PHRASE DEBUG] Sending phrase to AI:', { phrase: entry.word, sentence: entry.sentence });
+        console.log('[PHRASE DEBUG] Sending phrase to AI:', { phrase: entry.word, sentence: entry.sentence, language: entry.language });
         try {
           const phraseMeaningResult = await window.electronAPI.ai.getPhraseMeaning(
             entry.word,
-            entry.sentence
+            entry.sentence,
+            entry.language
           );
           console.log('[PHRASE DEBUG] AI phrase response:', phraseMeaningResult);
           if (phraseMeaningResult.meaning) {
             results.definition = phraseMeaningResult.meaning;
+          }
+          if (phraseMeaningResult.phraseTranslation) {
+            results.phraseTranslation = phraseMeaningResult.phraseTranslation;
           }
         } catch (err) {
           console.error('[DeferredWord] getPhraseMeaning error:', err);
@@ -162,13 +167,16 @@ export const DeferredWordProvider: React.FC<DeferredWordProviderProps> = ({ chil
         // Single word handling: original behavior
         // Fetch definition, IPA, and simplified sentence in parallel
         const [defResult, ipaResult, simplifyResult] = await Promise.allSettled([
-          window.electronAPI.ai.getDefinition(entry.word, entry.sentence),
-          window.electronAPI.ai.getIPA(entry.word),
-          window.electronAPI.ai.simplifySentence(entry.sentence),
+          window.electronAPI.ai.getDefinition(entry.word, entry.sentence, entry.language),
+          window.electronAPI.ai.getIPA(entry.word, entry.language),
+          window.electronAPI.ai.simplifySentence(entry.sentence, entry.language),
         ]);
 
         if (defResult.status === 'fulfilled') {
           results.definition = defResult.value.definition;
+          if (defResult.value.wordTranslation) {
+            results.wordTranslation = defResult.value.wordTranslation;
+          }
         }
         if (ipaResult.status === 'fulfilled') {
           results.ipa = ipaResult.value.ipa;
@@ -176,6 +184,13 @@ export const DeferredWordProvider: React.FC<DeferredWordProviderProps> = ({ chil
         }
         if (simplifyResult.status === 'fulfilled') {
           results.simplifiedSentence = simplifyResult.value.simplified;
+          // Store translations if available (for non-English books)
+          if (simplifyResult.value.sentenceTranslation) {
+            results.sentenceTranslation = simplifyResult.value.sentenceTranslation;
+          }
+          if (simplifyResult.value.simplifiedTranslation) {
+            results.simplifiedTranslation = simplifyResult.value.simplifiedTranslation;
+          }
 
           // Get word equivalent in simplified sentence
           try {
@@ -267,7 +282,7 @@ export const DeferredWordProvider: React.FC<DeferredWordProviderProps> = ({ chil
   };
 
   // Queue a word or phrase for background fetching (sentence-based caching)
-  const queueWord = useCallback((word: string, sentence: string, bookId: number) => {
+  const queueWord = useCallback((word: string, sentence: string, bookId: number, language: BookLanguage = 'en') => {
     // For phrases, preserve spaces; for single words, clean normally
     const cleanText = isPhrase(word)
       ? word.toLowerCase().trim()
@@ -302,6 +317,7 @@ export const DeferredWordProvider: React.FC<DeferredWordProviderProps> = ({ chil
         word: cleanText,
         sentence,
         bookId,
+        language,
         status: 'pending',
         queuedAt: Date.now(),
       });

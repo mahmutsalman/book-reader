@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import type { Book, BookData, ReadingProgress } from '../../shared/types';
+import type { Book, BookData, ReadingProgress, BookLanguage } from '../../shared/types';
 
 interface BookContextType {
   books: Book[];
@@ -10,7 +10,7 @@ interface BookContextType {
   error: string | null;
   loadBooks: () => Promise<void>;
   loadBook: (bookId: number) => Promise<void>;
-  importBook: (filePath: string) => Promise<Book>;
+  importBook: (filePath: string, language?: BookLanguage) => Promise<Book>;
   deleteBook: (bookId: number) => Promise<void>;
   updateProgress: (data: Partial<ReadingProgress>) => Promise<void>;
 }
@@ -76,14 +76,14 @@ export const BookProvider: React.FC<BookProviderProps> = ({ children }) => {
     }
   }, []);
 
-  const importBook = useCallback(async (filePath: string): Promise<Book> => {
+  const importBook = useCallback(async (filePath: string, language: BookLanguage = 'en'): Promise<Book> => {
     setLoading(true);
     setError(null);
     try {
       if (!window.electronAPI) {
         throw new Error('Electron API not available');
       }
-      const book = await window.electronAPI.book.import(filePath);
+      const book = await window.electronAPI.book.import(filePath, language);
       setBooks(prev => [...prev, book]);
       return book;
     } catch (err) {

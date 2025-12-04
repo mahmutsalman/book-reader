@@ -1,4 +1,4 @@
-import type { Book, BookData, ReadingProgress } from './book.types';
+import type { Book, BookData, ReadingProgress, BookLanguage } from './book.types';
 import type { VocabularyEntry, CreateVocabularyEntry, VocabularyFilters, StoredWordOccurrence } from './vocabulary.types';
 import type { AppSettings, LMStudioConnectionResult } from './settings.types';
 import type { WordDefinitionResult, IPAPronunciationResult, SimplifiedSentenceResult, WordEquivalentResult, PhraseMeaningResult, TatoebaSentence, TatoebaStatus } from './ai.types';
@@ -6,7 +6,7 @@ import type { WordDefinitionResult, IPAPronunciationResult, SimplifiedSentenceRe
 // IPC API exposed to renderer
 export interface ElectronAPI {
   book: {
-    import: (filePath: string) => Promise<Book>;
+    import: (filePath: string, language?: BookLanguage) => Promise<Book>;
     getAll: () => Promise<Book[]>;
     getById: (id: number) => Promise<Book | null>;
     delete: (id: number) => Promise<void>;
@@ -27,12 +27,12 @@ export interface ElectronAPI {
     addOccurrence: (wordId: number, bookId: number, pageNumber: number, sentence: string) => Promise<void>;
   };
   ai: {
-    getDefinition: (word: string, context: string) => Promise<WordDefinitionResult>;
-    getIPA: (word: string) => Promise<IPAPronunciationResult>;
-    simplifySentence: (sentence: string) => Promise<SimplifiedSentenceResult>;
+    getDefinition: (word: string, context: string, language?: string) => Promise<WordDefinitionResult>;
+    getIPA: (word: string, language?: string) => Promise<IPAPronunciationResult>;
+    simplifySentence: (sentence: string, language?: string) => Promise<SimplifiedSentenceResult>;
     getWordEquivalent: (word: string, originalSentence: string, simplifiedSentence: string) => Promise<WordEquivalentResult>;
     resimplifyWithWord: (originalSentence: string, originalWord: string, equivalentWord: string) => Promise<SimplifiedSentenceResult>;
-    getPhraseMeaning: (phrase: string, context: string) => Promise<PhraseMeaningResult>;
+    getPhraseMeaning: (phrase: string, context: string, language?: string) => Promise<PhraseMeaningResult>;
     testConnection: () => Promise<LMStudioConnectionResult>;
   };
   tatoeba: {
