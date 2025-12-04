@@ -252,16 +252,28 @@ export class PreStudyNotesService {
   }
 
   /**
+   * Normalize text for TTS - collapse whitespace and remove newlines
+   * This prevents Edge TTS from interpreting newlines as pauses
+   */
+  private normalizeForTTS(text: string): string {
+    return text
+      .replace(/[\r\n]+/g, ' ')  // Replace newlines with space
+      .replace(/\s+/g, ' ')       // Collapse multiple spaces
+      .trim();
+  }
+
+  /**
    * Fetch TTS audio for a word entry (word + sentence)
    * Runs in parallel with AI processing for efficiency
    */
   private async fetchAudioForEntry(entry: PreStudyWordEntry, language: string): Promise<void> {
     try {
       // Fetch word and sentence audio in parallel
+      // Normalize sentence text to prevent newlines from causing audio pauses
       const [wordResult, sentenceResult] = await Promise.all([
         pronunciationService.getTTS(entry.word, language),
         entry.contextSentence
-          ? pronunciationService.getTTS(entry.contextSentence, language)
+          ? pronunciationService.getTTS(this.normalizeForTTS(entry.contextSentence), language)
           : Promise.resolve({ success: false } as { success: false }),
       ]);
 
