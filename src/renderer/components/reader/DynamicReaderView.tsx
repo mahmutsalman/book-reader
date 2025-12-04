@@ -74,6 +74,18 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
   // Map word indices to their sentences (for checking if ready later)
   const wordSentenceMapRef = useRef<Map<number, string>>(new Map());
 
+  // Persist phrase ranges and loading positions per page for navigation preservation
+  const phraseRangesByPageRef = useRef<Map<number, Map<string, PhraseRange>>>(new Map());
+  const loadingDataByPageRef = useRef<Map<number, {
+    positions: Set<number>;
+    wordsMap: Map<number, string>;
+    sentenceMap: Map<number, string>;
+  }>>(new Map());
+  const prevPageIndexRef = useRef<number>(-1);
+  // Refs to access current state values in useEffect without adding them as dependencies
+  const phraseRangesRef = useRef<Map<string, PhraseRange>>(new Map());
+  const loadingPositionsRef = useRef<Set<number>>(new Set());
+
   // Use the text reflow hook
   const {
     state: reflowState,
@@ -110,6 +122,15 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
 
     return () => clearTimeout(timer);
   }, [zoom, reflowPages]);
+
+  // Keep refs in sync with state (for use in page change effect without causing loops)
+  useEffect(() => {
+    phraseRangesRef.current = phraseRanges;
+  }, [phraseRanges]);
+
+  useEffect(() => {
+    loadingPositionsRef.current = loadingPositions;
+  }, [loadingPositions]);
 
   // Save progress when position or zoom changes
   useEffect(() => {
@@ -471,14 +492,54 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
     }
   }, [loadingPositions, isWordReady, book.id]);
 
-  // Clear loading positions and phrase selection when page changes
+  // Save and restore loading positions and phrase ranges when page changes
   useEffect(() => {
-    setLoadingPositions(new Set());
-    loadingWordsMapRef.current.clear();
-    wordSentenceMapRef.current.clear();
+    const currentPageIndex = reflowState.currentPageIndex;
+    const prevPageIndex = prevPageIndexRef.current;
+
+    // Save current page's data before switching (only if prev page was valid and different)
+    if (prevPageIndex >= 0 && prevPageIndex !== currentPageIndex) {
+      // Save phrase ranges for the previous page (use ref to avoid dependency loop)
+      if (phraseRangesRef.current.size > 0) {
+        phraseRangesByPageRef.current.set(prevPageIndex, new Map(phraseRangesRef.current));
+      }
+
+      // Save loading data for the previous page
+      if (loadingPositionsRef.current.size > 0) {
+        loadingDataByPageRef.current.set(prevPageIndex, {
+          positions: new Set(loadingPositionsRef.current),
+          wordsMap: new Map(loadingWordsMapRef.current),
+          sentenceMap: new Map(wordSentenceMapRef.current),
+        });
+      }
+    }
+
+    // Restore saved data for the new page (if any)
+    const savedPhraseRanges = phraseRangesByPageRef.current.get(currentPageIndex);
+    const savedLoadingData = loadingDataByPageRef.current.get(currentPageIndex);
+
+    if (savedPhraseRanges) {
+      setPhraseRanges(new Map(savedPhraseRanges));
+    } else {
+      setPhraseRanges(new Map());
+    }
+
+    if (savedLoadingData) {
+      setLoadingPositions(new Set(savedLoadingData.positions));
+      loadingWordsMapRef.current = new Map(savedLoadingData.wordsMap);
+      wordSentenceMapRef.current = new Map(savedLoadingData.sentenceMap);
+    } else {
+      setLoadingPositions(new Set());
+      loadingWordsMapRef.current.clear();
+      wordSentenceMapRef.current.clear();
+    }
+
+    // Always clear selection and word index map on page change
     setSelectedIndices([]);
     wordIndexMapRef.current.clear();
-    setPhraseRanges(new Map());
+
+    // Update previous page ref
+    prevPageIndexRef.current = currentPageIndex;
   }, [reflowState.currentPageIndex]);
 
   // Update phrase ranges when phrases become ready
@@ -714,15 +775,17 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
             Book page: {reflowState.originalPage}
           </span>
 
-          {/* Queue indicator - show when words are pending or fetching */}
-          {(fetchingCount + pendingCount) > 0 && (
-            <span className="text-xs text-yellow-600 dark:text-yellow-400 flex items-center gap-1 px-2 py-1 bg-yellow-50 dark:bg-yellow-900/30 rounded">
-              <span className="relative inline-flex">
-                <span className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />
-              </span>
-              {fetchingCount + pendingCount} in queue
+          {/* Queue indicator - always reserve space to prevent layout shift */}
+          <span className={`text-xs flex items-center gap-1 px-2 py-1 rounded min-w-[90px] ${
+            (fetchingCount + pendingCount) > 0
+              ? 'text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/30'
+              : 'invisible'
+          }`}>
+            <span className="relative inline-flex">
+              <span className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />
             </span>
-          )}
+            {fetchingCount + pendingCount} in queue
+          </span>
 
           {/* Zoom control */}
           <div className="flex items-center gap-2">
@@ -743,14 +806,16 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
         </div>
       </div>
 
-      {/* Reading area */}
-      <div className="flex-1 overflow-hidden p-8">
+      {/* Reading area - horizontal scroll on outer, vertical scroll inside text box */}
+      <div className="flex-1 overflow-x-auto overflow-y-hidden p-8">
         <div
           ref={containerRef}
-          className="h-full max-w-3xl mx-auto bg-white dark:bg-gray-800 rounded-xl shadow-sm dark:shadow-gray-900/50 p-8 reader-text overflow-hidden text-gray-900 dark:text-gray-100"
+          className="h-full mx-auto bg-white dark:bg-gray-800 rounded-xl shadow-sm dark:shadow-gray-900/50 p-8 reader-text overflow-y-auto text-gray-900 dark:text-gray-100"
           style={{
             fontSize: `${fontSize}px`,
             lineHeight: REFLOW_SETTINGS.LINE_HEIGHT,
+            width: '768px',
+            minWidth: '768px',
           }}
         >
           {renderText(reflowState.currentText)}

@@ -134,6 +134,10 @@ export function useTextReflow({
   const fullTextRef = useRef<string>('');
   const pageMapRef = useRef<{ offset: number; page: BookPage }[]>([]);
 
+  // Use ref for characterOffset in reflow calculations to decouple navigation from re-pagination
+  // This prevents navigation from triggering unnecessary reflows
+  const characterOffsetRef = useRef<number>(initialCharacterOffset);
+
   // Build full text and page map once
   useEffect(() => {
     fullTextRef.current = buildFullText(bookData.pages);
@@ -143,7 +147,8 @@ export function useTextReflow({
   // Calculate font size from zoom
   const fontSize = useMemo(() => REFLOW_SETTINGS.BASE_FONT_SIZE * zoom, [zoom]);
 
-  // Reflow text when zoom or container changes
+  // Reflow text when zoom or container changes (NOT when navigating)
+  // Uses characterOffsetRef to decouple navigation from re-pagination
   const reflowPages = useCallback(() => {
     const container = containerRef.current;
     if (!container || !fullTextRef.current) return;
@@ -167,10 +172,10 @@ export function useTextReflow({
     }
     pageOffsetsRef.current = offsets;
 
-    // Find which page contains the current character offset
+    // Find which page contains the current character offset (using ref, not state)
     let newPageIndex = 0;
     for (let i = offsets.length - 1; i >= 0; i--) {
-      if (state.characterOffset >= offsets[i]) {
+      if (characterOffsetRef.current >= offsets[i]) {
         newPageIndex = i;
         break;
       }
@@ -186,32 +191,26 @@ export function useTextReflow({
       currentText: currentPage,
       currentPageIndex: newPageIndex,
       totalPages: pages.length,
+      characterOffset: characterOffsetRef.current, // Sync state with ref
       chapterName: originalPage?.chapter || null,
       originalPage: originalPage?.page || 1,
     }));
-  }, [containerRef, fontSize, state.characterOffset]);
+  }, [containerRef, fontSize]); // Removed state.characterOffset - navigation won't trigger reflow
 
   // Reflow on mount and when dependencies change
+  // Note: Window resize listener removed intentionally to keep word count stable.
+  // Layout uses fixed width container with horizontal scroll instead.
   useEffect(() => {
     reflowPages();
   }, [reflowPages]);
 
-  // Also reflow on window resize
-  useEffect(() => {
-    const handleResize = () => {
-      reflowPages();
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [reflowPages]);
-
-  // Navigation functions
+  // Navigation functions - update ref first, then state (no reflow triggered)
   const goToNextPage = useCallback(() => {
     const nextIndex = state.currentPageIndex + 1;
     if (nextIndex >= pagesRef.current.length) return;
 
     const newOffset = pageOffsetsRef.current[nextIndex] || 0;
+    characterOffsetRef.current = newOffset; // Update ref first
     const originalPage = findOriginalPage(newOffset, pageMapRef.current);
 
     setState(prev => ({
@@ -229,6 +228,7 @@ export function useTextReflow({
     if (prevIndex < 0) return;
 
     const newOffset = pageOffsetsRef.current[prevIndex] || 0;
+    characterOffsetRef.current = newOffset; // Update ref first
     const originalPage = findOriginalPage(newOffset, pageMapRef.current);
 
     setState(prev => ({
@@ -242,12 +242,16 @@ export function useTextReflow({
   }, [state.currentPageIndex]);
 
   const goToCharacterOffset = useCallback((offset: number) => {
+    const clampedOffset = Math.max(0, Math.min(offset, fullTextRef.current.length));
+    characterOffsetRef.current = clampedOffset; // Update ref first
     setState(prev => ({
       ...prev,
-      characterOffset: Math.max(0, Math.min(offset, fullTextRef.current.length)),
+      characterOffset: clampedOffset,
     }));
-    // Reflow will happen via effect
-  }, []);
+    // Reflow will happen via effect (triggered by reflowPages dependency on fontSize/containerRef)
+    // But only if zoom or container changed, not just offset
+    reflowPages();
+  }, [reflowPages]);
 
   const goToOriginalPage = useCallback((pageNum: number) => {
     const pageEntry = pageMapRef.current.find(p => p.page.page === pageNum);
