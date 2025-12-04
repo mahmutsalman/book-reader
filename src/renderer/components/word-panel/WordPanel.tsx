@@ -3,6 +3,7 @@ import { useSettings } from '../../context/SettingsContext';
 import type { CachedWordData } from '../../../shared/types/deferred-word.types';
 import { getWordBoundaryPattern } from '../../../shared/utils/text-utils';
 import type { BookLanguage } from '../../../shared/types';
+import PronunciationButton from './PronunciationButton';
 
 interface SelectedWord {
   word: string;
@@ -263,28 +264,42 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
       <div className="fixed top-0 right-0 h-full w-96 bg-white dark:bg-gray-800 shadow-2xl z-50 overflow-hidden flex flex-col">
         {/* Header */}
         <div className="bg-primary-600 text-white px-4 py-3 flex items-center justify-between">
-          <div>
-            <h2 className="text-xl font-semibold">{selectedWord.word}</h2>
-            {/* Only show IPA and syllables for single words, not phrases */}
-            {!selectedWord.isPhrase && (wordData.ipa || wordData.syllables) && (
-              <div className="flex items-center gap-2 text-sm">
-                {wordData.ipa && (
-                  <span className="text-primary-100 font-mono">
-                    /{wordData.ipa}/
-                  </span>
-                )}
-                {wordData.syllables && (
-                  <span className="text-primary-200">
-                    {wordData.syllables}
-                  </span>
+          <div className="flex items-center gap-2">
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-xl font-semibold">{selectedWord.word}</h2>
+                {/* Word pronunciation button */}
+                {!selectedWord.isPhrase && (
+                  <PronunciationButton
+                    text={selectedWord.word}
+                    language={bookLanguage}
+                    size="sm"
+                    title="Pronounce word"
+                    className="text-white/80 hover:text-white hover:bg-white/20"
+                  />
                 )}
               </div>
-            )}
-            {selectedWord.isPhrase && (
-              <span className="text-primary-200 text-xs">
-                phrase
-              </span>
-            )}
+              {/* Only show IPA and syllables for single words, not phrases */}
+              {!selectedWord.isPhrase && (wordData.ipa || wordData.syllables) && (
+                <div className="flex items-center gap-2 text-sm">
+                  {wordData.ipa && (
+                    <span className="text-primary-100 font-mono">
+                      /{wordData.ipa}/
+                    </span>
+                  )}
+                  {wordData.syllables && (
+                    <span className="text-primary-200">
+                      {wordData.syllables}
+                    </span>
+                  )}
+                </div>
+              )}
+              {selectedWord.isPhrase && (
+                <span className="text-primary-200 text-xs">
+                  phrase
+                </span>
+              )}
+            </div>
           </div>
           <button
             onClick={onClose}
@@ -328,7 +343,15 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
 
               {/* Original Sentence */}
               <section>
-                <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">📝 Original Sentence</h3>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-semibold text-gray-700 dark:text-gray-300">📝 Original Sentence</h3>
+                  <PronunciationButton
+                    text={selectedWord.sentence}
+                    language={bookLanguage}
+                    size="sm"
+                    title="Pronounce sentence"
+                  />
+                </div>
                 <p className="text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 p-3 rounded-lg italic">
                   "{highlightWord(selectedWord.sentence, selectedWord.word)}"
                 </p>
@@ -344,7 +367,15 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
               {/* Simplified Sentence - only for single words */}
               {!selectedWord.isPhrase && wordData.simplifiedSentence && (
                 <section>
-                  <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">✨ Simplified</h3>
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="font-semibold text-gray-700 dark:text-gray-300">✨ Simplified</h3>
+                    <PronunciationButton
+                      text={wordData.simplifiedSentence}
+                      language={bookLanguage}
+                      size="sm"
+                      title="Pronounce simplified sentence"
+                    />
+                  </div>
                   <p className="text-gray-600 dark:text-gray-300 bg-green-50 dark:bg-green-900/30 p-3 rounded-lg">
                     {wordData.wordEquivalent
                       ? highlightWord(wordData.simplifiedSentence, wordData.wordEquivalent)
