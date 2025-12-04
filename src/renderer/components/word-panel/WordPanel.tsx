@@ -37,6 +37,8 @@ interface WordData {
   sentenceTranslation?: string;
   simplifiedTranslation?: string;
   phraseTranslation?: string;
+  // Word type/part of speech
+  wordType?: string;
   loading: boolean;
   error?: string;
 }
@@ -146,6 +148,8 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
         sentenceTranslation: preloadedData.sentenceTranslation,
         simplifiedTranslation: preloadedData.simplifiedTranslation,
         phraseTranslation: preloadedData.phraseTranslation,
+        // Word type
+        wordType: preloadedData.wordType,
       });
       setSaved(false);
       return;
@@ -318,7 +322,19 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
                       {wordData.syllables}
                     </span>
                   )}
+                  {/* Word type badge */}
+                  {wordData.wordType && (
+                    <span className="px-2 py-0.5 text-xs rounded-full bg-white/20 text-primary-100">
+                      {wordData.wordType}
+                    </span>
+                  )}
                 </div>
+              )}
+              {/* Show word type even without IPA/syllables */}
+              {!selectedWord.isPhrase && !wordData.ipa && !wordData.syllables && wordData.wordType && (
+                <span className="px-2 py-0.5 text-xs rounded-full bg-white/20 text-primary-100">
+                  {wordData.wordType}
+                </span>
               )}
               {selectedWord.isPhrase && (
                 <span className="text-primary-200 text-xs">

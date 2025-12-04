@@ -49,6 +49,8 @@ export interface CachedWordData {
   sentenceTranslation?: string;    // English translation of original sentence
   simplifiedTranslation?: string;  // English translation of simplified sentence
   phraseTranslation?: string;      // English translation of phrase (for phrases)
+  // Word type/part of speech (noun, verb, adjective, etc.)
+  wordType?: string;
   fetchedAt: number;
 }
 

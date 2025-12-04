@@ -29,40 +29,96 @@ export class LMStudioService {
   async getWordDefinition(word: string, context: string, language = 'en'): Promise<{
     definition: string;
     wordTranslation?: string;
+    wordType?: string;
   }> {
     if (language === 'en') {
-      // English: just get the definition
-      const prompt = `Define the word "${word}" as it is used in the following context. Provide a clear, concise definition suitable for a language learner (2-3 sentences max).
+      // English: get definition and word type
+      const prompt = `Define the word "${word}" as it is used in the following context. Also identify its part of speech.
 
 Context: "${context}"
 
-Definition:`;
-      const definition = await this.chat(prompt);
-      return { definition };
+Format your response EXACTLY like this:
+DEFINITION: [2-3 sentence definition suitable for a language learner]
+TYPE: [part of speech: noun, verb, adjective, adverb, preposition, conjunction, interjection, pronoun, article, phrasal verb, idiom, or collocation]`;
+
+      const response = await this.chat(prompt);
+
+      // Parse the response
+      const defMatch = response.match(/DEFINITION:\s*(.+?)(?=TYPE:|$)/is);
+      const typeMatch = response.match(/TYPE:\s*(.+?)$/is);
+
+      const definition = defMatch ? defMatch[1].trim() : response;
+      const wordType = typeMatch ? this.normalizeWordType(typeMatch[1].trim()) : undefined;
+
+      return { definition, wordType };
     }
 
-    // Non-English: get English definition + English translation of the word
+    // Non-English: get English definition + English translation of the word + word type
     const languageName = this.getLanguageName(language);
     const prompt = `For the ${languageName} word "${word}" in this context, provide:
 1. A definition in English explaining what this word means (2-3 sentences, write the definition in ENGLISH)
 2. The English translation of the word (single word or short phrase)
+3. The part of speech (noun, verb, adjective, adverb, preposition, conjunction, interjection, pronoun, article, phrasal verb, idiom, or collocation)
 
 Context: "${context}"
 
 Format your response EXACTLY like this:
 DEFINITION: [definition in English]
-ENGLISH: [English translation of the word]`;
+ENGLISH: [English translation of the word]
+TYPE: [part of speech]`;
 
     const response = await this.chat(prompt);
 
     // Parse the response
     const defMatch = response.match(/DEFINITION:\s*(.+?)(?=ENGLISH:|$)/is);
-    const engMatch = response.match(/ENGLISH:\s*(.+?)$/is);
+    const engMatch = response.match(/ENGLISH:\s*(.+?)(?=TYPE:|$)/is);
+    const typeMatch = response.match(/TYPE:\s*(.+?)$/is);
 
     const definition = defMatch ? defMatch[1].trim() : response;
     const wordTranslation = engMatch ? engMatch[1].trim() : undefined;
+    const wordType = typeMatch ? this.normalizeWordType(typeMatch[1].trim()) : undefined;
 
-    return { definition, wordTranslation };
+    return { definition, wordTranslation, wordType };
+  }
+
+  /**
+   * Normalize word type to a consistent format.
+   * Handles variations like "Noun", "NOUN", "noun." -> "noun"
+   */
+  private normalizeWordType(type: string): string {
+    // Clean and lowercase
+    const cleaned = type.toLowerCase()
+      .replace(/[.,;:!?]+$/, '')  // Remove trailing punctuation
+      .replace(/\s+/g, ' ')       // Normalize whitespace
+      .trim();
+
+    // Map common variations to standard types
+    const typeMap: Record<string, string> = {
+      'n': 'noun',
+      'n.': 'noun',
+      'v': 'verb',
+      'v.': 'verb',
+      'adj': 'adjective',
+      'adj.': 'adjective',
+      'adv': 'adverb',
+      'adv.': 'adverb',
+      'prep': 'preposition',
+      'prep.': 'preposition',
+      'conj': 'conjunction',
+      'conj.': 'conjunction',
+      'interj': 'interjection',
+      'interj.': 'interjection',
+      'pron': 'pronoun',
+      'pron.': 'pronoun',
+      'art': 'article',
+      'art.': 'article',
+      'phr': 'phrasal verb',
+      'phr. v': 'phrasal verb',
+      'phr. v.': 'phrasal verb',
+      'pv': 'phrasal verb',
+    };
+
+    return typeMap[cleaned] || cleaned;
   }
 
   private getLanguageName(code: string): string {

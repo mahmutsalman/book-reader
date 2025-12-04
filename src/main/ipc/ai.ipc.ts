@@ -30,6 +30,7 @@ export function registerAIHandlers(): void {
           definition: result.definition,
           context,
           wordTranslation: result.wordTranslation,
+          wordType: result.wordType,
         };
       } catch (error) {
         console.error('Failed to get definition:', error);
