@@ -89,6 +89,16 @@ const electronAPI: ElectronAPI = {
     openFile: (options) =>
       ipcRenderer.invoke(IPC_CHANNELS.DIALOG_OPEN_FILE, options),
   },
+
+  // Pronunciation Services
+  pronunciation: {
+    getTTS: (text: string, language?: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PRONUNCIATION_GET_TTS, text, language || 'en'),
+    getIPA: (text: string, language?: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PRONUNCIATION_GET_IPA, text, language || 'en'),
+    getServerStatus: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.PRONUNCIATION_SERVER_STATUS),
+  },
 };
 
 // Expose the API to the renderer process

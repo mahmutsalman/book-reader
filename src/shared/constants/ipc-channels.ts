@@ -42,6 +42,11 @@ export const IPC_CHANNELS = {
 
   // File dialogs
   DIALOG_OPEN_FILE: 'dialog:open-file',
+
+  // Pronunciation Services
+  PRONUNCIATION_GET_TTS: 'pronunciation:get-tts',
+  PRONUNCIATION_GET_IPA: 'pronunciation:get-ipa',
+  PRONUNCIATION_SERVER_STATUS: 'pronunciation:server-status',
 } as const;
 
 export type IPCChannel = typeof IPC_CHANNELS[keyof typeof IPC_CHANNELS];

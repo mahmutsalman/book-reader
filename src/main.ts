@@ -3,6 +3,7 @@ import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import { registerAllIpcHandlers } from './main/ipc';
 import { initializeDatabase } from './database';
+import { pythonManager } from './main/services/python-manager.service';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -61,6 +62,14 @@ app.on('ready', async () => {
     await initializeDatabase();
     console.log('Database initialized');
 
+    // Start Python pronunciation server
+    try {
+      await pythonManager.start();
+      console.log('Pronunciation server started');
+    } catch (error) {
+      console.warn('Failed to start pronunciation server (will retry on demand):', error);
+    }
+
     // Register IPC handlers
     registerAllIpcHandlers();
     console.log('IPC handlers registered');
@@ -84,4 +93,10 @@ app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
   }
+});
+
+// Cleanup before quitting
+app.on('before-quit', async () => {
+  console.log('Stopping pronunciation server...');
+  await pythonManager.stop();
 });
