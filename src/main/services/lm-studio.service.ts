@@ -1,4 +1,4 @@
-import type { PreStudyWordEntry, GrammarTopic, GrammarLevel } from '../../shared/types/pre-study-notes.types';
+import type { PreStudyWordEntry } from '../../shared/types/pre-study-notes.types';
 
 interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
@@ -844,34 +844,25 @@ MEANING: [explanation of the phrase meaning]${!isEnglish ? '\nENGLISH: [English 
     const languageName = this.getLanguageName(language);
     const isEnglish = language === 'en';
 
-    // Build grammar topics section for prompt
-    const grammarSection = `
-Grammar topics for ${languageName} (by CEFR level):
-A1: ${grammarTopicsByLevel.a1 || 'none'}
-A2: ${grammarTopicsByLevel.a2 || 'none'}
-B1: ${grammarTopicsByLevel.b1 || 'none'}
-B2: ${grammarTopicsByLevel.b2 || 'none'}`;
+    // Note: grammarTopicsByLevel parameter kept for API compatibility but not used currently
+    void grammarTopicsByLevel;
 
     const prompt = `Analyze this ${languageName} word for a language learner.
 
 Word: "${word}"
 Sentence: "${sentence}"
-${grammarSection}
 
 Provide:
 1. IPA pronunciation (in slashes like /example/)
 2. Syllable breakdown with dots (like ex·am·ple)
 3. Part of speech (noun, verb, adjective, adverb, preposition, conjunction, pronoun, article)
 4. Brief definition (1-2 sentences explaining meaning in this context)${!isEnglish ? '\n5. English translation of the word' : ''}${language === 'de' ? '\n6. German article if noun (der/die/das)' : ''}
-7. Which grammar topic from the list above applies to this word in this sentence? Pick the MOST relevant one. Explain briefly why.
 
 Format your response EXACTLY like this:
 IPA: /pronunciation/
 SYLLABLES: syl·la·bles
 TYPE: part of speech${!isEnglish ? '\nENGLISH: translation' : ''}${language === 'de' ? '\nARTICLE: der/die/das' : ''}
-DEFINITION: brief definition
-GRAMMAR_TOPIC: [topic name] (level)
-GRAMMAR_EXPLANATION: why this topic applies`;
+DEFINITION: brief definition`;
 
     const response = await this.chat(prompt);
 
@@ -881,9 +872,7 @@ GRAMMAR_EXPLANATION: why this topic applies`;
     const typeMatch = response.match(/TYPE:\s*([^\n]+)/i);
     const engMatch = response.match(/ENGLISH:\s*([^\n]+)/i);
     const articleMatch = response.match(/ARTICLE:\s*([^\n]+)/i);
-    const defMatch = response.match(/DEFINITION:\s*(.+?)(?=GRAMMAR_TOPIC:|$)/is);
-    const topicMatch = response.match(/GRAMMAR_TOPIC:\s*(.+?)(?:\(([^)]+)\))?/i);
-    const explanationMatch = response.match(/GRAMMAR_EXPLANATION:\s*(.+?)$/is);
+    const defMatch = response.match(/DEFINITION:\s*(.+?)$/is);
 
     // Extract values with fallbacks
     const ipa = ipaMatch ? ipaMatch[1].trim() : '';
@@ -892,23 +881,6 @@ GRAMMAR_EXPLANATION: why this topic applies`;
     const wordTranslation = engMatch ? engMatch[1].trim() : undefined;
     const germanArticle = articleMatch ? this.normalizeGermanArticle(articleMatch[1].trim()) : undefined;
     const definition = defMatch ? defMatch[1].trim() : 'Definition not available';
-
-    // Parse grammar topic
-    let grammarTopics: GrammarTopic[] | undefined;
-    if (topicMatch) {
-      const topicName = topicMatch[1].trim();
-      const levelRaw = topicMatch[2]?.trim().toUpperCase() || 'A1';
-      const level = (['A1', 'A2', 'B1', 'B2'].includes(levelRaw) ? levelRaw : 'A1') as GrammarLevel;
-      const explanation = explanationMatch ? explanationMatch[1].trim() : '';
-
-      if (topicName && topicName.toLowerCase() !== 'none' && topicName !== '-') {
-        grammarTopics = [{
-          name: topicName,
-          explanation,
-          level,
-        }];
-      }
-    }
 
     return {
       word,
@@ -920,7 +892,6 @@ GRAMMAR_EXPLANATION: why this topic applies`;
       wordTranslation,
       germanArticle,
       contextSentence: sentence,
-      grammarTopics,
     };
   }
 }
