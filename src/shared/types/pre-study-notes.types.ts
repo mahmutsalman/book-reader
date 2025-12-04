@@ -21,6 +21,9 @@ export interface PreStudyWordEntry {
   germanArticle?: string;        // For German: der, die, das
   contextSentence: string;
   grammarTopics?: GrammarTopic[];
+  // Audio (base64-encoded MP3)
+  wordAudio?: string;            // Pronunciation of the word
+  sentenceAudio?: string;        // Pronunciation of context sentence
 }
 
 export interface PreStudyNotesRequest {

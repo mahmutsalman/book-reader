@@ -61,6 +61,52 @@ export class PreStudyHtmlService {
       const btn = document.querySelector('.theme-btn');
       btn.textContent = document.body.classList.contains('dark') ? '☀️ Theme' : '🌙 Theme';
     }
+
+    // Audio playback management
+    let currentAudio = null;
+    let currentButton = null;
+
+    function playAudio(button, base64Audio) {
+      // Stop any currently playing audio
+      if (currentAudio) {
+        currentAudio.pause();
+        currentAudio = null;
+        if (currentButton) {
+          currentButton.classList.remove('playing');
+        }
+      }
+
+      // If clicking the same button, just stop
+      if (currentButton === button) {
+        currentButton = null;
+        return;
+      }
+
+      // Play new audio
+      if (base64Audio) {
+        currentAudio = new Audio('data:audio/mp3;base64,' + base64Audio);
+        currentButton = button;
+        button.classList.add('playing');
+
+        currentAudio.onended = () => {
+          button.classList.remove('playing');
+          currentAudio = null;
+          currentButton = null;
+        };
+
+        currentAudio.onerror = () => {
+          button.classList.remove('playing');
+          currentAudio = null;
+          currentButton = null;
+        };
+
+        currentAudio.play().catch(() => {
+          button.classList.remove('playing');
+          currentAudio = null;
+          currentButton = null;
+        });
+      }
+    }
   </script>
 </body>
 </html>`;
@@ -105,6 +151,13 @@ export class PreStudyHtmlService {
         <span class="label">Context:</span>
         <blockquote>${highlightedSentence}</blockquote>
       </div>
+
+      ${entry.wordAudio || entry.sentenceAudio ? `
+      <div class="audio-controls">
+        ${entry.wordAudio ? `<button class="audio-btn" onclick="playAudio(this, '${entry.wordAudio}')">🔊 Word</button>` : ''}
+        ${entry.sentenceAudio ? `<button class="audio-btn" onclick="playAudio(this, '${entry.sentenceAudio}')">🔊 Sentence</button>` : ''}
+      </div>
+      ` : ''}
 
       ${hasGrammar && entry.grammarTopics && entry.grammarTopics[0] ? `
       <details class="grammar">
@@ -367,6 +420,34 @@ export class PreStudyHtmlService {
       color: var(--text-secondary);
     }
 
+    .audio-controls {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .audio-btn {
+      padding: 6px 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: all 0.2s;
+    }
+
+    .audio-btn:hover {
+      background: var(--accent-light);
+      border-color: var(--accent);
+    }
+
+    .audio-btn.playing {
+      background: var(--accent);
+      color: white;
+      border-color: var(--accent);
+    }
+
     .context mark {
       background: var(--mark-bg);
       color: var(--mark-text);
@@ -427,6 +508,10 @@ export class PreStudyHtmlService {
       }
 
       .controls {
+        display: none;
+      }
+
+      .audio-controls {
         display: none;
       }
 

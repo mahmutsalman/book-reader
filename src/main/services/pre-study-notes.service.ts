@@ -1,5 +1,6 @@
 import { LMStudioService } from './lm-studio.service';
 import { grammarTopicsService } from './grammar-topics.service';
+import { pronunciationService } from './pronunciation.service';
 import { settingsRepository } from '../../database/repositories';
 import type {
   PreStudyNotesRequest,
@@ -70,8 +71,9 @@ export class PreStudyNotesService {
     // Get grammar topics for the language
     const grammarTopics = await grammarTopicsService.getTopicsForPrompt(request.language);
 
-    // Phase 2: Processing words
+    // Phase 2: Processing words with parallel audio generation
     const entries: PreStudyWordEntry[] = [];
+    const audioPromises: Promise<void>[] = [];
     const total = uniqueWords.length;
 
     for (let i = 0; i < uniqueWords.length; i++) {
@@ -91,6 +93,12 @@ export class PreStudyNotesService {
         currentWord: word,
         estimatedTimeRemaining: (total - i - 1) * 2, // Rough estimate: 2 seconds per word
       });
+
+      // Start audio fetch for previous entry in parallel (non-blocking)
+      // This runs while AI is processing the current word
+      if (i > 0 && entries[i - 1]) {
+        audioPromises.push(this.fetchAudioForEntry(entries[i - 1], request.language));
+      }
 
       try {
         const entry = await service.generatePreStudyEntry(
@@ -113,6 +121,16 @@ export class PreStudyNotesService {
         });
       }
     }
+
+    // Fetch audio for the last entry
+    if (entries.length > 0) {
+      audioPromises.push(this.fetchAudioForEntry(entries[entries.length - 1], request.language));
+    }
+
+    // Wait for all audio fetches to complete
+    console.log(`[PreStudy] Waiting for ${audioPromises.length} audio fetches to complete...`);
+    await Promise.allSettled(audioPromises);
+    console.log('[PreStudy] All audio fetches completed');
 
     // Phase 3: Generating result
     onProgress?.({
@@ -231,6 +249,32 @@ export class PreStudyNotesService {
     }
 
     return this.lmService;
+  }
+
+  /**
+   * Fetch TTS audio for a word entry (word + sentence)
+   * Runs in parallel with AI processing for efficiency
+   */
+  private async fetchAudioForEntry(entry: PreStudyWordEntry, language: string): Promise<void> {
+    try {
+      // Fetch word and sentence audio in parallel
+      const [wordResult, sentenceResult] = await Promise.all([
+        pronunciationService.getTTS(entry.word, language),
+        entry.contextSentence
+          ? pronunciationService.getTTS(entry.contextSentence, language)
+          : Promise.resolve({ success: false } as { success: false }),
+      ]);
+
+      if (wordResult.success && wordResult.audio_base64) {
+        entry.wordAudio = wordResult.audio_base64;
+      }
+      if (sentenceResult.success && 'audio_base64' in sentenceResult && sentenceResult.audio_base64) {
+        entry.sentenceAudio = sentenceResult.audio_base64;
+      }
+    } catch (error) {
+      console.error(`[PreStudy] Error fetching audio for "${entry.word}":`, error);
+      // Audio is optional, so we just log and continue
+    }
   }
 }
 
