@@ -6,6 +6,7 @@ import type {
   CachedWordData,
 } from '../../shared/types/deferred-word.types';
 import { generateWordKey, generatePhraseKey } from '../../shared/types/deferred-word.types';
+import { cleanWord } from '../../shared/utils/text-utils';
 import type { BookLanguage } from '../../shared/types';
 
 // Helper to check if a string is a phrase (multiple words)
@@ -283,10 +284,10 @@ export const DeferredWordProvider: React.FC<DeferredWordProviderProps> = ({ chil
 
   // Queue a word or phrase for background fetching (sentence-based caching)
   const queueWord = useCallback((word: string, sentence: string, bookId: number, language: BookLanguage = 'en') => {
-    // For phrases, preserve spaces; for single words, clean normally
+    // For phrases, preserve spaces; for single words, clean normally (Unicode-aware)
     const cleanText = isPhrase(word)
       ? word.toLowerCase().trim()
-      : word.replace(/[^\w'-]/g, '').toLowerCase();
+      : cleanWord(word);
 
     // Use appropriate key generator (sentence hash for zoom-independent caching)
     const key = isPhrase(word)
@@ -329,7 +330,7 @@ export const DeferredWordProvider: React.FC<DeferredWordProviderProps> = ({ chil
   const isWordReady = useCallback((word: string, sentence: string, bookId: number): boolean => {
     const cleanText = isPhrase(word)
       ? word.toLowerCase().trim()
-      : word.replace(/[^\w'-]/g, '').toLowerCase();
+      : cleanWord(word);
     const key = isPhrase(word)
       ? generatePhraseKey(bookId, cleanText)
       : generateWordKey(bookId, cleanText, sentence);
@@ -341,7 +342,7 @@ export const DeferredWordProvider: React.FC<DeferredWordProviderProps> = ({ chil
   const getWordStatus = useCallback((word: string, sentence: string, bookId: number): QueuedWordStatus | null => {
     const cleanText = isPhrase(word)
       ? word.toLowerCase().trim()
-      : word.replace(/[^\w'-]/g, '').toLowerCase();
+      : cleanWord(word);
     const key = isPhrase(word)
       ? generatePhraseKey(bookId, cleanText)
       : generateWordKey(bookId, cleanText, sentence);
@@ -353,7 +354,7 @@ export const DeferredWordProvider: React.FC<DeferredWordProviderProps> = ({ chil
   const getWordData = useCallback((word: string, sentence: string, bookId: number): CachedWordData | null => {
     const cleanText = isPhrase(word)
       ? word.toLowerCase().trim()
-      : word.replace(/[^\w'-]/g, '').toLowerCase();
+      : cleanWord(word);
     const key = isPhrase(word)
       ? generatePhraseKey(bookId, cleanText)
       : generateWordKey(bookId, cleanText, sentence);

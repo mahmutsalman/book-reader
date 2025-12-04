@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBooks } from '../../context/BookContext';
 import { ZOOM_LEVELS } from '../../../shared/constants';
+import { cleanWord } from '../../../shared/utils/text-utils';
 import type { Book, BookData, ReadingProgress } from '../../../shared/types';
 import WordPanel from '../word-panel/WordPanel';
 
@@ -68,7 +69,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, bookData, initialProgress
     ) || fullText.substring(0, 200);
 
     setSelectedWord({
-      word: word.replace(/[^\w'-]/g, ''), // Clean punctuation
+      word: cleanWord(word), // Clean punctuation (Unicode-aware for Russian, etc.)
       sentence,
       pageNumber: currentPage,
     });

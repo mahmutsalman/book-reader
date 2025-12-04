@@ -1,6 +1,7 @@
 import fs from 'fs';
 import { getDatabase } from '../index';
 import type { Book, BookData, BookLanguage } from '../../shared/types';
+import { createWordBoundaryRegex } from '../../shared/utils/text-utils';
 
 export class BookRepository {
   private get db() {
@@ -83,7 +84,7 @@ export class BookRepository {
 
     const results: { page: number; sentence: string }[] = [];
     const wordLower = word.toLowerCase();
-    const wordRegex = new RegExp(`\\b${word}\\b`, 'gi');
+    const wordRegex = createWordBoundaryRegex(word, 'gi'); // Unicode-aware for Russian, etc.
 
     for (const page of bookData.pages) {
       if (!page.text) continue;

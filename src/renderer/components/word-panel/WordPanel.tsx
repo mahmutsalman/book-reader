@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSettings } from '../../context/SettingsContext';
 import type { CachedWordData } from '../../../shared/types/deferred-word.types';
+import { getWordBoundaryPattern } from '../../../shared/utils/text-utils';
 import type { BookLanguage } from '../../../shared/types';
 
 interface SelectedWord {
@@ -75,10 +76,10 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
     // Escape special regex characters in the word/phrase
     const escaped = searchWord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-    // Create a case-insensitive regex to find the word/phrase
+    // Create a case-insensitive regex to find the word/phrase (Unicode-aware for Russian, etc.)
     const isPhrase = searchWord.includes(' ');
-    const pattern = isPhrase ? `(${escaped})` : `(\\b${escaped}\\b)`;
-    const regex = new RegExp(pattern, 'gi');
+    const pattern = isPhrase ? `(${escaped})` : `(${getWordBoundaryPattern(escaped)})`;
+    const regex = new RegExp(pattern, 'giu'); // 'u' flag for Unicode support
 
     const parts = sentence.split(regex);
 
