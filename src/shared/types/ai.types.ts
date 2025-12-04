@@ -15,6 +15,10 @@ export interface IPAPronunciationResult {
   syllables: string;
 }
 
+export interface BatchIPAResult {
+  words: IPAPronunciationResult[];
+}
+
 export interface SimplifiedSentenceResult {
   original: string;
   simplified: string;

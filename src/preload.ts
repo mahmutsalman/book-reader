@@ -52,6 +52,8 @@ const electronAPI: ElectronAPI = {
       ipcRenderer.invoke(IPC_CHANNELS.AI_GET_DEFINITION, word, context, language || 'en'),
     getIPA: (word, language?) =>
       ipcRenderer.invoke(IPC_CHANNELS.AI_GET_IPA, word, language || 'en'),
+    getBatchIPA: (words, language?) =>
+      ipcRenderer.invoke(IPC_CHANNELS.AI_GET_BATCH_IPA, words, language || 'en'),
     simplifySentence: (sentence, language?) =>
       ipcRenderer.invoke(IPC_CHANNELS.AI_SIMPLIFY_SENTENCE, sentence, language || 'en'),
     getWordEquivalent: (word, originalSentence, simplifiedSentence) =>

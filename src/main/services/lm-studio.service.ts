@@ -232,6 +232,84 @@ Do not include any other text.`;
     return { ipa, syllables };
   }
 
+  /**
+   * Get IPA pronunciation and syllables for multiple words at once.
+   * More efficient than calling getIPAPronunciation for each word individually.
+   */
+  async getBatchIPAPronunciation(words: string[], language = 'en'): Promise<{ word: string; ipa: string; syllables: string }[]> {
+    // Filter out empty/whitespace-only words and punctuation-only tokens
+    const validWords = words.filter(w => w.trim() && /\p{L}/u.test(w));
+
+    if (validWords.length === 0) {
+      return words.map(word => ({ word, ipa: '', syllables: '' }));
+    }
+
+    const languageName = this.getLanguageName(language);
+
+    // For non-Latin scripts, use native script for syllables
+    const syllableNote = ['ru', 'ja', 'zh', 'ko'].includes(language)
+      ? `Use · as separator. Use the native script (do NOT romanize).`
+      : `Use · as separator.`;
+
+    const wordsListText = validWords.map((w, i) => `${i + 1}. ${w}`).join('\n');
+
+    const prompt = `For each ${languageName} word below, provide its IPA pronunciation and syllable breakdown.
+
+Words:
+${wordsListText}
+
+Rules:
+- IPA in slashes (e.g., /ˈeksæmpəl/)
+- Syllables with middle dots (e.g., ex·am·ple). ${syllableNote}
+
+Format your response EXACTLY like this, one per line:
+1. /ipa/ syl·la·bles
+2. /ipa/ syl·la·bles
+...
+
+Do not include any other text.`;
+
+    const response = await this.chat(prompt);
+
+    // Parse the response - each line should be: "N. /ipa/ syllables"
+    const results: { word: string; ipa: string; syllables: string }[] = [];
+    const lines = response.split('\n').filter(l => l.trim());
+
+    for (let i = 0; i < validWords.length; i++) {
+      const word = validWords[i];
+      // Try to find a matching line
+      const linePattern = new RegExp(`^${i + 1}[.)]?\\s*`);
+      const line = lines.find(l => linePattern.test(l.trim()));
+
+      if (line) {
+        // Extract IPA (between slashes)
+        const ipaMatch = line.match(/\/([^/]+)\//);
+        const ipa = ipaMatch ? ipaMatch[1] : '';
+
+        // Extract syllables (after the /ipa/, remaining text)
+        let syllables = '';
+        const afterIpa = line.substring(line.lastIndexOf('/') + 1).trim();
+        // Clean up any number prefix if present
+        const cleanedSyllables = afterIpa.replace(/^\d+[.)]\s*/, '').trim();
+        if (cleanedSyllables && cleanedSyllables !== ipa) {
+          syllables = cleanedSyllables.replace(/\./g, '·');
+        }
+
+        results.push({ word, ipa, syllables });
+      } else {
+        // Line not found, return empty
+        results.push({ word, ipa: '', syllables: '' });
+      }
+    }
+
+    // Build final results array preserving original word order
+    // (including whitespace/punctuation which were filtered out)
+    return words.map(originalWord => {
+      const found = results.find(r => r.word === originalWord);
+      return found || { word: originalWord, ipa: '', syllables: '' };
+    });
+  }
+
   async simplifySentence(sentence: string, language = 'en'): Promise<{
     simplified: string;
     simplifiedTranslation?: string;

@@ -60,6 +60,11 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
   const isNonEnglish = bookLanguage !== 'en';
   const [saved, setSaved] = useState(false);
 
+  // Syllable mode state
+  const [syllableModeEnabled, setSyllableModeEnabled] = useState(false);
+  const [syllableModeLoading, setSyllableModeLoading] = useState(false);
+  const [sentenceWordData, setSentenceWordData] = useState<Map<string, { ipa: string; syllables: string }>>(new Map());
+
   // Helper function to highlight the selected word/phrase in a sentence
   const highlightWord = useCallback((sentence: string, word: string) => {
     if (!word || !sentence) return <>{sentence}</>;
@@ -143,6 +148,13 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
       { text: wordData.simplifiedSentence, language: bookLanguage, type: AudioType.SIMPLIFIED },
     ]);
   }, [isOpen, wordData.simplifiedSentence, bookLanguage, preloadAudio]);
+
+  // Reset syllable mode when word changes
+  useEffect(() => {
+    setSyllableModeEnabled(false);
+    setSyllableModeLoading(false);
+    setSentenceWordData(new Map());
+  }, [selectedWord?.word, selectedWord?.sentence]);
 
   // Fetch word data when word changes (or use preloaded data)
   useEffect(() => {
@@ -277,6 +289,76 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
 
     fetchWordData();
   }, [selectedWord, isOpen, bookId, settings.tatoeba_enabled, settings.tatoeba_language, preloadedData]);
+
+  // Handle syllable mode toggle
+  const handleSyllableModeToggle = useCallback(async () => {
+    if (!selectedWord || !window.electronAPI) return;
+
+    // If already enabled, just disable
+    if (syllableModeEnabled) {
+      setSyllableModeEnabled(false);
+      return;
+    }
+
+    // Start loading
+    setSyllableModeLoading(true);
+
+    try {
+      // Split sentence into words - preserve punctuation separately
+      const sentence = selectedWord.sentence;
+      const wordTokens = sentence.split(/(\s+)/).filter(Boolean);
+
+      // Extract just the words (not whitespace) and clean them
+      const words = wordTokens
+        .filter(token => /\p{L}/u.test(token))
+        .map(token => token.replace(/[^\p{L}]/gu, '')); // Remove punctuation
+
+      // Fetch IPA from Python server (accurate) and syllables from AI
+      // Process in parallel for efficiency
+      const dataMap = new Map<string, { ipa: string; syllables: string }>();
+
+      await Promise.all(words.map(async (word) => {
+        const wordLower = word.toLowerCase();
+        if (dataMap.has(wordLower)) return; // Skip duplicates
+
+        let ipa = '';
+        let syllables = '';
+
+        // Try Python server for IPA first (accurate)
+        try {
+          const pythonResult = await window.electronAPI.pronunciation.getIPA(word, bookLanguage);
+          if (pythonResult.success && pythonResult.ipa) {
+            ipa = pythonResult.ipa;
+          }
+        } catch {
+          // Python IPA failed, will try AI fallback below
+        }
+
+        // Get syllables from AI (and IPA fallback if Python failed)
+        try {
+          const aiResult = await window.electronAPI.ai.getIPA(word, bookLanguage);
+          if (aiResult.syllables) {
+            syllables = aiResult.syllables;
+          }
+          // Use AI IPA only as fallback if Python failed
+          if (!ipa && aiResult.ipa) {
+            ipa = aiResult.ipa;
+          }
+        } catch {
+          // AI also failed, leave empty
+        }
+
+        dataMap.set(wordLower, { ipa, syllables });
+      }));
+
+      setSentenceWordData(dataMap);
+      setSyllableModeEnabled(true);
+    } catch (error) {
+      console.error('Failed to fetch batch IPA:', error);
+    } finally {
+      setSyllableModeLoading(false);
+    }
+  }, [selectedWord, syllableModeEnabled, bookLanguage]);
 
   // Save to vocabulary
   const handleSave = useCallback(async () => {
@@ -456,11 +538,75 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
                       size="sm"
                       title="Slow loop (0.6x)"
                     />
+                    {/* Syllable mode button */}
+                    <button
+                      onClick={handleSyllableModeToggle}
+                      disabled={syllableModeLoading}
+                      className={`p-1 rounded transition-colors ${
+                        syllableModeEnabled
+                          ? 'bg-green-500 text-white hover:bg-green-600'
+                          : syllableModeLoading
+                            ? 'bg-gray-300 dark:bg-gray-600 text-gray-500 cursor-wait'
+                            : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700'
+                      }`}
+                      title={syllableModeEnabled ? 'Hide syllables' : 'Show syllables & IPA'}
+                    >
+                      {syllableModeLoading ? (
+                        <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                      ) : (
+                        <span className="text-xs font-bold">Aa</span>
+                      )}
+                    </button>
                   </div>
                 </div>
-                <p className="text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 p-3 rounded-lg italic">
-                  "{highlightWord(selectedWord.sentence, selectedWord.word)}"
-                </p>
+                {/* Sentence display - normal or syllable mode */}
+                {syllableModeEnabled && sentenceWordData.size > 0 ? (
+                  <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
+                    <div className="flex flex-wrap gap-x-4 gap-y-3 italic">
+                      {selectedWord.sentence.split(/(\s+)/).map((token, idx) => {
+                        // Check if token is a word (contains letters)
+                        const isWord = /\p{L}/u.test(token);
+                        if (!isWord) {
+                          // Whitespace or punctuation - render as-is
+                          return <span key={idx}>{token}</span>;
+                        }
+
+                        // Get IPA and syllables for this word
+                        const wordLower = token.replace(/[^\p{L}]/gu, '').toLowerCase();
+                        const data = sentenceWordData.get(wordLower);
+                        const isHighlighted = token.toLowerCase() === selectedWord.word.toLowerCase() ||
+                          token.toLowerCase().includes(selectedWord.word.toLowerCase());
+
+                        return (
+                          <div key={idx} className="flex flex-col items-center">
+                            {/* IPA above */}
+                            <span className="text-[10px] font-mono text-primary-500 dark:text-primary-400 leading-none">
+                              {data?.ipa ? `/${data.ipa}/` : '\u00A0'}
+                            </span>
+                            {/* Word */}
+                            <span className={isHighlighted
+                              ? 'text-red-600 dark:text-red-400 font-semibold not-italic'
+                              : 'text-gray-600 dark:text-gray-300'
+                            }>
+                              {token}
+                            </span>
+                            {/* Syllables below */}
+                            <span className="text-[10px] text-gray-500 dark:text-gray-400 leading-none">
+                              {data?.syllables || '\u00A0'}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 p-3 rounded-lg italic">
+                    "{highlightWord(selectedWord.sentence, selectedWord.word)}"
+                  </p>
+                )}
                 {/* English translation of sentence (for non-English books) */}
                 {isNonEnglish && wordData.sentenceTranslation && (
                   <p className="text-sm text-blue-600 dark:text-blue-400 mt-2 flex items-start gap-1">

@@ -1,7 +1,7 @@
 import type { Book, BookData, ReadingProgress, BookLanguage } from './book.types';
 import type { VocabularyEntry, CreateVocabularyEntry, VocabularyFilters, StoredWordOccurrence } from './vocabulary.types';
 import type { AppSettings, LMStudioConnectionResult } from './settings.types';
-import type { WordDefinitionResult, IPAPronunciationResult, SimplifiedSentenceResult, WordEquivalentResult, PhraseMeaningResult, TatoebaSentence, TatoebaStatus } from './ai.types';
+import type { WordDefinitionResult, IPAPronunciationResult, BatchIPAResult, SimplifiedSentenceResult, WordEquivalentResult, PhraseMeaningResult, TatoebaSentence, TatoebaStatus } from './ai.types';
 import type { TTSResponse, IPAResponse, PronunciationServerStatus, IPALanguagesResponse, InstallLanguageResponse } from './pronunciation.types';
 
 // IPC API exposed to renderer
@@ -30,6 +30,7 @@ export interface ElectronAPI {
   ai: {
     getDefinition: (word: string, context: string, language?: string) => Promise<WordDefinitionResult>;
     getIPA: (word: string, language?: string) => Promise<IPAPronunciationResult>;
+    getBatchIPA: (words: string[], language?: string) => Promise<BatchIPAResult>;
     simplifySentence: (sentence: string, language?: string) => Promise<SimplifiedSentenceResult>;
     getWordEquivalent: (word: string, originalSentence: string, simplifiedSentence: string) => Promise<WordEquivalentResult>;
     resimplifyWithWord: (originalSentence: string, originalWord: string, equivalentWord: string) => Promise<SimplifiedSentenceResult>;

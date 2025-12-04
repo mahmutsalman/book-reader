@@ -55,6 +55,17 @@ export function registerAIHandlers(): void {
     }
   });
 
+  ipcMain.handle(IPC_CHANNELS.AI_GET_BATCH_IPA, async (_, words: string[], language = 'en') => {
+    try {
+      const service = await getService();
+      const results = await service.getBatchIPAPronunciation(words, language);
+      return { words: results };
+    } catch (error) {
+      console.error('Failed to get batch IPA:', error);
+      return { words: words.map(word => ({ word, ipa: '', syllables: '' })) };
+    }
+  });
+
   ipcMain.handle(IPC_CHANNELS.AI_SIMPLIFY_SENTENCE, async (_, sentence: string, language = 'en') => {
     try {
       const service = await getService();

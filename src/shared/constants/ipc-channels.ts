@@ -24,6 +24,7 @@ export const IPC_CHANNELS = {
   // AI Services
   AI_GET_DEFINITION: 'ai:get-definition',
   AI_GET_IPA: 'ai:get-ipa',
+  AI_GET_BATCH_IPA: 'ai:get-batch-ipa',
   AI_SIMPLIFY_SENTENCE: 'ai:simplify-sentence',
   AI_GET_WORD_EQUIVALENT: 'ai:get-word-equivalent',
   AI_RESIMPLIFY_WITH_WORD: 'ai:resimplify-with-word',
