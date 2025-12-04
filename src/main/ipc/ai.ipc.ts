@@ -89,10 +89,10 @@ export function registerAIHandlers(): void {
 
   ipcMain.handle(
     IPC_CHANNELS.AI_RESIMPLIFY_WITH_WORD,
-    async (_, originalSentence: string, originalWord: string, equivalentWord: string) => {
+    async (_, originalSentence: string, originalWord: string, equivalentWord: string, language = 'en') => {
       try {
         const service = await getService();
-        const simplified = await service.resimplifyWithWord(originalSentence, originalWord, equivalentWord);
+        const simplified = await service.resimplifyWithWord(originalSentence, originalWord, equivalentWord, language);
         return { original: originalSentence, simplified };
       } catch (error) {
         console.error('Failed to resimplify sentence:', error);

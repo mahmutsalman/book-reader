@@ -93,6 +93,7 @@ async def text_to_speech(request: TTSRequest):
         )
 
     try:
+        print(f"[Server TTS] Received request: language={request.language}, text={request.text[:50]}...")
         audio_base64 = await generate_audio(request.text, request.language)
 
         if audio_base64:

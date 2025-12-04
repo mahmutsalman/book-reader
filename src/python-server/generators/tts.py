@@ -55,6 +55,10 @@ async def generate_audio(text: str, language: str = "en") -> Optional[str]:
         fd, temp_file = tempfile.mkstemp(suffix='.mp3')
         os.close(fd)
 
+        # Debug logging
+        text_preview = text[:50] + '...' if len(text) > 50 else text
+        print(f"[TTS] Generating audio: text='{text_preview}' language={language} voice={voice}")
+
         # Generate audio using Edge TTS
         communicate = edge_tts.Communicate(text, voice)
         await communicate.save(temp_file)

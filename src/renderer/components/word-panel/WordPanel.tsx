@@ -4,6 +4,7 @@ import type { CachedWordData } from '../../../shared/types/deferred-word.types';
 import { getWordBoundaryPattern } from '../../../shared/utils/text-utils';
 import type { BookLanguage } from '../../../shared/types';
 import PronunciationButton from './PronunciationButton';
+import { useAudioCache, AudioType } from '../../hooks/useAudioCache';
 
 interface SelectedWord {
   word: string;
@@ -42,6 +43,7 @@ interface WordData {
 
 const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bookId, bookLanguage = 'en', onNavigateToPage, preloadedData }) => {
   const { settings } = useSettings();
+  const { preloadAudio } = useAudioCache();
   const [wordData, setWordData] = useState<WordData>({ loading: false });
   const isNonEnglish = bookLanguage !== 'en';
   const [saved, setSaved] = useState(false);
@@ -101,6 +103,29 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
     );
   }, []);
 
+  // Preload audio when panel opens (background fetch)
+  useEffect(() => {
+    if (!isOpen || !selectedWord) return;
+
+    // Build list of audio to preload
+    const preloadItems = [
+      { text: selectedWord.word, language: bookLanguage, type: AudioType.WORD },
+      { text: selectedWord.sentence, language: bookLanguage, type: AudioType.SENTENCE },
+    ];
+
+    // Preload in background (non-blocking)
+    preloadAudio(preloadItems);
+  }, [isOpen, selectedWord?.word, selectedWord?.sentence, bookLanguage, preloadAudio]);
+
+  // Preload simplified sentence audio when it becomes available
+  useEffect(() => {
+    if (!isOpen || !wordData.simplifiedSentence) return;
+
+    preloadAudio([
+      { text: wordData.simplifiedSentence, language: bookLanguage, type: AudioType.SIMPLIFIED },
+    ]);
+  }, [isOpen, wordData.simplifiedSentence, bookLanguage, preloadAudio]);
+
   // Fetch word data when word changes (or use preloaded data)
   useEffect(() => {
     if (!selectedWord || !isOpen) return;
@@ -135,11 +160,11 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
         const results: WordData = { loading: false };
 
         if (window.electronAPI) {
-          // Fetch definition and IPA in parallel
+          // Fetch definition and IPA in parallel (pass bookLanguage for proper language handling)
           const [defResult, ipaResult, simplifyResult] = await Promise.allSettled([
-            window.electronAPI.ai.getDefinition(selectedWord.word, selectedWord.sentence),
-            window.electronAPI.ai.getIPA(selectedWord.word),
-            window.electronAPI.ai.simplifySentence(selectedWord.sentence),
+            window.electronAPI.ai.getDefinition(selectedWord.word, selectedWord.sentence, bookLanguage),
+            window.electronAPI.ai.getIPA(selectedWord.word, bookLanguage),
+            window.electronAPI.ai.simplifySentence(selectedWord.sentence, bookLanguage),
           ]);
 
           if (defResult.status === 'fulfilled') {
@@ -273,6 +298,7 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
                   <PronunciationButton
                     text={selectedWord.word}
                     language={bookLanguage}
+                    audioType={AudioType.WORD}
                     size="sm"
                     title="Pronounce word"
                     className="text-white/80 hover:text-white hover:bg-white/20"
@@ -348,6 +374,7 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
                   <PronunciationButton
                     text={selectedWord.sentence}
                     language={bookLanguage}
+                    audioType={AudioType.SENTENCE}
                     size="sm"
                     title="Pronounce sentence"
                   />
@@ -372,6 +399,7 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
                     <PronunciationButton
                       text={wordData.simplifiedSentence}
                       language={bookLanguage}
+                      audioType={AudioType.SIMPLIFIED}
                       size="sm"
                       title="Pronounce simplified sentence"
                     />

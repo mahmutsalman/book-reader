@@ -1,12 +1,18 @@
 /**
  * Pronunciation button component with animated speaker icon.
+ * Supports audio caching for instant playback.
  */
 import React, { useCallback, useState } from 'react';
 import { useAudioPlayer } from '../../hooks/useAudioPlayer';
+import { useAudioCache, AudioType } from '../../hooks/useAudioCache';
 
 interface PronunciationButtonProps {
   text: string;
   language: string;
+  /** Type of audio for cache key differentiation */
+  audioType?: AudioType;
+  /** Pre-fetched audio (from preloading) for instant playback */
+  cachedAudio?: string;
   className?: string;
   size?: 'sm' | 'md';
   title?: string;
@@ -15,11 +21,14 @@ interface PronunciationButtonProps {
 const PronunciationButton: React.FC<PronunciationButtonProps> = ({
   text,
   language,
+  audioType = AudioType.WORD,
+  cachedAudio,
   className = '',
   size = 'md',
   title = 'Play pronunciation',
 }) => {
   const { playAudio, stop, isPlaying, isLoading, setIsLoading, error } = useAudioPlayer();
+  const { getAudio, setAudio } = useAudioCache();
   const [serverError, setServerError] = useState(false);
 
   const handleClick = useCallback(async () => {
@@ -34,16 +43,36 @@ const PronunciationButton: React.FC<PronunciationButtonProps> = ({
     setServerError(false);
 
     try {
+      // 1. Check if we have pre-fetched audio (from preloading)
+      if (cachedAudio) {
+        await playAudio(cachedAudio);
+        return;
+      }
+
+      // 2. Check cache (memory → IndexedDB)
+      const cached = await getAudio(text, language, audioType);
+      if (cached) {
+        console.log('[Pronunciation] Cache hit');
+        await playAudio(cached);
+        return;
+      }
+
+      // 3. Fetch from server
       if (!window.electronAPI) {
         throw new Error('Electron API not available');
       }
 
+      console.log('[Pronunciation] Cache miss, fetching from server:', { text: text.substring(0, 30), language });
       const response = await window.electronAPI.pronunciation.getTTS(text, language);
 
       if (!response.success || !response.audio_base64) {
         throw new Error(response.error || 'Failed to generate audio');
       }
 
+      // 4. Store in cache for future use
+      await setAudio(text, language, audioType, response.audio_base64);
+
+      // 5. Play the audio
       await playAudio(response.audio_base64);
     } catch (err) {
       console.error('[Pronunciation] Error:', err);
@@ -51,7 +80,7 @@ const PronunciationButton: React.FC<PronunciationButtonProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [text, language, isPlaying, isLoading, playAudio, stop, setIsLoading]);
+  }, [text, language, audioType, cachedAudio, isPlaying, isLoading, playAudio, stop, setIsLoading, getAudio, setAudio]);
 
   // Size classes
   const sizeClasses = size === 'sm'

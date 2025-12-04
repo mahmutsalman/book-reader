@@ -236,7 +236,8 @@ export const DeferredWordProvider: React.FC<DeferredWordProviderProps> = ({ chil
                 const resimplifyResult = await window.electronAPI.ai.resimplifyWithWord(
                   entry.sentence,
                   entry.word,
-                  equivalentResult.equivalent
+                  equivalentResult.equivalent,
+                  entry.language  // Pass language to keep simplified in source language
                 );
                 results.simplifiedSentence = resimplifyResult.simplified;
               }

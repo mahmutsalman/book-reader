@@ -41,16 +41,16 @@ Definition:`;
       return { definition };
     }
 
-    // Non-English: get definition in source language + English translation
+    // Non-English: get English definition + English translation of the word
     const languageName = this.getLanguageName(language);
     const prompt = `For the ${languageName} word "${word}" in this context, provide:
-1. A definition in ${languageName} (2-3 sentences, keep it in ${languageName}, do NOT translate to English)
-2. The English translation of the word
+1. A definition in English explaining what this word means (2-3 sentences, write the definition in ENGLISH)
+2. The English translation of the word (single word or short phrase)
 
 Context: "${context}"
 
 Format your response EXACTLY like this:
-DEFINITION: [definition in ${languageName}]
+DEFINITION: [definition in English]
 ENGLISH: [English translation of the word]`;
 
     const response = await this.chat(prompt);
@@ -180,18 +180,26 @@ SIMPLIFIED_ENGLISH: [English translation of simplified]`;
   async resimplifyWithWord(
     originalSentence: string,
     originalWord: string,
-    equivalentWord: string
+    equivalentWord: string,
+    language = 'en'
   ): Promise<string> {
-    const prompt = `Rewrite this sentence using simpler words for a language learner.
+    const languageName = this.getLanguageName(language);
+
+    // For non-English, explicitly specify to keep in source language
+    const languageInstruction = language === 'en'
+      ? ''
+      : `\n- Keep the output in ${languageName} (do NOT translate to English)`;
+
+    const prompt = `Rewrite this ${languageName} sentence using simpler words for a language learner.
 
 IMPORTANT: You MUST use the word "${equivalentWord}" as the replacement for "${originalWord}".
 
 Rules:
-- Replace difficult words with easier synonyms
+- Replace difficult words with easier ${languageName} synonyms
 - Keep the SAME sentence structure as much as possible
 - Do NOT remove any concepts or meanings
 - The word "${equivalentWord}" MUST appear in your simplified version as the replacement for "${originalWord}"
-- Keep names and places unchanged
+- Keep names and places unchanged${languageInstruction}
 
 Original: "${originalSentence}"
 
@@ -282,18 +290,18 @@ Meaning:`;
       return { meaning };
     }
 
-    // Non-English: explain in source language + English translation
+    // Non-English: explain in English + provide English translation of phrase
     const languageName = this.getLanguageName(language);
     const prompt = `For the ${languageName} phrase "${phrase}" in this context, provide:
-1. An explanation in ${languageName} of what this phrase means (keep it in ${languageName}, do NOT translate to English)
-2. The English translation of the phrase
+1. An explanation in English of what this phrase means (write the explanation in ENGLISH)
+2. The English translation of the phrase (how you would say it in English)
 
 Focus on idiomatic meaning if applicable.
 
 Context: "${context}"
 
 Format your response EXACTLY like this:
-MEANING: [explanation in ${languageName}]
+MEANING: [explanation in English]
 ENGLISH: [English translation of the phrase]`;
 
     const response = await this.chat(prompt);
