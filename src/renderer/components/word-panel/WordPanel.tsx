@@ -5,6 +5,7 @@ import { getWordBoundaryPattern } from '../../../shared/utils/text-utils';
 import type { BookLanguage } from '../../../shared/types';
 import PronunciationButton from './PronunciationButton';
 import LoopPlayButton from './LoopPlayButton';
+import SlowLoopPlayButton from './SlowLoopPlayButton';
 import { useAudioCache, AudioType } from '../../hooks/useAudioCache';
 
 interface SelectedWord {
@@ -342,6 +343,16 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
                       title="Loop pronunciation"
                       className="text-white/80 hover:text-white hover:bg-white/20"
                     />
+                    <SlowLoopPlayButton
+                      text={wordData.germanArticle
+                        ? `${wordData.germanArticle} ${capitalizeGermanNoun(selectedWord.word)}`
+                        : selectedWord.word}
+                      language={bookLanguage}
+                      audioType={AudioType.WORD}
+                      size="sm"
+                      title="Slow loop (0.6x)"
+                      className="text-white/80 hover:text-white hover:bg-white/20"
+                    />
                   </div>
                 )}
               </div>
@@ -438,6 +449,13 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
                       size="sm"
                       title="Loop sentence"
                     />
+                    <SlowLoopPlayButton
+                      text={selectedWord.sentence}
+                      language={bookLanguage}
+                      audioType={AudioType.SENTENCE}
+                      size="sm"
+                      title="Slow loop (0.6x)"
+                    />
                   </div>
                 </div>
                 <p className="text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 p-3 rounded-lg italic">
@@ -471,6 +489,13 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
                         audioType={AudioType.SIMPLIFIED}
                         size="sm"
                         title="Loop simplified sentence"
+                      />
+                      <SlowLoopPlayButton
+                        text={wordData.simplifiedSentence}
+                        language={bookLanguage}
+                        audioType={AudioType.SIMPLIFIED}
+                        size="sm"
+                        title="Slow loop (0.6x)"
                       />
                     </div>
                   </div>

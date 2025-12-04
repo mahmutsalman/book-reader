@@ -36,8 +36,8 @@ interface UseAudioPlayerReturn {
   isLoading: boolean;
   setIsLoading: (loading: boolean) => void;
   error: string | null;
-  // Loop playback support
-  playLooping: (base64: string) => Promise<void>;
+  // Loop playback support (with optional playback rate for slow mode)
+  playLooping: (base64: string, playbackRate?: number) => Promise<void>;
   stopLooping: () => void;
   isLooping: boolean;
 }
@@ -108,7 +108,8 @@ export function useAudioPlayer(): UseAudioPlayerReturn {
   }, []);
 
   // Play audio in a continuous loop (global - only one loop at a time)
-  const playLooping = useCallback(async (base64: string) => {
+  // playbackRate: 1.0 = normal speed, 0.6 = 60% speed (slow mode)
+  const playLooping = useCallback(async (base64: string, playbackRate = 1.0) => {
     const instanceId = instanceIdRef.current;
 
     // Stop regular playback if active
@@ -126,6 +127,7 @@ export function useAudioPlayer(): UseAudioPlayerReturn {
     try {
       const audio = new Audio(`data:audio/mp3;base64,${base64}`);
       audio.loop = true; // Enable native looping
+      audio.playbackRate = playbackRate; // Set playback speed (0.5-4.0 supported)
       globalLoopAudio = audio;
       globalLoopInstanceId = instanceId;
 
