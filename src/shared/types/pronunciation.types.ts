@@ -42,3 +42,23 @@ export interface HealthResponse {
   status: string;
   version: string;
 }
+
+// IPA Language management types
+export interface IPALanguageInfo {
+  code: string;
+  name: string;
+  package: string;
+  installed: boolean;
+}
+
+export interface IPALanguagesResponse {
+  success: boolean;
+  languages: IPALanguageInfo[];
+  error?: string;
+}
+
+export interface InstallLanguageResponse {
+  success: boolean;
+  message: string;
+  error?: string;
+}

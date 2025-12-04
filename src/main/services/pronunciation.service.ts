@@ -7,6 +7,8 @@ import type {
   TTSResponse,
   IPAResponse,
   PronunciationServerStatus,
+  IPALanguagesResponse,
+  InstallLanguageResponse,
 } from '../../shared/types/pronunciation.types';
 
 const TTS_TIMEOUT = 15000; // 15 seconds for TTS (sentences can be long)
@@ -98,6 +100,89 @@ class PronunciationService {
    */
   getServerStatus(): PronunciationServerStatus {
     return pythonManager.getStatus();
+  }
+
+  /**
+   * Get list of available IPA languages and their installation status.
+   */
+  async getIPALanguages(): Promise<IPALanguagesResponse> {
+    if (!pythonManager.ready) {
+      return {
+        success: false,
+        languages: [],
+        error: 'Pronunciation server is not ready',
+      };
+    }
+
+    try {
+      const response = await fetch(`${pythonManager.baseUrl}/api/ipa/languages`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        signal: AbortSignal.timeout(5000),
+      });
+
+      if (!response.ok) {
+        return {
+          success: false,
+          languages: [],
+          error: `Server error: ${response.status}`,
+        };
+      }
+
+      return (await response.json()) as IPALanguagesResponse;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[PronunciationService] getIPALanguages error:', message);
+      return {
+        success: false,
+        languages: [],
+        error: message,
+      };
+    }
+  }
+
+  /**
+   * Install a gruut language package for IPA support.
+   */
+  async installIPALanguage(language: string): Promise<InstallLanguageResponse> {
+    if (!pythonManager.ready) {
+      return {
+        success: false,
+        message: 'Pronunciation server is not ready',
+        error: 'Server not ready',
+      };
+    }
+
+    try {
+      const response = await fetch(`${pythonManager.baseUrl}/api/ipa/install`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ language }),
+        signal: AbortSignal.timeout(180000), // 3 minutes for installation
+      });
+
+      if (!response.ok) {
+        return {
+          success: false,
+          message: 'Installation failed',
+          error: `Server error: ${response.status}`,
+        };
+      }
+
+      return (await response.json()) as InstallLanguageResponse;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[PronunciationService] installIPALanguage error:', message);
+      return {
+        success: false,
+        message: 'Installation failed',
+        error: message,
+      };
+    }
   }
 }
 

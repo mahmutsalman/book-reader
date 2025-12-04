@@ -47,6 +47,8 @@ export const IPC_CHANNELS = {
   PRONUNCIATION_GET_TTS: 'pronunciation:get-tts',
   PRONUNCIATION_GET_IPA: 'pronunciation:get-ipa',
   PRONUNCIATION_SERVER_STATUS: 'pronunciation:server-status',
+  PRONUNCIATION_GET_IPA_LANGUAGES: 'pronunciation:get-ipa-languages',
+  PRONUNCIATION_INSTALL_IPA_LANGUAGE: 'pronunciation:install-ipa-language',
 } as const;
 
 export type IPCChannel = typeof IPC_CHANNELS[keyof typeof IPC_CHANNELS];

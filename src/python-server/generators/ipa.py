@@ -32,6 +32,7 @@ def generate_ipa(text: str, language: str = "en") -> Optional[str]:
         IPA transcription string (e.g., "/h ə l oʊ/"), or None if generation fails
     """
     if not text or not text.strip():
+        print(f"[IPA] Empty text, returning None")
         return None
 
     try:
@@ -42,25 +43,34 @@ def generate_ipa(text: str, language: str = "en") -> Optional[str]:
             "en": "en-us",
             "de": "de-de",
             "ru": "ru-ru",
+            "fr": "fr-fr",
+            "es": "es-es",
+            "it": "it-it",
         }
         gruut_lang = lang_map.get(language, "en-us")
+        print(f"[IPA] Using gruut language: {gruut_lang} for input language: {language}")
 
         # Generate phonemes using gruut
         phonemes = []
         for sent in _sentences_func(text, lang=gruut_lang):
             for word in sent:
+                print(f"[IPA] Word: '{word.text}' -> phonemes: {word.phonemes}")
                 if word.phonemes:
                     phonemes.extend(word.phonemes)
 
         if not phonemes:
+            print(f"[IPA] No phonemes generated for '{text}'")
             return None
 
         # Format as IPA string
         ipa_string = ' '.join(phonemes)
+        print(f"[IPA] Final IPA: {ipa_string}")
         return ipa_string
 
     except Exception as e:
+        import traceback
         print(f"[IPA] Error generating IPA: {e}")
+        print(f"[IPA] Traceback: {traceback.format_exc()}")
         return None
 
 

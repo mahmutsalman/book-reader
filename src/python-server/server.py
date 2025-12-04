@@ -8,9 +8,11 @@ Default port: 8766
 """
 import os
 import asyncio
-from typing import Optional
+import subprocess
+import sys
+from typing import Optional, List, Dict
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -66,6 +68,90 @@ class IPAResponse(BaseModel):
 class HealthResponse(BaseModel):
     status: str
     version: str
+
+
+class IPALanguageInfo(BaseModel):
+    code: str
+    name: str
+    package: str
+    installed: bool
+
+
+class IPALanguagesResponse(BaseModel):
+    success: bool
+    languages: List[IPALanguageInfo]
+    error: Optional[str] = None
+
+
+class InstallLanguageRequest(BaseModel):
+    language: str
+
+
+class InstallLanguageResponse(BaseModel):
+    success: bool
+    message: str
+    error: Optional[str] = None
+
+
+# Track ongoing installations
+_installing_languages: Dict[str, bool] = {}
+
+
+# Available gruut language packages
+GRUUT_LANGUAGES = {
+    "en": {"name": "English", "package": "gruut-lang-en"},
+    "de": {"name": "German", "package": "gruut-lang-de"},
+    "ru": {"name": "Russian", "package": "gruut-lang-ru"},
+    "fr": {"name": "French", "package": "gruut-lang-fr"},
+    "es": {"name": "Spanish", "package": "gruut-lang-es"},
+    "it": {"name": "Italian", "package": "gruut-lang-it"},
+    "nl": {"name": "Dutch", "package": "gruut-lang-nl"},
+    "cs": {"name": "Czech", "package": "gruut-lang-cs"},
+    "pt": {"name": "Portuguese", "package": "gruut-lang-pt"},
+    "sv": {"name": "Swedish", "package": "gruut-lang-sv"},
+    "ar": {"name": "Arabic", "package": "gruut-lang-ar"},
+    "fa": {"name": "Persian", "package": "gruut-lang-fa"},
+    "sw": {"name": "Swahili", "package": "gruut-lang-sw"},
+    "zh": {"name": "Chinese", "package": "gruut-lang-zh"},
+}
+
+
+def is_language_installed(lang_code: str) -> bool:
+    """Check if a gruut language package is installed."""
+    try:
+        package_name = f"gruut_lang_{lang_code}"
+        __import__(package_name)
+        return True
+    except ImportError:
+        return False
+
+
+def install_language_sync(lang_code: str) -> tuple[bool, str]:
+    """Install a gruut language package synchronously."""
+    if lang_code not in GRUUT_LANGUAGES:
+        return False, f"Unknown language: {lang_code}"
+
+    package = GRUUT_LANGUAGES[lang_code]["package"]
+
+    try:
+        print(f"[IPA] Installing {package}...")
+        result = subprocess.run(
+            [sys.executable, "-m", "pip", "install", package],
+            capture_output=True,
+            text=True,
+            timeout=120  # 2 minute timeout
+        )
+
+        if result.returncode == 0:
+            print(f"[IPA] Successfully installed {package}")
+            return True, f"Successfully installed {GRUUT_LANGUAGES[lang_code]['name']} IPA support"
+        else:
+            print(f"[IPA] Failed to install {package}: {result.stderr}")
+            return False, f"Installation failed: {result.stderr}"
+    except subprocess.TimeoutExpired:
+        return False, "Installation timed out"
+    except Exception as e:
+        return False, f"Installation error: {str(e)}"
 
 
 # Endpoints
@@ -141,6 +227,8 @@ async def get_ipa(request: IPARequest):
     Returns:
         IPAResponse with IPA transcription
     """
+    print(f"[Server IPA] Received request: language={request.language}, text={request.text[:50]}...")
+
     if not request.text or not request.text.strip():
         return IPAResponse(
             success=False,
@@ -150,6 +238,7 @@ async def get_ipa(request: IPARequest):
 
     try:
         ipa = generate_ipa(request.text, request.language)
+        print(f"[Server IPA] Generated IPA: {ipa}")
 
         if ipa:
             return IPAResponse(
@@ -158,6 +247,7 @@ async def get_ipa(request: IPARequest):
                 ipa=ipa
             )
         else:
+            print(f"[Server IPA] IPA generation returned None")
             return IPAResponse(
                 success=False,
                 text=request.text,
@@ -165,6 +255,7 @@ async def get_ipa(request: IPARequest):
             )
 
     except Exception as e:
+        print(f"[Server IPA] Exception: {e}")
         return IPAResponse(
             success=False,
             text=request.text,
@@ -185,6 +276,74 @@ async def get_ipa_get(language: str, text: str):
         IPAResponse with IPA transcription
     """
     return await get_ipa(IPARequest(text=text, language=language))
+
+
+@app.get("/api/ipa/languages", response_model=IPALanguagesResponse)
+async def get_ipa_languages():
+    """
+    Get list of available IPA languages and their installation status.
+
+    Returns:
+        IPALanguagesResponse with list of languages
+    """
+    try:
+        languages = []
+        for code, info in GRUUT_LANGUAGES.items():
+            languages.append(IPALanguageInfo(
+                code=code,
+                name=info["name"],
+                package=info["package"],
+                installed=is_language_installed(code)
+            ))
+
+        # Sort by name, but put installed first
+        languages.sort(key=lambda x: (not x.installed, x.name))
+
+        return IPALanguagesResponse(success=True, languages=languages)
+    except Exception as e:
+        return IPALanguagesResponse(success=False, languages=[], error=str(e))
+
+
+@app.post("/api/ipa/install", response_model=InstallLanguageResponse)
+async def install_ipa_language(request: InstallLanguageRequest):
+    """
+    Install a gruut language package for IPA support.
+
+    Args:
+        request: InstallLanguageRequest with language code
+
+    Returns:
+        InstallLanguageResponse with installation result
+    """
+    lang = request.language
+
+    # Check if already installed
+    if is_language_installed(lang):
+        return InstallLanguageResponse(
+            success=True,
+            message=f"{GRUUT_LANGUAGES.get(lang, {}).get('name', lang)} is already installed"
+        )
+
+    # Check if installation is already in progress
+    if _installing_languages.get(lang):
+        return InstallLanguageResponse(
+            success=False,
+            message="Installation already in progress",
+            error="Please wait for the current installation to complete"
+        )
+
+    # Mark as installing
+    _installing_languages[lang] = True
+
+    try:
+        success, message = install_language_sync(lang)
+
+        if success:
+            return InstallLanguageResponse(success=True, message=message)
+        else:
+            return InstallLanguageResponse(success=False, message="Installation failed", error=message)
+    finally:
+        _installing_languages[lang] = False
 
 
 # Main entry point

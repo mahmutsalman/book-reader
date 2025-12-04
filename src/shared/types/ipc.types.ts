@@ -2,7 +2,7 @@ import type { Book, BookData, ReadingProgress, BookLanguage } from './book.types
 import type { VocabularyEntry, CreateVocabularyEntry, VocabularyFilters, StoredWordOccurrence } from './vocabulary.types';
 import type { AppSettings, LMStudioConnectionResult } from './settings.types';
 import type { WordDefinitionResult, IPAPronunciationResult, SimplifiedSentenceResult, WordEquivalentResult, PhraseMeaningResult, TatoebaSentence, TatoebaStatus } from './ai.types';
-import type { TTSResponse, IPAResponse, PronunciationServerStatus } from './pronunciation.types';
+import type { TTSResponse, IPAResponse, PronunciationServerStatus, IPALanguagesResponse, InstallLanguageResponse } from './pronunciation.types';
 
 // IPC API exposed to renderer
 export interface ElectronAPI {
@@ -53,6 +53,8 @@ export interface ElectronAPI {
     getTTS: (text: string, language?: string) => Promise<TTSResponse>;
     getIPA: (text: string, language?: string) => Promise<IPAResponse>;
     getServerStatus: () => Promise<PronunciationServerStatus>;
+    getIPALanguages: () => Promise<IPALanguagesResponse>;
+    installIPALanguage: (language: string) => Promise<InstallLanguageResponse>;
   };
 }
 

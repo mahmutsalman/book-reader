@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSettings } from '../context/SettingsContext';
 import type { AppSettings } from '../../shared/types';
+import type { IPALanguageInfo } from '../../shared/types/pronunciation.types';
 
 type ThemeOption = AppSettings['theme'];
 
@@ -11,6 +12,10 @@ const SettingsPage: React.FC = () => {
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [pythonStatus, setPythonStatus] = useState<{ running: boolean; ready: boolean; url: string } | null>(null);
   const [testingPython, setTestingPython] = useState(false);
+  const [ipaLanguages, setIpaLanguages] = useState<IPALanguageInfo[]>([]);
+  const [loadingIpaLanguages, setLoadingIpaLanguages] = useState(false);
+  const [installingLanguage, setInstallingLanguage] = useState<string | null>(null);
+  const [installResult, setInstallResult] = useState<{ success: boolean; message: string } | null>(null);
 
   const handleTestConnection = async () => {
     if (!window.electronAPI) return;
@@ -56,6 +61,55 @@ const SettingsPage: React.FC = () => {
       setTestingPython(false);
     }
   };
+
+  const loadIpaLanguages = async () => {
+    if (!window.electronAPI) return;
+
+    setLoadingIpaLanguages(true);
+    try {
+      const result = await window.electronAPI.pronunciation.getIPALanguages();
+      if (result.success) {
+        setIpaLanguages(result.languages);
+      }
+    } catch (error) {
+      console.error('Failed to load IPA languages:', error);
+    } finally {
+      setLoadingIpaLanguages(false);
+    }
+  };
+
+  const handleInstallLanguage = async (langCode: string) => {
+    if (!window.electronAPI || installingLanguage) return;
+
+    setInstallingLanguage(langCode);
+    setInstallResult(null);
+
+    try {
+      const result = await window.electronAPI.pronunciation.installIPALanguage(langCode);
+      setInstallResult({
+        success: result.success,
+        message: result.success ? result.message : (result.error || 'Installation failed'),
+      });
+      if (result.success) {
+        // Refresh the language list
+        loadIpaLanguages();
+      }
+    } catch (error) {
+      setInstallResult({
+        success: false,
+        message: error instanceof Error ? error.message : 'Installation failed',
+      });
+    } finally {
+      setInstallingLanguage(null);
+    }
+  };
+
+  // Load IPA languages when Python server is ready
+  useEffect(() => {
+    if (pythonStatus?.ready) {
+      loadIpaLanguages();
+    }
+  }, [pythonStatus?.ready]);
 
   if (loading) {
     return (
@@ -220,6 +274,71 @@ const SettingsPage: React.FC = () => {
             <div className="text-sm text-gray-500 dark:text-gray-400">
               <div>Status: {pythonStatus.running ? 'Running' : 'Stopped'}</div>
               <div>URL: {pythonStatus.url}</div>
+            </div>
+          )}
+
+          {/* IPA Language Packages */}
+          {pythonStatus?.ready && (
+            <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-600">
+              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                IPA Pronunciation Packages
+              </h4>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                Install language packages for accurate IPA transcription. Without a package, AI will be used as fallback.
+              </p>
+
+              {loadingIpaLanguages ? (
+                <div className="text-sm text-gray-500 dark:text-gray-400">Loading languages...</div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  {ipaLanguages.map((lang) => (
+                    <div
+                      key={lang.code}
+                      className={`flex items-center justify-between p-2 rounded-lg border ${
+                        lang.installed
+                          ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20'
+                          : 'border-gray-200 dark:border-gray-600'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          {lang.name}
+                        </span>
+                        <span className="text-xs text-gray-400">({lang.code})</span>
+                      </div>
+                      {lang.installed ? (
+                        <span className="text-xs text-green-600 dark:text-green-400 font-medium">
+                          ✓ Installed
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => handleInstallLanguage(lang.code)}
+                          disabled={installingLanguage !== null}
+                          className={`text-xs px-2 py-1 rounded ${
+                            installingLanguage === lang.code
+                              ? 'bg-gray-200 dark:bg-gray-600 text-gray-500'
+                              : 'bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 hover:bg-primary-200 dark:hover:bg-primary-900/50'
+                          }`}
+                        >
+                          {installingLanguage === lang.code ? 'Installing...' : 'Install'}
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {installResult && (
+                <div
+                  className={`mt-3 p-2 rounded text-sm ${
+                    installResult.success
+                      ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+                      : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
+                  }`}
+                >
+                  {installResult.message}
+                </div>
+              )}
             </div>
           )}
         </div>

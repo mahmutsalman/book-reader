@@ -26,4 +26,17 @@ export function registerPronunciationHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.PRONUNCIATION_SERVER_STATUS, async () => {
     return pronunciationService.getServerStatus();
   });
+
+  // Get available IPA languages
+  ipcMain.handle(IPC_CHANNELS.PRONUNCIATION_GET_IPA_LANGUAGES, async () => {
+    return pronunciationService.getIPALanguages();
+  });
+
+  // Install IPA language package
+  ipcMain.handle(
+    IPC_CHANNELS.PRONUNCIATION_INSTALL_IPA_LANGUAGE,
+    async (_, language: string) => {
+      return pronunciationService.installIPALanguage(language);
+    }
+  );
 }

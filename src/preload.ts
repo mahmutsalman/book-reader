@@ -98,6 +98,10 @@ const electronAPI: ElectronAPI = {
       ipcRenderer.invoke(IPC_CHANNELS.PRONUNCIATION_GET_IPA, text, language || 'en'),
     getServerStatus: () =>
       ipcRenderer.invoke(IPC_CHANNELS.PRONUNCIATION_SERVER_STATUS),
+    getIPALanguages: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.PRONUNCIATION_GET_IPA_LANGUAGES),
+    installIPALanguage: (language: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PRONUNCIATION_INSTALL_IPA_LANGUAGE, language),
   },
 };
 
