@@ -127,6 +127,7 @@ export function useAudioPlayer(): UseAudioPlayerReturn {
     try {
       const audio = new Audio(`data:audio/mp3;base64,${base64}`);
       audio.loop = true; // Enable native looping
+      audio.preservesPitch = true; // Preserve pitch at different playback speeds
       audio.playbackRate = playbackRate; // Set playback speed (0.5-4.0 supported)
       globalLoopAudio = audio;
       globalLoopInstanceId = instanceId;
