@@ -166,10 +166,10 @@ export const DeferredWordProvider: React.FC<DeferredWordProviderProps> = ({ chil
 
       } else {
         // Single word handling: original behavior
-        // Fetch definition, IPA, and simplified sentence in parallel
-        const [defResult, ipaResult, simplifyResult] = await Promise.allSettled([
+        // Fetch definition and simplified sentence in parallel
+        // IPA is fetched separately with Python server as primary, AI as fallback
+        const [defResult, simplifyResult] = await Promise.allSettled([
           window.electronAPI.ai.getDefinition(entry.word, entry.sentence, entry.language),
-          window.electronAPI.ai.getIPA(entry.word, entry.language),
           window.electronAPI.ai.simplifySentence(entry.sentence, entry.language),
         ]);
 
@@ -179,9 +179,38 @@ export const DeferredWordProvider: React.FC<DeferredWordProviderProps> = ({ chil
             results.wordTranslation = defResult.value.wordTranslation;
           }
         }
-        if (ipaResult.status === 'fulfilled') {
-          results.ipa = ipaResult.value.ipa;
-          results.syllables = ipaResult.value.syllables;
+
+        // Try Python server for IPA first, fall back to AI
+        try {
+          const pythonIpaResult = await window.electronAPI.pronunciation.getIPA(entry.word, entry.language);
+          if (pythonIpaResult.success && pythonIpaResult.ipa) {
+            results.ipa = pythonIpaResult.ipa;
+            // Python server doesn't provide syllables, so fetch from AI
+            try {
+              const aiIpaResult = await window.electronAPI.ai.getIPA(entry.word, entry.language);
+              if (aiIpaResult.syllables) {
+                results.syllables = aiIpaResult.syllables;
+              }
+            } catch {
+              // Syllables are non-critical, ignore
+            }
+          } else {
+            throw new Error('Python IPA failed, using AI fallback');
+          }
+        } catch {
+          // Fallback to AI for IPA and syllables
+          console.log('[DeferredWord] Python IPA failed, using AI fallback');
+          try {
+            const aiIpaResult = await window.electronAPI.ai.getIPA(entry.word, entry.language);
+            if (aiIpaResult.ipa) {
+              results.ipa = aiIpaResult.ipa;
+            }
+            if (aiIpaResult.syllables) {
+              results.syllables = aiIpaResult.syllables;
+            }
+          } catch (err) {
+            console.error('[DeferredWord] AI IPA fallback also failed:', err);
+          }
         }
         if (simplifyResult.status === 'fulfilled') {
           results.simplifiedSentence = simplifyResult.value.simplified;
