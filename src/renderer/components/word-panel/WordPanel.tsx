@@ -4,6 +4,7 @@ import type { CachedWordData } from '../../../shared/types/deferred-word.types';
 import { getWordBoundaryPattern } from '../../../shared/utils/text-utils';
 import type { BookLanguage } from '../../../shared/types';
 import PronunciationButton from './PronunciationButton';
+import LoopPlayButton from './LoopPlayButton';
 import { useAudioCache, AudioType } from '../../hooks/useAudioCache';
 
 interface SelectedWord {
@@ -318,18 +319,30 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
                     ? `${wordData.germanArticle} ${capitalizeGermanNoun(selectedWord.word)}`
                     : selectedWord.word}
                 </h2>
-                {/* Word pronunciation button - include article for German nouns */}
+                {/* Word pronunciation buttons - include article for German nouns */}
                 {!selectedWord.isPhrase && (
-                  <PronunciationButton
-                    text={wordData.germanArticle
-                      ? `${wordData.germanArticle} ${capitalizeGermanNoun(selectedWord.word)}`
-                      : selectedWord.word}
-                    language={bookLanguage}
-                    audioType={AudioType.WORD}
-                    size="sm"
-                    title="Pronounce word"
-                    className="text-white/80 hover:text-white hover:bg-white/20"
-                  />
+                  <div className="flex items-center gap-0.5">
+                    <PronunciationButton
+                      text={wordData.germanArticle
+                        ? `${wordData.germanArticle} ${capitalizeGermanNoun(selectedWord.word)}`
+                        : selectedWord.word}
+                      language={bookLanguage}
+                      audioType={AudioType.WORD}
+                      size="sm"
+                      title="Pronounce word"
+                      className="text-white/80 hover:text-white hover:bg-white/20"
+                    />
+                    <LoopPlayButton
+                      text={wordData.germanArticle
+                        ? `${wordData.germanArticle} ${capitalizeGermanNoun(selectedWord.word)}`
+                        : selectedWord.word}
+                      language={bookLanguage}
+                      audioType={AudioType.WORD}
+                      size="sm"
+                      title="Loop pronunciation"
+                      className="text-white/80 hover:text-white hover:bg-white/20"
+                    />
+                  </div>
                 )}
               </div>
               {/* Only show IPA and syllables for single words, not phrases */}
@@ -410,13 +423,22 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
               <section>
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="font-semibold text-gray-700 dark:text-gray-300">📝 Original Sentence</h3>
-                  <PronunciationButton
-                    text={selectedWord.sentence}
-                    language={bookLanguage}
-                    audioType={AudioType.SENTENCE}
-                    size="sm"
-                    title="Pronounce sentence"
-                  />
+                  <div className="flex items-center gap-0.5">
+                    <PronunciationButton
+                      text={selectedWord.sentence}
+                      language={bookLanguage}
+                      audioType={AudioType.SENTENCE}
+                      size="sm"
+                      title="Pronounce sentence"
+                    />
+                    <LoopPlayButton
+                      text={selectedWord.sentence}
+                      language={bookLanguage}
+                      audioType={AudioType.SENTENCE}
+                      size="sm"
+                      title="Loop sentence"
+                    />
+                  </div>
                 </div>
                 <p className="text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 p-3 rounded-lg italic">
                   "{highlightWord(selectedWord.sentence, selectedWord.word)}"
@@ -435,13 +457,22 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
                 <section>
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="font-semibold text-gray-700 dark:text-gray-300">✨ Simplified</h3>
-                    <PronunciationButton
-                      text={wordData.simplifiedSentence}
-                      language={bookLanguage}
-                      audioType={AudioType.SIMPLIFIED}
-                      size="sm"
-                      title="Pronounce simplified sentence"
-                    />
+                    <div className="flex items-center gap-0.5">
+                      <PronunciationButton
+                        text={wordData.simplifiedSentence}
+                        language={bookLanguage}
+                        audioType={AudioType.SIMPLIFIED}
+                        size="sm"
+                        title="Pronounce simplified sentence"
+                      />
+                      <LoopPlayButton
+                        text={wordData.simplifiedSentence}
+                        language={bookLanguage}
+                        audioType={AudioType.SIMPLIFIED}
+                        size="sm"
+                        title="Loop simplified sentence"
+                      />
+                    </div>
                   </div>
                   <p className="text-gray-600 dark:text-gray-300 bg-green-50 dark:bg-green-900/30 p-3 rounded-lg">
                     {wordData.wordEquivalent
