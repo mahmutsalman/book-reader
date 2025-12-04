@@ -341,6 +341,31 @@ const SettingsPage: React.FC = () => {
               )}
             </div>
           )}
+
+          {/* Slow Playback Speed */}
+          <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-600">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Slow Playback Speed: {settings.slow_playback_speed.toFixed(2)}x
+              </label>
+              <input
+                type="range"
+                min="0.25"
+                max="2.0"
+                step="0.05"
+                value={settings.slow_playback_speed}
+                onChange={(e) => updateSetting('slow_playback_speed', parseFloat(e.target.value))}
+                className="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer accent-primary-600"
+              />
+              <div className="flex justify-between text-xs text-gray-400 mt-1">
+                <span>0.25x</span>
+                <span>2.0x</span>
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Speed for slow audio playback in word panel and pre-study notes
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 

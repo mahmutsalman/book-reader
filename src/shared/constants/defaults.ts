@@ -14,6 +14,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   // Pre-Study Notes settings
   pre_study_view_count: 10,      // Default: 10 views
   pre_study_sentence_limit: 0,   // Default: 0 = all sentences
+  // Audio settings
+  slow_playback_speed: 0.6,      // Default: 0.6x speed for slow playback
 };
 
 // Zoom level constraints

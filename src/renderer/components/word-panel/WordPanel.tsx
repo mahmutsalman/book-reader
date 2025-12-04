@@ -53,6 +53,15 @@ const capitalizeGermanNoun = (word: string): string => {
   return word.charAt(0).toUpperCase() + word.slice(1);
 };
 
+// Normalize text for TTS - collapse whitespace and remove newlines
+// This prevents Edge TTS from interpreting newlines as pauses
+const normalizeForTTS = (text: string): string => {
+  return text
+    .replace(/[\r\n]+/g, ' ')  // Replace newlines with space
+    .replace(/\s+/g, ' ')       // Collapse multiple spaces
+    .trim();
+};
+
 const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bookId, bookLanguage = 'en', onNavigateToPage, preloadedData }) => {
   const { settings } = useSettings();
   const { preloadAudio } = useAudioCache();
@@ -131,9 +140,10 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
       : selectedWord.word;
 
     // Build list of audio to preload
+    // Normalize sentence to prevent newlines from causing TTS pauses
     const preloadItems = [
       { text: wordText, language: bookLanguage, type: AudioType.WORD },
-      { text: selectedWord.sentence, language: bookLanguage, type: AudioType.SENTENCE },
+      { text: normalizeForTTS(selectedWord.sentence), language: bookLanguage, type: AudioType.SENTENCE },
     ];
 
     // Preload in background (non-blocking)
@@ -432,7 +442,6 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
                       language={bookLanguage}
                       audioType={AudioType.WORD}
                       size="sm"
-                      title="Slow loop (0.6x)"
                       className="text-white/80 hover:text-white hover:bg-white/20"
                     />
                   </div>
@@ -512,25 +521,24 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
                   <h3 className="font-semibold text-gray-700 dark:text-gray-300">📝 Original Sentence</h3>
                   <div className="flex items-center gap-0.5">
                     <PronunciationButton
-                      text={selectedWord.sentence}
+                      text={normalizeForTTS(selectedWord.sentence)}
                       language={bookLanguage}
                       audioType={AudioType.SENTENCE}
                       size="sm"
                       title="Pronounce sentence"
                     />
                     <LoopPlayButton
-                      text={selectedWord.sentence}
+                      text={normalizeForTTS(selectedWord.sentence)}
                       language={bookLanguage}
                       audioType={AudioType.SENTENCE}
                       size="sm"
                       title="Loop sentence"
                     />
                     <SlowLoopPlayButton
-                      text={selectedWord.sentence}
+                      text={normalizeForTTS(selectedWord.sentence)}
                       language={bookLanguage}
                       audioType={AudioType.SENTENCE}
                       size="sm"
-                      title="Slow loop (0.6x)"
                     />
                     {/* Syllable mode button */}
                     <button
@@ -635,8 +643,7 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
                         language={bookLanguage}
                         audioType={AudioType.SIMPLIFIED}
                         size="sm"
-                        title="Slow loop (0.6x)"
-                      />
+                        />
                     </div>
                   </div>
                   <p className="text-gray-600 dark:text-gray-300 bg-green-50 dark:bg-green-900/30 p-3 rounded-lg">

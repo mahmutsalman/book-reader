@@ -12,6 +12,8 @@ export interface AppSettings {
   // Pre-Study Notes settings
   pre_study_view_count: number;      // Number of views to process (1-20, default: 10)
   pre_study_sentence_limit: number;  // Max sentences per view (0 = all, 1-2 for testing)
+  // Audio settings
+  slow_playback_speed: number;       // Slow audio playback speed (0.25 to 2.0, default: 0.6)
 }
 
 // Settings update

@@ -3,6 +3,7 @@ import { IPC_CHANNELS } from '../../shared/constants';
 import { getPreStudyNotesService } from '../services/pre-study-notes.service';
 import { preStudyHtmlService } from '../services/pre-study-html.service';
 import { windowManagerService } from '../services/window-manager.service';
+import { settingsRepository } from '../../database/repositories';
 import type { PreStudyNotesRequest } from '../../shared/types/pre-study-notes.types';
 
 export function registerPreStudyHandlers(): void {
@@ -34,8 +35,11 @@ export function registerPreStudyHandlers(): void {
           uniqueWords: result.uniqueWords,
         });
 
+        // Get slow playback speed setting
+        const slowPlaybackSpeed = await settingsRepository.get('slow_playback_speed') || 0.6;
+
         // Generate HTML
-        const html = preStudyHtmlService.generateHtml(result);
+        const html = preStudyHtmlService.generateHtml(result, slowPlaybackSpeed);
 
         // Open in new window
         windowManagerService.openHtmlWindow(html, `Pre-Study Notes - ${result.bookTitle}`);

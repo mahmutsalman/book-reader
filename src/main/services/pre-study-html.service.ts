@@ -6,8 +6,10 @@ import type { PreStudyNotesResult, PreStudyWordEntry } from '../../shared/types/
 export class PreStudyHtmlService {
   /**
    * Generate complete HTML document for pre-study notes
+   * @param result - The pre-study notes result data
+   * @param slowPlaybackSpeed - Speed for slow audio playback (0.25 to 2.0)
    */
-  generateHtml(result: PreStudyNotesResult): string {
+  generateHtml(result: PreStudyNotesResult, slowPlaybackSpeed: number = 0.6): string {
     const languageNames: Record<string, string> = {
       en: 'English',
       de: 'German',
@@ -52,7 +54,7 @@ export class PreStudyHtmlService {
   </header>
 
   <main class="cards-container">
-    ${result.entries.map(entry => this.generateWordCard(entry, result.language)).join('\n')}
+    ${result.entries.map(entry => this.generateWordCard(entry, result.language, slowPlaybackSpeed)).join('\n')}
   </main>
 
   <script>
@@ -66,7 +68,7 @@ export class PreStudyHtmlService {
     let currentAudio = null;
     let currentButton = null;
 
-    function playAudio(button, base64Audio) {
+    function playAudio(button, base64Audio, playbackRate = 1.0) {
       // Stop any currently playing audio
       if (currentAudio) {
         currentAudio.pause();
@@ -85,6 +87,8 @@ export class PreStudyHtmlService {
       // Play new audio
       if (base64Audio) {
         currentAudio = new Audio('data:audio/mp3;base64,' + base64Audio);
+        currentAudio.preservesPitch = true;
+        currentAudio.playbackRate = playbackRate;
         currentButton = button;
         button.classList.add('playing');
 
@@ -115,7 +119,7 @@ export class PreStudyHtmlService {
   /**
    * Generate HTML for a single word card
    */
-  private generateWordCard(entry: PreStudyWordEntry, language: string): string {
+  private generateWordCard(entry: PreStudyWordEntry, language: string, slowPlaybackSpeed: number): string {
     const hasGrammar = entry.grammarTopics && entry.grammarTopics.length > 0;
     const isGerman = language === 'de';
     const isNonEnglish = language !== 'en';
@@ -155,7 +159,9 @@ export class PreStudyHtmlService {
       ${entry.wordAudio || entry.sentenceAudio ? `
       <div class="audio-controls">
         ${entry.wordAudio ? `<button class="audio-btn" onclick="playAudio(this, '${entry.wordAudio}')">🔊 Word</button>` : ''}
+        ${entry.wordAudio ? `<button class="audio-btn slow-btn" onclick="playAudio(this, '${entry.wordAudio}', ${slowPlaybackSpeed})" title="Play word at ${slowPlaybackSpeed}x speed">🐢 Slow</button>` : ''}
         ${entry.sentenceAudio ? `<button class="audio-btn" onclick="playAudio(this, '${entry.sentenceAudio}')">🔊 Sentence</button>` : ''}
+        ${entry.sentenceAudio ? `<button class="audio-btn slow-btn" onclick="playAudio(this, '${entry.sentenceAudio}', ${slowPlaybackSpeed})" title="Play sentence at ${slowPlaybackSpeed}x speed">🐢 Slow</button>` : ''}
       </div>
       ` : ''}
 
@@ -446,6 +452,34 @@ export class PreStudyHtmlService {
       background: var(--accent);
       color: white;
       border-color: var(--accent);
+    }
+
+    .audio-btn.slow-btn {
+      background: #fff3e0;
+      border-color: #ff9800;
+      color: #e65100;
+    }
+
+    body.dark .audio-btn.slow-btn {
+      background: #3d2800;
+      border-color: #ff9800;
+      color: #ffb74d;
+    }
+
+    .audio-btn.slow-btn:hover {
+      background: #ffe0b2;
+      border-color: #f57c00;
+    }
+
+    body.dark .audio-btn.slow-btn:hover {
+      background: #4d3200;
+      border-color: #ffa726;
+    }
+
+    .audio-btn.slow-btn.playing {
+      background: #ff9800;
+      color: white;
+      border-color: #ff9800;
     }
 
     .context mark {
