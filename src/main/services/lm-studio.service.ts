@@ -225,27 +225,30 @@ Simplified: "She had good luck"
 Word: "fortune"
 Answer: luck
 
+Example:
+Original: "Sie war sehr schön"
+Simplified: "Sie war sehr schön"
+Word: "schön"
+Answer: schön
+
 Now your turn:
 Original: "${originalSentence}"
 Simplified: "${simplifiedSentence}"
 Word: "${originalWord}"
 Answer:`;
 
-    const response = await this.chat(prompt);
+    // Use chatShort for single-word answers - applies aggressive cleaning
+    const response = await this.chatShort(prompt);
 
-    console.log('[DEBUG main] AI raw response for word equivalent:', JSON.stringify(response));
+    console.log('[DEBUG main] AI response for word equivalent (after cleaning):', JSON.stringify(response));
 
-    // Clean the response: remove quotes, trim, punctuation, and common prefixes
-    const cleaned = response.trim()
-      .replace(/^["'`]|["'`]$/g, '')  // Remove surrounding quotes/backticks
+    // Additional cleanup for edge cases
+    const cleaned = response
+      .replace(/^["'`]|["'`]$/g, '')  // Remove surrounding quotes
       .replace(/\.+$/, '')             // Remove trailing periods
-      .replace(/^answer:\s*/i, '')     // Remove "Answer:" prefix (case-insensitive)
-      .replace(/^equivalent:\s*/i, '') // Remove "Equivalent:" prefix
-      .replace(/^the answer is:?\s*/i, '') // Remove "The answer is:" prefix
-      .replace(/^["'`]|["'`]$/g, '')  // Remove quotes again after stripping prefix
+      .replace(/^answer:\s*/i, '')     // Remove "Answer:" prefix
+      .replace(/^["'`]|["'`]$/g, '')  // Remove quotes again
       .trim();
-
-    console.log('[DEBUG main] After cleaning:', JSON.stringify(cleaned));
 
     // Check for NONE variations
     if (cleaned.toUpperCase().startsWith('NONE') || cleaned === '') {
@@ -254,7 +257,6 @@ Answer:`;
     }
 
     // Validate that the equivalent actually exists in the simplified sentence
-    // This prevents AI hallucination where it returns words not in the sentence
     const simplifiedLower = simplifiedSentence.toLowerCase();
     const cleanedLower = cleaned.toLowerCase();
 
@@ -262,7 +264,6 @@ Answer:`;
       console.log('[DEBUG main] Equivalent not found in simplified sentence, needs regeneration');
       console.log('[DEBUG main] Looking for:', cleanedLower);
       console.log('[DEBUG main] In sentence:', simplifiedLower);
-      // Return the equivalent word anyway - caller will use it to regenerate
       return { equivalent: cleaned, needsRegeneration: true };
     }
 
@@ -317,30 +318,180 @@ ENGLISH: [English translation of the phrase]`;
   }
 
   /**
-   * Strip thinking model content (e.g., DeepSeek R1 wraps reasoning in <think> tags)
-   * This removes the thinking process and returns only the actual answer
+   * Smart AI response cleaning system.
+   * Handles thinking tags, reasoning noise, and extracts clean answers.
    */
-  private stripThinkingContent(response: string): string {
-    // Check if response contains <think> tags (thinking model like DeepSeek R1)
-    if (response.includes('<think>')) {
-      console.log('[DEBUG main] Detected thinking model response, stripping <think> tags');
+  private cleanAIResponse(response: string, extractType: 'full' | 'short' = 'full'): string {
+    let cleaned = response;
 
-      // Remove everything between <think> and </think> tags (including the tags)
-      let cleaned = response.replace(/<think>[\s\S]*?<\/think>/gi, '');
-
-      // Also handle case where </think> might be missing (incomplete response)
-      cleaned = cleaned.replace(/<think>[\s\S]*/gi, '');
-
-      // Trim and return
-      cleaned = cleaned.trim();
-      console.log('[DEBUG main] After stripping thinking:', JSON.stringify(cleaned));
-      return cleaned;
+    // Step 1: Remove <think>...</think> tags (DeepSeek R1 style)
+    if (cleaned.includes('<think>')) {
+      cleaned = cleaned.replace(/<think>[\s\S]*?<\/think>/gi, '');
+      cleaned = cleaned.replace(/<think>[\s\S]*/gi, ''); // Incomplete tags
     }
 
-    return response;
+    // Step 2: Remove other common thinking/reasoning tags
+    cleaned = cleaned.replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, '');
+    cleaned = cleaned.replace(/<thought>[\s\S]*?<\/thought>/gi, '');
+    cleaned = cleaned.replace(/<analysis>[\s\S]*?<\/analysis>/gi, '');
+
+    // Step 3: For short answers (single word/phrase), apply aggressive cleaning
+    if (extractType === 'short') {
+      cleaned = this.extractShortAnswer(cleaned);
+    } else {
+      // For full responses, just clean up reasoning noise
+      cleaned = this.removeReasoningNoise(cleaned);
+    }
+
+    return cleaned.trim();
   }
 
+  /**
+   * Extract a short answer (word or phrase) from potentially verbose AI response.
+   * Used for word equivalents, translations, etc.
+   */
+  private extractShortAnswer(response: string): string {
+    const lines = response.split('\n').map(l => l.trim()).filter(l => l);
+
+    // If response is already short (single line, few words), return as-is
+    if (lines.length === 1 && response.split(/\s+/).length <= 5) {
+      return this.cleanMarkdownFormatting(response.trim());
+    }
+
+    // Look for explicit answer patterns
+    const answerPatterns = [
+      /(?:^|\n)\s*(?:answer|result|equivalent|translation):\s*\**([^*\n]+)\**/i,
+      /(?:^|\n)\s*(?:so the answer is|the answer is|therefore)[:,]?\s*\**([^*\n]+)\**/i,
+      /(?:^|\n)\s*\*\*([^*]+)\*\*\s*$/m,  // Last bold text
+    ];
+
+    for (const pattern of answerPatterns) {
+      const match = response.match(pattern);
+      if (match && match[1]) {
+        return this.cleanMarkdownFormatting(match[1].trim());
+      }
+    }
+
+    // If no pattern found, try to find the last meaningful short line
+    // (often the AI puts the final answer at the end after reasoning)
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const line = lines[i];
+
+      // Skip lines that look like reasoning
+      if (this.isReasoningLine(line)) continue;
+
+      // Skip lines that are too long (likely explanation)
+      if (line.split(/\s+/).length > 8) continue;
+
+      // Skip lines starting with common reasoning markers
+      if (/^(but|so|wait|let|this|in this|because|since|however|therefore|thus)/i.test(line)) continue;
+
+      // This looks like a valid short answer
+      return this.cleanMarkdownFormatting(line);
+    }
+
+    // Fallback: return first non-reasoning line
+    for (const line of lines) {
+      if (!this.isReasoningLine(line) && line.split(/\s+/).length <= 8) {
+        return this.cleanMarkdownFormatting(line);
+      }
+    }
+
+    // Ultimate fallback: return cleaned first line
+    return this.cleanMarkdownFormatting(lines[0] || response);
+  }
+
+  /**
+   * Check if a line appears to be reasoning/thinking rather than answer
+   */
+  private isReasoningLine(line: string): boolean {
+    const reasoningPatterns = [
+      /^(but wait|wait —|hmm|let me|let's|okay|ok,)/i,
+      /^(so the instruction|the instruction|in the example|the example)/i,
+      /^(this is a trick|this means|this shows|looking at)/i,
+      /^(we need to|we should|we can|i need to|i should)/i,
+      /^(notice that|note that|remember that|observe that)/i,
+      /^(first,|second,|third,|finally,|next,)/i,
+      /^(→|—|>|\*\*?wait)/i,
+      /^["'].*["'].*→/,  // Quoted text with arrow (example from prompt)
+      /(because|since|therefore|thus|hence).*[.!?]$/i,
+      /\?$/,  // Questions are usually reasoning
+    ];
+
+    return reasoningPatterns.some(p => p.test(line.trim()));
+  }
+
+  /**
+   * Remove reasoning noise from full responses while keeping the actual content.
+   */
+  private removeReasoningNoise(response: string): string {
+    const lines = response.split('\n');
+    const cleanedLines: string[] = [];
+    let inReasoningBlock = false;
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+
+      // Skip empty lines at the start
+      if (cleanedLines.length === 0 && !trimmed) continue;
+
+      // Detect start of reasoning block
+      if (/^(but wait|wait —|hmm|let me think|let's see|okay so)/i.test(trimmed)) {
+        inReasoningBlock = true;
+        continue;
+      }
+
+      // Detect end of reasoning block (actual content markers)
+      if (inReasoningBlock && /^(DEFINITION:|SIMPLIFIED:|MEANING:|IPA:|SYLLABLES:|ENGLISH:|ORIGINAL_ENGLISH:|SIMPLIFIED_ENGLISH:)/i.test(trimmed)) {
+        inReasoningBlock = false;
+      }
+
+      // Skip reasoning lines
+      if (inReasoningBlock || this.isReasoningLine(trimmed)) continue;
+
+      // Skip lines that look like quoted prompts
+      if (/^>\s/.test(trimmed)) continue;
+
+      cleanedLines.push(line);
+    }
+
+    return cleanedLines.join('\n').trim();
+  }
+
+  /**
+   * Clean markdown formatting from a string (bold, italic, backticks)
+   */
+  private cleanMarkdownFormatting(text: string): string {
+    return text
+      .replace(/\*\*([^*]+)\*\*/g, '$1')  // **bold**
+      .replace(/\*([^*]+)\*/g, '$1')       // *italic*
+      .replace(/`([^`]+)`/g, '$1')         // `code`
+      .replace(/^["'`]|["'`]$/g, '')       // Surrounding quotes
+      .trim();
+  }
+
+  /**
+   * Core chat method - returns raw cleaned response.
+   * Use chatShort() for single word/phrase answers.
+   */
   private async chat(content: string): Promise<string> {
+    const rawContent = await this.rawChat(content);
+    return this.cleanAIResponse(rawContent, 'full');
+  }
+
+  /**
+   * Chat method optimized for short answers (single word/phrase).
+   * Applies aggressive cleaning to extract just the answer.
+   */
+  private async chatShort(content: string): Promise<string> {
+    const rawContent = await this.rawChat(content);
+    return this.cleanAIResponse(rawContent, 'short');
+  }
+
+  /**
+   * Raw chat method - no cleaning applied.
+   */
+  private async rawChat(content: string): Promise<string> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.timeout);
 
@@ -367,10 +518,7 @@ ENGLISH: [English translation of the phrase]`;
       }
 
       const data = await response.json() as ChatResponse;
-      const rawContent = data.choices[0]?.message?.content?.trim() || '';
-
-      // Strip thinking content if present (for thinking models like DeepSeek R1)
-      return this.stripThinkingContent(rawContent);
+      return data.choices[0]?.message?.content?.trim() || '';
     } finally {
       clearTimeout(timeoutId);
     }
