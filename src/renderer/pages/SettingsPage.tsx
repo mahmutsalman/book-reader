@@ -5,6 +5,13 @@ import type { IPALanguageInfo } from '../../shared/types/pronunciation.types';
 
 type ThemeOption = AppSettings['theme'];
 
+const GROQ_MODELS = [
+  { value: 'llama-3.3-70b-versatile', label: 'Llama 3.3 70B (Recommended)' },
+  { value: 'llama-3.1-8b-instant', label: 'Llama 3.1 8B (Faster)' },
+  { value: 'mixtral-8x7b-32768', label: 'Mixtral 8x7B' },
+  { value: 'gemma2-9b-it', label: 'Gemma 2 9B' },
+];
+
 const SettingsPage: React.FC = () => {
   const { settings, updateSetting, loading } = useSettings();
   const [testingConnection, setTestingConnection] = useState(false);
@@ -16,6 +23,10 @@ const SettingsPage: React.FC = () => {
   const [loadingIpaLanguages, setLoadingIpaLanguages] = useState(false);
   const [installingLanguage, setInstallingLanguage] = useState<string | null>(null);
   const [installResult, setInstallResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [testingGroqConnection, setTestingGroqConnection] = useState(false);
+  const [groqConnectionResult, setGroqConnectionResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [showGroqSetupModal, setShowGroqSetupModal] = useState(false);
+  const [groqSetupStep, setGroqSetupStep] = useState(1);
 
   const handleTestConnection = async () => {
     if (!window.electronAPI) return;
@@ -46,6 +57,45 @@ const SettingsPage: React.FC = () => {
     } finally {
       setTestingConnection(false);
     }
+  };
+
+  const handleTestGroqConnection = async () => {
+    if (!window.electronAPI) return;
+
+    setTestingGroqConnection(true);
+    setGroqConnectionResult(null);
+
+    try {
+      const result = await window.electronAPI.ai.testGroqConnection();
+      setGroqConnectionResult({
+        success: result.success,
+        message: result.success
+          ? `Connected! Groq API is working.`
+          : `Failed: ${result.error || 'Unknown error'}`,
+      });
+    } catch (error) {
+      setGroqConnectionResult({
+        success: false,
+        message: error instanceof Error ? error.message : 'Connection failed',
+      });
+    } finally {
+      setTestingGroqConnection(false);
+    }
+  };
+
+  const handleOpenGroqSetup = () => {
+    setGroqSetupStep(1);
+    setShowGroqSetupModal(true);
+  };
+
+  const handleGroqSetupOpenBrowser = () => {
+    window.open('https://console.groq.com/keys', '_blank');
+    setGroqSetupStep(2);
+  };
+
+  const handleGroqSetupComplete = () => {
+    setShowGroqSetupModal(false);
+    setGroqSetupStep(1);
   };
 
   const handleTestPythonServer = async () => {
@@ -163,76 +213,221 @@ const SettingsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* LM Studio Settings */}
+      {/* AI Provider Settings */}
       <div className="card mb-6">
         <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">
-          🤖 LM Studio (AI)
+          🤖 AI Provider
         </h3>
 
         <div className="space-y-4">
+          {/* Provider Toggle */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              LM Studio URL
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Select AI Provider
             </label>
-            <input
-              type="text"
-              value={settings.lm_studio_url}
-              onChange={(e) => updateSetting('lm_studio_url', e.target.value)}
-              placeholder="http://localhost:1234"
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-            />
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-              Default: http://localhost:1234
+            <div className="inline-flex rounded-lg border border-gray-300 dark:border-gray-600 p-1 bg-gray-100 dark:bg-gray-700">
+              <button
+                onClick={() => updateSetting('ai_provider', 'local')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center gap-2 ${
+                  settings.ai_provider === 'local'
+                    ? 'bg-primary-600 text-white shadow-sm'
+                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                }`}
+              >
+                <span>💻</span>
+                <span>Local AI</span>
+              </button>
+              <button
+                onClick={() => updateSetting('ai_provider', 'groq')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center gap-2 ${
+                  settings.ai_provider === 'groq'
+                    ? 'bg-primary-600 text-white shadow-sm'
+                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                }`}
+              >
+                <span>☁️</span>
+                <span>Cloud AI (Groq)</span>
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+              {settings.ai_provider === 'local'
+                ? 'Uses LM Studio running locally on your computer'
+                : 'Uses Groq\'s free cloud API for enhanced AI features with example sentences and grammar explanations'}
             </p>
           </div>
 
-          <div className="flex items-center gap-4">
-            <button
-              onClick={handleTestConnection}
-              disabled={testingConnection}
-              className="btn-secondary"
-            >
-              {testingConnection ? 'Testing...' : 'Test Connection'}
-            </button>
-            {connectionResult && (
-              <span
-                className={`text-sm ${
-                  connectionResult.success ? 'text-green-600' : 'text-red-600'
-                }`}
-              >
-                {connectionResult.message}
-              </span>
-            )}
-          </div>
+          {/* Local AI Settings */}
+          {settings.ai_provider === 'local' && (
+            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
+              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                LM Studio Settings
+              </h4>
 
-          {/* Model Selection */}
-          {availableModels.length > 0 && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                AI Model
-              </label>
-              <select
-                value={settings.lm_studio_model}
-                onChange={(e) => updateSetting('lm_studio_model', e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-              >
-                {availableModels.map((model) => (
-                  <option key={model} value={model}>
-                    {model}
-                  </option>
-                ))}
-              </select>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                Select the model to use for word definitions and sentence simplification
-              </p>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    LM Studio URL
+                  </label>
+                  <input
+                    type="text"
+                    value={settings.lm_studio_url}
+                    onChange={(e) => updateSetting('lm_studio_url', e.target.value)}
+                    placeholder="http://localhost:1234"
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Default: http://localhost:1234
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={handleTestConnection}
+                    disabled={testingConnection}
+                    className="btn-secondary"
+                  >
+                    {testingConnection ? 'Testing...' : 'Test Connection'}
+                  </button>
+                  {connectionResult && (
+                    <span
+                      className={`text-sm ${
+                        connectionResult.success ? 'text-green-600' : 'text-red-600'
+                      }`}
+                    >
+                      {connectionResult.message}
+                    </span>
+                  )}
+                </div>
+
+                {/* Model Selection */}
+                {availableModels.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      AI Model
+                    </label>
+                    <select
+                      value={settings.lm_studio_model}
+                      onChange={(e) => updateSetting('lm_studio_model', e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                    >
+                      {availableModels.map((model) => (
+                        <option key={model} value={model}>
+                          {model}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Select the model to use for word definitions and sentence simplification
+                    </p>
+                  </div>
+                )}
+
+                {settings.lm_studio_model !== 'default' && availableModels.length === 0 && (
+                  <div className="text-sm text-gray-500 dark:text-gray-400">
+                    Current model: <span className="font-medium">{settings.lm_studio_model}</span>
+                    <br />
+                    <span className="text-xs">Test connection to see available models</span>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
-          {settings.lm_studio_model !== 'default' && availableModels.length === 0 && (
-            <div className="text-sm text-gray-500 dark:text-gray-400">
-              Current model: <span className="font-medium">{settings.lm_studio_model}</span>
-              <br />
-              <span className="text-xs">Test connection to see available models</span>
+          {/* Groq Cloud AI Settings */}
+          {settings.ai_provider === 'groq' && (
+            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
+              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                Groq Cloud AI Settings
+              </h4>
+
+              <div className="space-y-4">
+                {/* Setup Instructions */}
+                {!settings.groq_api_key && (
+                  <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <p className="text-sm text-blue-700 dark:text-blue-300 mb-2">
+                      To use Groq's free AI, you need an API key:
+                    </p>
+                    <ol className="text-xs text-blue-600 dark:text-blue-400 list-decimal list-inside space-y-1 mb-3">
+                      <li>Click "Setup Groq" to create a free account</li>
+                      <li>Go to API Keys and create a new key</li>
+                      <li>Paste your API key below</li>
+                    </ol>
+                    <button
+                      onClick={handleOpenGroqSetup}
+                      className="btn-primary text-sm"
+                    >
+                      Setup Groq (Free)
+                    </button>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    API Key
+                  </label>
+                  <input
+                    type="password"
+                    value={settings.groq_api_key}
+                    onChange={(e) => updateSetting('groq_api_key', e.target.value)}
+                    placeholder="gsk_..."
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Your API key is stored locally and never shared
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Model
+                  </label>
+                  <select
+                    value={settings.groq_model}
+                    onChange={(e) => updateSetting('groq_model', e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                  >
+                    {GROQ_MODELS.map((model) => (
+                      <option key={model.value} value={model.value}>
+                        {model.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Llama 3.3 70B provides the best results for language learning
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={handleTestGroqConnection}
+                    disabled={testingGroqConnection || !settings.groq_api_key}
+                    className="btn-secondary"
+                  >
+                    {testingGroqConnection ? 'Testing...' : 'Test Connection'}
+                  </button>
+                  {groqConnectionResult && (
+                    <span
+                      className={`text-sm ${
+                        groqConnectionResult.success ? 'text-green-600' : 'text-red-600'
+                      }`}
+                    >
+                      {groqConnectionResult.message}
+                    </span>
+                  )}
+                </div>
+
+                {/* Enhanced Features Info */}
+                <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                  <p className="text-sm font-medium text-green-700 dark:text-green-300 mb-1">
+                    Enhanced Features with Cloud AI
+                  </p>
+                  <ul className="text-xs text-green-600 dark:text-green-400 list-disc list-inside space-y-1">
+                    <li>Example sentences for each word showing different grammar contexts</li>
+                    <li>Grammar explanations to help understand sentence structures</li>
+                    <li>Works for all AI features: definitions, IPA, simplification, pre-study notes</li>
+                  </ul>
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -515,6 +710,155 @@ const SettingsPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Groq Setup Modal */}
+      {showGroqSetupModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-blue-500 to-purple-600 px-6 py-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-bold text-white">Setup Groq (Free)</h3>
+                <button
+                  onClick={() => setShowGroqSetupModal(false)}
+                  className="text-white/80 hover:text-white text-2xl leading-none"
+                >
+                  &times;
+                </button>
+              </div>
+              <p className="text-white/80 text-sm mt-1">
+                Get your free API key in 3 easy steps
+              </p>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6">
+              {groqSetupStep === 1 && (
+                <div className="space-y-4">
+                  <div className="flex items-start gap-4">
+                    <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold flex-shrink-0">
+                      1
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-800 dark:text-gray-200">
+                        Create a free Groq account
+                      </p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        Sign up with Google or email - it's completely free
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-4">
+                    <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-400 font-bold flex-shrink-0">
+                      2
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-400">
+                        Create an API key
+                      </p>
+                      <p className="text-sm text-gray-400">
+                        Click "Create API Key" on the Groq console
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-4">
+                    <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-400 font-bold flex-shrink-0">
+                      3
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-400">
+                        Paste it here
+                      </p>
+                      <p className="text-sm text-gray-400">
+                        Copy the key and paste it in the settings
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="pt-4 border-t border-gray-200 dark:border-gray-600">
+                    <button
+                      onClick={handleGroqSetupOpenBrowser}
+                      className="w-full btn-primary py-3 text-lg flex items-center justify-center gap-2"
+                    >
+                      <span>Open Groq Console</span>
+                      <span>→</span>
+                    </button>
+                    <p className="text-xs text-gray-400 text-center mt-2">
+                      Opens in your default browser
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {groqSetupStep === 2 && (
+                <div className="space-y-4">
+                  <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                    <p className="text-green-700 dark:text-green-300 font-medium">
+                      Browser opened! Complete these steps:
+                    </p>
+                  </div>
+
+                  <div className="flex items-start gap-4">
+                    <div className="w-8 h-8 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center text-green-600 dark:text-green-400 font-bold flex-shrink-0">
+                      ✓
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-800 dark:text-gray-200">
+                        Sign in with Google or email
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-4">
+                    <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold flex-shrink-0">
+                      2
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-800 dark:text-gray-200">
+                        Click "Create API Key"
+                      </p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        Give it any name (e.g., "BookReader")
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-4">
+                    <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold flex-shrink-0">
+                      3
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-800 dark:text-gray-200">
+                        Copy the API key (starts with "gsk_")
+                      </p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        Click the copy button next to your new key
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="pt-4 border-t border-gray-200 dark:border-gray-600 space-y-2">
+                    <button
+                      onClick={handleGroqSetupComplete}
+                      className="w-full btn-primary py-3"
+                    >
+                      Done - I have my API key
+                    </button>
+                    <button
+                      onClick={handleGroqSetupOpenBrowser}
+                      className="w-full btn-secondary py-2 text-sm"
+                    >
+                      Reopen Groq Console
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

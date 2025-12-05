@@ -178,6 +178,31 @@ export class PreStudyHtmlService {
       </div>
       ` : ''}
 
+      ${entry.exampleSentences && entry.exampleSentences.length > 0 ? `
+      <div class="examples-section">
+        <h4 class="section-title">Example Sentences</h4>
+        ${entry.exampleSentences.map(ex => `
+          <div class="example-item">
+            <div class="example-sentence">${this.escapeHtml(ex.sentence)}</div>
+            <div class="example-translation">${this.escapeHtml(ex.translation)}</div>
+            <span class="grammar-tag">${this.escapeHtml(ex.grammarPoint)}</span>
+          </div>
+        `).join('')}
+      </div>
+      ` : ''}
+
+      ${entry.grammarExplanation ? `
+      <div class="grammar-section">
+        <h4 class="section-title">Grammar Notes</h4>
+        <p class="grammar-content">${this.escapeHtml(entry.grammarExplanation)}</p>
+        ${entry.relatedGrammarTopics && entry.relatedGrammarTopics.length > 0 ? `
+        <div class="grammar-topics">
+          ${entry.relatedGrammarTopics.map(t => `<span class="topic-tag">${this.escapeHtml(t)}</span>`).join('')}
+        </div>
+        ` : ''}
+      </div>
+      ` : ''}
+
       ${hasGrammar && entry.grammarTopics && entry.grammarTopics[0] ? `
       <details class="grammar">
         <summary>
@@ -540,6 +565,101 @@ export class PreStudyHtmlService {
       font-size: 0.9rem;
       color: var(--text-secondary);
       line-height: 1.5;
+    }
+
+    /* Enhanced Content Sections (Example Sentences & Grammar Notes) */
+    .section-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--accent);
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .section-title::before {
+      content: '';
+      display: inline-block;
+      width: 3px;
+      height: 14px;
+      background: var(--accent);
+      border-radius: 2px;
+    }
+
+    .examples-section {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+    }
+
+    .example-item {
+      margin-bottom: 12px;
+      padding: 12px;
+      background: var(--bg-primary);
+      border-radius: 8px;
+      border-left: 3px solid var(--accent);
+    }
+
+    .example-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .example-sentence {
+      font-size: 0.95rem;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+      line-height: 1.5;
+    }
+
+    .example-translation {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      font-style: italic;
+      margin-bottom: 6px;
+    }
+
+    .grammar-tag {
+      display: inline-block;
+      font-size: 0.75rem;
+      padding: 3px 8px;
+      background: var(--accent-light);
+      color: var(--accent);
+      border-radius: 12px;
+      font-weight: 500;
+    }
+
+    .grammar-section {
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+    }
+
+    .grammar-content {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      line-height: 1.6;
+      margin-bottom: 10px;
+      padding: 12px;
+      background: var(--bg-primary);
+      border-radius: 8px;
+    }
+
+    .grammar-topics {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .topic-tag {
+      display: inline-block;
+      font-size: 0.75rem;
+      padding: 4px 10px;
+      background: linear-gradient(135deg, var(--accent-light), transparent);
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      border-radius: 16px;
+      font-weight: 500;
     }
 
     /* Print styles */

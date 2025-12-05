@@ -1,4 +1,4 @@
-import { LMStudioService } from './lm-studio.service';
+import { getAIService, isEnhancedModeEnabled } from './ai-provider.factory';
 import { grammarTopicsService } from './grammar-topics.service';
 import { pronunciationService } from './pronunciation.service';
 import { settingsRepository } from '../../database/repositories';
@@ -17,7 +17,6 @@ const WORD_REGEX = /[\p{L}\p{M}]+(?:[-'][\p{L}\p{M}]+)*/gu;
  * Orchestrates word extraction, AI processing, and result compilation
  */
 export class PreStudyNotesService {
-  private lmService: LMStudioService | null = null;
   private isCancelled = false;
 
   /**
@@ -43,8 +42,9 @@ export class PreStudyNotesService {
       phase: 'extracting',
     });
 
-    // Get LM Studio service
-    const service = await this.getService();
+    // Get AI service (respects user's provider selection)
+    const service = await getAIService();
+    const enhanced = await isEnhancedModeEnabled();
 
     // Get sentence limit setting (0 = all sentences)
     const sentenceLimit = await settingsRepository.get('pre_study_sentence_limit');
@@ -105,7 +105,8 @@ export class PreStudyNotesService {
           word,
           sentence,
           request.language,
-          grammarTopics
+          grammarTopics,
+          enhanced
         );
         entries.push(entry);
       } catch (error) {
@@ -233,22 +234,6 @@ export class PreStudyNotesService {
   private countTotalWords(text: string): number {
     const matches = text.match(WORD_REGEX);
     return matches ? matches.length : 0;
-  }
-
-  /**
-   * Get or create LM Studio service instance
-   */
-  private async getService(): Promise<LMStudioService> {
-    const url = await settingsRepository.get('lm_studio_url');
-    const model = await settingsRepository.get('lm_studio_model');
-
-    if (!this.lmService || this.lmService.baseUrl !== url) {
-      this.lmService = new LMStudioService(url, model);
-    } else if (this.lmService.model !== model) {
-      this.lmService.setModel(model);
-    }
-
-    return this.lmService;
   }
 
   /**

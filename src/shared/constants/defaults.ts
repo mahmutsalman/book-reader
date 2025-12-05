@@ -16,6 +16,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
   pre_study_sentence_limit: 0,   // Default: 0 = all sentences
   // Audio settings
   slow_playback_speed: 0.6,      // Default: 0.6x speed for slow playback
+  // AI Provider settings
+  ai_provider: 'local',          // Default: local LM Studio
+  groq_api_key: '',              // Empty by default - user must set up
+  groq_model: 'llama-3.3-70b-versatile', // Recommended Groq model
 };
 
 // Zoom level constraints

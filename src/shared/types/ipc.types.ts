@@ -1,6 +1,6 @@
 import type { Book, BookData, ReadingProgress, BookLanguage } from './book.types';
 import type { VocabularyEntry, CreateVocabularyEntry, VocabularyFilters, StoredWordOccurrence } from './vocabulary.types';
-import type { AppSettings, LMStudioConnectionResult } from './settings.types';
+import type { AppSettings, LMStudioConnectionResult, GroqConnectionResult } from './settings.types';
 import type { WordDefinitionResult, IPAPronunciationResult, BatchIPAResult, SimplifiedSentenceResult, WordEquivalentResult, PhraseMeaningResult, TatoebaSentence, TatoebaStatus } from './ai.types';
 import type { TTSResponse, IPAResponse, PronunciationServerStatus, IPALanguagesResponse, InstallLanguageResponse } from './pronunciation.types';
 import type { PreStudyNotesRequest, PreStudyNotesResult, PreStudyProgress } from './pre-study-notes.types';
@@ -48,6 +48,7 @@ export interface ElectronAPI {
     resimplifyWithWord: (originalSentence: string, originalWord: string, equivalentWord: string) => Promise<SimplifiedSentenceResult>;
     getPhraseMeaning: (phrase: string, context: string, language?: string) => Promise<PhraseMeaningResult>;
     testConnection: () => Promise<LMStudioConnectionResult>;
+    testGroqConnection: () => Promise<GroqConnectionResult>;
   };
   tatoeba: {
     search: (word: string, language?: string) => Promise<TatoebaSentence[]>;

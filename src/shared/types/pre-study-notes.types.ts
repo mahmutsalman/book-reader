@@ -10,6 +10,13 @@ export interface GrammarTopic {
   level: GrammarLevel;
 }
 
+// Enhanced example sentence (for API AI mode)
+export interface ExampleSentence {
+  sentence: string;           // Example sentence in target language
+  translation: string;        // English translation
+  grammarPoint: string;       // Grammar concept demonstrated (e.g., "accusative case")
+}
+
 export interface PreStudyWordEntry {
   word: string;
   cleanWord: string;
@@ -24,6 +31,10 @@ export interface PreStudyWordEntry {
   // Audio (base64-encoded MP3)
   wordAudio?: string;            // Pronunciation of the word
   sentenceAudio?: string;        // Pronunciation of context sentence
+  // Enhanced fields (for API AI mode - Groq)
+  exampleSentences?: ExampleSentence[];   // 3-5 example sentences showing word in different contexts
+  grammarExplanation?: string;             // Detailed grammar explanation for beginners
+  relatedGrammarTopics?: string[];         // List of grammar topics (e.g., "Accusative Case", "Verb Conjugation")
 }
 
 export interface PreStudyNotesRequest {

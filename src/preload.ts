@@ -69,6 +69,8 @@ const electronAPI: ElectronAPI = {
       ipcRenderer.invoke(IPC_CHANNELS.AI_GET_PHRASE_MEANING, phrase, context, language || 'en'),
     testConnection: () =>
       ipcRenderer.invoke(IPC_CHANNELS.AI_TEST_CONNECTION),
+    testGroqConnection: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.AI_TEST_GROQ_CONNECTION),
   },
 
   // Tatoeba
