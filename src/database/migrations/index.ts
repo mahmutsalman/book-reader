@@ -2,6 +2,7 @@ import type Database from 'better-sqlite3';
 import { migration001 } from './001_initial_schema';
 import { migration002 } from './002_add_book_language';
 import { migration003 } from './003_add_word_type';
+import { migration004 } from './004_add_progress_percentage';
 
 interface Migration {
   version: number;
@@ -13,6 +14,7 @@ const migrations: Migration[] = [
   migration001,
   migration002,
   migration003,
+  migration004,
 ];
 
 export function runMigrations(db: Database.Database): void {

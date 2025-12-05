@@ -6,6 +6,7 @@ interface ReflowState {
   currentText: string;
   currentPageIndex: number;
   totalPages: number;
+  totalCharacters: number;
   characterOffset: number;
   chapterName: string | null;
   originalPage: number;
@@ -16,6 +17,7 @@ interface UseTextReflowOptions {
   containerRef: React.RefObject<HTMLDivElement>;
   zoom: number;
   initialCharacterOffset?: number;
+  initialProgressPercentage?: number;
 }
 
 interface UseTextReflowReturn {
@@ -119,11 +121,13 @@ export function useTextReflow({
   containerRef,
   zoom,
   initialCharacterOffset = 0,
+  initialProgressPercentage,
 }: UseTextReflowOptions): UseTextReflowReturn {
   const [state, setState] = useState<ReflowState>({
     currentText: '',
     currentPageIndex: 0,
     totalPages: 1,
+    totalCharacters: 0,
     characterOffset: initialCharacterOffset,
     chapterName: null,
     originalPage: 1,
@@ -139,10 +143,18 @@ export function useTextReflow({
   const characterOffsetRef = useRef<number>(initialCharacterOffset);
 
   // Build full text and page map once
+  // Also calculate initial character offset from percentage if provided (more stable than absolute offset)
   useEffect(() => {
     fullTextRef.current = buildFullText(bookData.pages);
     pageMapRef.current = buildPageMap(bookData.pages);
-  }, [bookData]);
+
+    // If percentage is provided and valid, use it to calculate the initial character offset
+    // This provides stable position restoration regardless of pagination changes
+    if (initialProgressPercentage && initialProgressPercentage > 0 && fullTextRef.current.length > 0) {
+      const calculatedOffset = Math.floor(fullTextRef.current.length * initialProgressPercentage);
+      characterOffsetRef.current = Math.min(calculatedOffset, fullTextRef.current.length);
+    }
+  }, [bookData, initialProgressPercentage]);
 
   // Calculate font size from zoom
   const fontSize = useMemo(() => REFLOW_SETTINGS.BASE_FONT_SIZE * zoom, [zoom]);
@@ -191,6 +203,7 @@ export function useTextReflow({
       currentText: currentPage,
       currentPageIndex: newPageIndex,
       totalPages: pages.length,
+      totalCharacters: fullTextRef.current.length,
       characterOffset: characterOffsetRef.current, // Sync state with ref
       chapterName: originalPage?.chapter || null,
       originalPage: originalPage?.page || 1,

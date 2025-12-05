@@ -53,6 +53,7 @@ export interface ReadingProgress {
   book_id: number;
   current_page: number;
   character_offset: number;
+  progress_percentage: number;
   zoom_level: number;
   last_read_at: string;
 }

@@ -110,6 +110,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
     containerRef,
     zoom,
     initialCharacterOffset: initialProgress?.character_offset || 0,
+    initialProgressPercentage: initialProgress?.progress_percentage,
   });
 
   // Extract unique chapters with their starting pages
@@ -147,14 +148,19 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
   // Save progress when position or zoom changes
   useEffect(() => {
     const saveProgress = async () => {
+      // Calculate progress percentage for stable position restoration
+      const progressPercentage = reflowState.totalCharacters > 0
+        ? reflowState.characterOffset / reflowState.totalCharacters
+        : 0;
       await updateProgress({
         current_page: reflowState.originalPage,
         character_offset: reflowState.characterOffset,
+        progress_percentage: progressPercentage,
         zoom_level: zoom,
       });
     };
     saveProgress();
-  }, [reflowState.characterOffset, reflowState.originalPage, zoom, updateProgress]);
+  }, [reflowState.characterOffset, reflowState.originalPage, reflowState.totalCharacters, zoom, updateProgress]);
 
   // Helper to normalize quotes in text for consistent matching
   // Comprehensive apostrophe normalization covering:
