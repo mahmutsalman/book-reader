@@ -289,3 +289,12 @@
 :is(html.dark .spinner) {
   @apply border-gray-700 border-t-primary-400;
 }
+
+/* Electron window drag regions for custom titlebar */
+.app-drag {
+  -webkit-app-region: drag;
+}
+
+.app-no-drag {
+  -webkit-app-region: no-drag;
+}

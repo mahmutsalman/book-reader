@@ -11,8 +11,8 @@ const MainLayout: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col">
-      {/* Header - pl-20 accounts for macOS traffic light buttons */}
-      <header className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 pl-20 pr-6 py-3 flex items-center justify-between">
+      {/* Header - pl-20 accounts for macOS traffic light buttons, app-drag enables window dragging */}
+      <header className="app-drag bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 pl-20 pr-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="text-2xl">📚</span>
           <h1 className="text-xl font-semibold text-gray-800 dark:text-gray-100">
@@ -20,7 +20,7 @@ const MainLayout: React.FC = () => {
           </h1>
         </div>
 
-        <nav className="flex items-center gap-2">
+        <nav className="app-no-drag flex items-center gap-2">
           <NavLink to="/library" className={navLinkClass}>
             Library
           </NavLink>
