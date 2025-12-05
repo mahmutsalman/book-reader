@@ -7,6 +7,7 @@ import PronunciationButton from './PronunciationButton';
 import LoopPlayButton from './LoopPlayButton';
 import SlowLoopPlayButton from './SlowLoopPlayButton';
 import { useAudioCache, AudioType } from '../../hooks/useAudioCache';
+import { useAudioPlayer } from '../../hooks/useAudioPlayer';
 
 interface SelectedWord {
   word: string;
@@ -64,7 +65,8 @@ const normalizeForTTS = (text: string): string => {
 
 const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bookId, bookLanguage = 'en', onNavigateToPage, preloadedData }) => {
   const { settings } = useSettings();
-  const { preloadAudio } = useAudioCache();
+  const { preloadAudio, getAudio, setAudio } = useAudioCache();
+  const { playAudio, stop: stopAudio, isLoading: isLoadingAudio, setIsLoading } = useAudioPlayer();
   const [wordData, setWordData] = useState<WordData>({ loading: false });
   const isNonEnglish = bookLanguage !== 'en';
   const [saved, setSaved] = useState(false);
@@ -128,6 +130,32 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
       </>
     );
   }, []);
+
+  // Helper function to play audio for clickable areas
+  // Clicking always stops current audio and starts new one immediately
+  const playText = useCallback(async (text: string, language: string, audioType: AudioType) => {
+    // Stop any currently playing audio first
+    stopAudio();
+
+    if (isLoadingAudio) return; // Only skip if we're still loading/fetching
+    setIsLoading(true);
+    try {
+      // Check cache first
+      const cached = await getAudio(text, language, audioType);
+      if (cached) {
+        await playAudio(cached);
+        return;
+      }
+      // Fetch from server
+      const response = await window.electronAPI?.pronunciation.getTTS(text, language);
+      if (response?.success && response.audio_base64) {
+        await setAudio(text, language, audioType, response.audio_base64);
+        await playAudio(response.audio_base64);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }, [isLoadingAudio, stopAudio, playAudio, setIsLoading, getAudio, setAudio]);
 
   // Preload audio when panel opens (background fetch)
   // Note: For German nouns with articles, we re-preload when article becomes available
@@ -401,8 +429,19 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
 
       {/* Panel */}
       <div className="fixed top-0 right-0 h-full w-96 bg-white dark:bg-gray-800 shadow-2xl z-50 overflow-hidden flex flex-col">
-        {/* Header */}
-        <div className="bg-primary-600 text-white px-4 py-3 flex items-center justify-between">
+        {/* Header - entire area clickable for word pronunciation */}
+        <div
+          className={`bg-primary-600 text-white px-4 py-3 flex items-center justify-between ${!selectedWord.isPhrase ? 'cursor-pointer hover:bg-primary-700 transition-colors' : ''}`}
+          onClick={() => {
+            if (!selectedWord.isPhrase) {
+              const wordText = wordData.germanArticle
+                ? `${wordData.germanArticle} ${capitalizeGermanNoun(selectedWord.word)}`
+                : selectedWord.word;
+              playText(wordText, bookLanguage, AudioType.WORD);
+            }
+          }}
+          title={!selectedWord.isPhrase ? 'Click anywhere to hear pronunciation' : undefined}
+        >
           <div className="flex items-center gap-2">
             <div>
               <div className="flex items-center gap-2">
@@ -476,8 +515,11 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
             </div>
           </div>
           <button
-            onClick={onClose}
-            className="text-white/80 hover:text-white text-2xl"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
+            className="text-white/80 hover:text-white text-2xl hover:bg-white/20 rounded-lg px-2 py-1 transition-colors"
           >
             ×
           </button>
@@ -503,16 +545,16 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
                 <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">
                   {selectedWord.isPhrase ? '📖 Phrase Meaning' : '📖 Definition'}
                 </h3>
-                <p className="text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
-                  {wordData.definition || (selectedWord.isPhrase ? 'No phrase meaning available' : 'No definition available')}
-                </p>
-                {/* English translation of word/phrase (for non-English books) */}
+                {/* English translation of word/phrase (for non-English books) - shown prominently */}
                 {isNonEnglish && (wordData.wordTranslation || wordData.phraseTranslation) && (
-                  <p className="text-sm text-blue-600 dark:text-blue-400 mt-2 flex items-center gap-1">
+                  <p className="text-sm text-blue-600 dark:text-blue-400 mb-2 flex items-center gap-1 font-medium">
                     <span>🇬🇧</span>
                     <span>{selectedWord.isPhrase ? wordData.phraseTranslation : wordData.wordTranslation}</span>
                   </p>
                 )}
+                <p className="text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
+                  {wordData.definition || (selectedWord.isPhrase ? 'No phrase meaning available' : 'No definition available')}
+                </p>
               </section>
 
               {/* Original Sentence */}
@@ -605,7 +647,11 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
                     </div>
                   </div>
                 ) : (
-                  <p className="text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 p-3 rounded-lg italic">
+                  <p
+                    className="text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 p-3 rounded-lg italic cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+                    onClick={() => playText(normalizeForTTS(selectedWord.sentence), bookLanguage, AudioType.SENTENCE)}
+                    title="Click to hear sentence"
+                  >
                     "{highlightWord(selectedWord.sentence, selectedWord.word)}"
                   </p>
                 )}
@@ -646,7 +692,11 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
                         />
                     </div>
                   </div>
-                  <p className="text-gray-600 dark:text-gray-300 bg-green-50 dark:bg-green-900/30 p-3 rounded-lg">
+                  <p
+                    className="text-gray-600 dark:text-gray-300 bg-green-50 dark:bg-green-900/30 p-3 rounded-lg cursor-pointer hover:bg-green-100 dark:hover:bg-green-900/50 transition-colors"
+                    onClick={() => playText(wordData.simplifiedSentence!, bookLanguage, AudioType.SIMPLIFIED)}
+                    title="Click to hear simplified sentence"
+                  >
                     {wordData.wordEquivalent
                       ? highlightWord(wordData.simplifiedSentence, wordData.wordEquivalent)
                       : wordData.simplifiedSentence}
