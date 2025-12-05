@@ -15,7 +15,7 @@ const BookFilter: React.FC<BookFilterProps> = ({ books, selectedBookId, onBookCh
       className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
                  bg-white dark:bg-gray-700 text-gray-900 dark:text-cream-100
                  focus:outline-none focus:ring-2 focus:ring-primary-500
-                 text-sm"
+                 text-sm max-w-[180px] truncate"
     >
       <option value="">All Books</option>
       {books.map(book => (
