@@ -1,8 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useBooks } from '../context/BookContext';
 import type { Book, BookLanguage } from '../../shared/types';
 import { BOOK_LANGUAGES } from '../../shared/types';
+
+// Get display name for a language code
+const getLanguageName = (code: BookLanguage): string => {
+  const lang = BOOK_LANGUAGES.find(l => l.code === code);
+  return lang?.name || code.toUpperCase();
+};
 
 const LibraryPage: React.FC = () => {
   const { books, loading, error, loadBooks, importBook, deleteBook } = useBooks();
@@ -12,6 +18,32 @@ const LibraryPage: React.FC = () => {
   const [pendingFilePath, setPendingFilePath] = useState<string | null>(null);
   const [isPdfFile, setIsPdfFile] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState<BookLanguage>('en');
+  const [collapsedSections, setCollapsedSections] = useState<Set<BookLanguage>>(new Set());
+
+  // Group books by language
+  const booksByLanguage = useMemo(() => {
+    const grouped = new Map<BookLanguage, Book[]>();
+    books.forEach(book => {
+      const existing = grouped.get(book.language) || [];
+      grouped.set(book.language, [...existing, book]);
+    });
+    // Sort by language name for consistent ordering
+    return Array.from(grouped.entries()).sort((a, b) =>
+      getLanguageName(a[0]).localeCompare(getLanguageName(b[0]))
+    );
+  }, [books]);
+
+  const toggleSection = (lang: BookLanguage) => {
+    setCollapsedSections(prev => {
+      const next = new Set(prev);
+      if (next.has(lang)) {
+        next.delete(lang);
+      } else {
+        next.add(lang);
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
     loadBooks();
@@ -141,30 +173,73 @@ const LibraryPage: React.FC = () => {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {books.map((book) => (
-            <div
-              key={book.id}
-              onClick={() => handleOpenBook(book)}
-              className="card cursor-pointer hover:shadow-md dark:hover:shadow-gray-700/50 transition-shadow group"
-            >
-              <div className="aspect-[3/4] bg-gradient-to-br from-primary-100 to-primary-200 dark:from-primary-800 dark:to-primary-700 rounded-lg mb-4 flex items-center justify-center">
-                <span className="text-5xl">📕</span>
+        <div className="space-y-6">
+          {booksByLanguage.map(([language, languageBooks]) => {
+            const isCollapsed = collapsedSections.has(language);
+            return (
+              <div key={language} className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+                {/* Language Section Header */}
+                <button
+                  onClick={() => toggleSection(language)}
+                  className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className={`text-gray-500 dark:text-cream-300 transition-transform ${isCollapsed ? '' : 'rotate-90'}`}>
+                      ▶
+                    </span>
+                    <span className="font-medium text-gray-800 dark:text-cream-100">
+                      {getLanguageName(language)}
+                    </span>
+                    <span className="px-2 py-0.5 text-xs font-medium bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-cream-200 rounded-full">
+                      {languageBooks.length}
+                    </span>
+                  </div>
+                </button>
+
+                {/* Books Grid */}
+                {!isCollapsed && (
+                  <div className="p-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                      {languageBooks.map((book) => (
+                        <div
+                          key={book.id}
+                          onClick={() => handleOpenBook(book)}
+                          className="bg-white dark:bg-gray-800 rounded-lg p-3 cursor-pointer hover:shadow-md dark:hover:shadow-gray-700/50 transition-all hover:scale-[1.02] group border border-gray-100 dark:border-gray-700 flex flex-col"
+                        >
+                          {/* Book Cover - shorter aspect ratio */}
+                          <div className="aspect-[4/5] bg-gradient-to-br from-book-paper to-book-spine dark:from-book-cover dark:to-book-accent rounded-md mb-2 flex items-center justify-center relative overflow-hidden flex-shrink-0">
+                            {/* Decorative spine line */}
+                            <div className="absolute left-0 top-0 bottom-0 w-2 bg-book-spine/50 dark:bg-book-accent/50" />
+                            {/* Book icon */}
+                            <svg className="w-8 h-8 text-book-spine/70 dark:text-cream-300/70" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M6 2a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H6zm0 2h12v16H6V4zm2 2v2h8V6H8zm0 4v2h8v-2H8z"/>
+                            </svg>
+                          </div>
+                          {/* Book Title - flex-grow pushes page count to bottom */}
+                          <div className="flex-grow min-h-[2.5rem]">
+                            <h3 className="text-sm font-medium text-gray-800 dark:text-cream-100 line-clamp-2">
+                              {book.title}
+                            </h3>
+                          </div>
+                          {/* Page Count - fixed at bottom */}
+                          <p className="text-xs text-gray-500 dark:text-cream-300 mt-1">
+                            {book.total_pages} pages
+                          </p>
+                          {/* Delete Button */}
+                          <button
+                            onClick={(e) => handleDeleteBook(e, book.id)}
+                            className="mt-2 text-xs text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-              <h3 className="font-medium text-gray-800 dark:text-white line-clamp-2 mb-2">
-                {book.title}
-              </h3>
-              <p className="text-sm text-gray-500 dark:text-cream-200">
-                {book.total_pages} pages
-              </p>
-              <button
-                onClick={(e) => handleDeleteBook(e, book.id)}
-                className="mt-3 text-sm text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 opacity-0 group-hover:opacity-100 transition-opacity"
-              >
-                Delete
-              </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

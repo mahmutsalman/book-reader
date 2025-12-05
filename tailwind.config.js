@@ -28,6 +28,13 @@ module.exports = {
           400: '#A89F8F', // Muted/disabled text
           500: '#8A8175', // Subtle/faint text
         },
+        // Book card palette - warm earthy tones
+        book: {
+          paper: '#F5ECD7',      // Light mode - warm cream paper
+          spine: '#D4C4A8',      // Light mode - spine accent
+          cover: '#3D3630',      // Dark mode - warm dark brown
+          accent: '#5C4F42',     // Dark mode - book spine color
+        },
       },
       fontFamily: {
         serif: ['Georgia', 'Cambria', 'Times New Roman', 'serif'],
