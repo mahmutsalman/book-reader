@@ -37,6 +37,11 @@ export interface PhraseMeaningResult {
   meaning: string;
   context: string;
   phraseTranslation?: string; // English translation of the phrase (for non-English books)
+  isPhrasalVerb: boolean;     // Whether the phrase is a phrasal verb (e.g., "give up", "look forward to")
+  phrasalVerbInfo?: {         // Additional info if it's a phrasal verb
+    baseVerb: string;         // The base verb (e.g., "give" in "give up")
+    particle: string;         // The particle(s) (e.g., "up" in "give up")
+  };
 }
 
 // Tatoeba sentence

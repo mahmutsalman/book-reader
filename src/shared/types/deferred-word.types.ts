@@ -53,6 +53,8 @@ export interface CachedWordData {
   wordType?: string;
   // German definite article (der, die, das) - only for German nouns
   germanArticle?: string;
+  // Phrasal verb detection (for multi-word phrases)
+  isPhrasalVerb?: boolean;
   fetchedAt: number;
 }
 

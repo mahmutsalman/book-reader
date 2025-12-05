@@ -18,10 +18,12 @@ export const IPC_CHANNELS = {
   // Vocabulary
   VOCABULARY_ADD: 'vocabulary:add',
   VOCABULARY_GET_ALL: 'vocabulary:get-all',
+  VOCABULARY_GET_COUNTS: 'vocabulary:get-counts',
   VOCABULARY_UPDATE: 'vocabulary:update',
   VOCABULARY_DELETE: 'vocabulary:delete',
   VOCABULARY_GET_OCCURRENCES: 'vocabulary:get-occurrences',
   VOCABULARY_ADD_OCCURRENCE: 'vocabulary:add-occurrence',
+  VOCABULARY_EXPORT: 'vocabulary:export',
 
   // AI Services
   AI_GET_DEFINITION: 'ai:get-definition',

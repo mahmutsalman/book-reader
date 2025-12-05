@@ -158,6 +158,8 @@ export const DeferredWordProvider: React.FC<DeferredWordProviderProps> = ({ chil
           if (phraseMeaningResult.phraseTranslation) {
             results.phraseTranslation = phraseMeaningResult.phraseTranslation;
           }
+          // Store phrasal verb detection result
+          results.isPhrasalVerb = phraseMeaningResult.isPhrasalVerb;
         } catch (err) {
           console.error('[DeferredWord] getPhraseMeaning error:', err);
         }

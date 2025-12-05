@@ -1,5 +1,5 @@
 import type { Book, BookData, ReadingProgress, BookLanguage } from './book.types';
-import type { VocabularyEntry, CreateVocabularyEntry, VocabularyFilters, StoredWordOccurrence } from './vocabulary.types';
+import type { VocabularyEntry, CreateVocabularyEntry, VocabularyFilters, StoredWordOccurrence, WordTypeCounts } from './vocabulary.types';
 import type { AppSettings, LMStudioConnectionResult, GroqConnectionResult } from './settings.types';
 import type { WordDefinitionResult, IPAPronunciationResult, BatchIPAResult, SimplifiedSentenceResult, WordEquivalentResult, PhraseMeaningResult, TatoebaSentence, TatoebaStatus } from './ai.types';
 import type { TTSResponse, IPAResponse, PronunciationServerStatus, IPALanguagesResponse, InstallLanguageResponse } from './pronunciation.types';
@@ -23,6 +23,21 @@ export interface PdfStatusResponse {
   error: string | null;
 }
 
+// Vocabulary export types
+export type VocabularyExportType = 'words-only' | 'words-context';
+
+export interface VocabularyExportEntry {
+  word: string;
+  sentence?: string;
+}
+
+export interface VocabularyExportResult {
+  success: boolean;
+  cancelled?: boolean;
+  filePath?: string;
+  error?: string;
+}
+
 // IPC API exposed to renderer
 export interface ElectronAPI {
   book: {
@@ -43,10 +58,12 @@ export interface ElectronAPI {
   vocabulary: {
     add: (entry: CreateVocabularyEntry) => Promise<VocabularyEntry>;
     getAll: (filters?: VocabularyFilters) => Promise<VocabularyEntry[]>;
+    getCounts: (bookId?: number) => Promise<WordTypeCounts>;
     update: (id: number, data: Partial<VocabularyEntry>) => Promise<void>;
     delete: (id: number) => Promise<void>;
     getOccurrences: (wordId: number) => Promise<StoredWordOccurrence[]>;
     addOccurrence: (wordId: number, bookId: number, pageNumber: number, sentence: string) => Promise<void>;
+    export: (exportType: VocabularyExportType, entries: VocabularyExportEntry[]) => Promise<VocabularyExportResult>;
   };
   ai: {
     getDefinition: (word: string, context: string, language?: string) => Promise<WordDefinitionResult>;

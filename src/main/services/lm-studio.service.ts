@@ -602,29 +602,44 @@ Answer:`;
 
   /**
    * Get the meaning of a phrase (phrasal verb, collocation, idiom) in context
+   * Also detects if the phrase is a phrasal verb
    */
   async getPhraseMeaning(phrase: string, context: string, language = 'en'): Promise<{
     meaning: string;
     phraseTranslation?: string;
+    isPhrasalVerb: boolean;
+    phrasalVerbInfo?: {
+      baseVerb: string;
+      particle: string;
+    };
   }> {
     const isEnglish = language === 'en';
     const languageName = isEnglish ? 'English' : this.getLanguageName(language);
 
     // Use structured format for all languages to ensure consistent parsing
-    const prompt = `For the ${languageName} phrase "${phrase}" in this context, provide:
+    const prompt = `For the ${languageName} phrase "${phrase}" in this context, analyze and provide:
+
 1. A clear explanation of what this phrase means (focus on idiomatic usage if applicable)
 ${!isEnglish ? '2. The English translation of the phrase' : ''}
+${isEnglish ? '2' : '3'}. Is this a PHRASAL VERB? A phrasal verb is a verb combined with a preposition or adverb that creates a meaning different from the original verb (e.g., "give up" = surrender, "look forward to" = anticipate, "break down" = stop working)
+${isEnglish ? '3' : '4'}. If it IS a phrasal verb, identify the base verb and particle(s)
 
 Context: "${context}"
 
 Format your response EXACTLY like this:
-MEANING: [explanation of the phrase meaning]${!isEnglish ? '\nENGLISH: [English translation]' : ''}`;
+MEANING: [explanation of the phrase meaning]${!isEnglish ? '\nENGLISH: [English translation]' : ''}
+IS_PHRASAL_VERB: [yes/no]
+BASE_VERB: [base verb if phrasal verb, otherwise leave empty]
+PARTICLE: [particle(s) if phrasal verb, otherwise leave empty]`;
 
     const response = await this.chat(prompt);
 
     // Parse the response - look for MEANING: label first
-    const meaningMatch = response.match(/MEANING:\s*(.+?)(?=ENGLISH:|$)/is);
-    const engMatch = response.match(/ENGLISH:\s*(.+?)$/is);
+    const meaningMatch = response.match(/MEANING:\s*(.+?)(?=ENGLISH:|IS_PHRASAL_VERB:|$)/is);
+    const engMatch = response.match(/ENGLISH:\s*(.+?)(?=IS_PHRASAL_VERB:|$)/is);
+    const isPhrasalMatch = response.match(/IS_PHRASAL_VERB:\s*(\w+)/i);
+    const baseVerbMatch = response.match(/BASE_VERB:\s*([^\n]+)/i);
+    const particleMatch = response.match(/PARTICLE:\s*([^\n]+)/i);
 
     // Fallback: if no MEANING: label, use full response (trimmed)
     let meaning = meaningMatch ? meaningMatch[1].trim() : response.trim();
@@ -640,7 +655,18 @@ MEANING: [explanation of the phrase meaning]${!isEnglish ? '\nENGLISH: [English 
       }
     }
 
-    return { meaning, phraseTranslation };
+    // Determine if it's a phrasal verb
+    const isPhrasalVerb = isPhrasalMatch
+      ? isPhrasalMatch[1].toLowerCase() === 'yes'
+      : false;
+
+    // Extract phrasal verb info if applicable
+    const phrasalVerbInfo = isPhrasalVerb ? {
+      baseVerb: baseVerbMatch?.[1]?.trim() || '',
+      particle: particleMatch?.[1]?.trim() || '',
+    } : undefined;
+
+    return { meaning, phraseTranslation, isPhrasalVerb, phrasalVerbInfo };
   }
 
   /**

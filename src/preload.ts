@@ -41,6 +41,8 @@ const electronAPI: ElectronAPI = {
       ipcRenderer.invoke(IPC_CHANNELS.VOCABULARY_ADD, entry),
     getAll: (filters) =>
       ipcRenderer.invoke(IPC_CHANNELS.VOCABULARY_GET_ALL, filters),
+    getCounts: (bookId?: number) =>
+      ipcRenderer.invoke(IPC_CHANNELS.VOCABULARY_GET_COUNTS, bookId),
     update: (id, data) =>
       ipcRenderer.invoke(IPC_CHANNELS.VOCABULARY_UPDATE, id, data),
     delete: (id) =>
@@ -49,6 +51,8 @@ const electronAPI: ElectronAPI = {
       ipcRenderer.invoke(IPC_CHANNELS.VOCABULARY_GET_OCCURRENCES, wordId),
     addOccurrence: (wordId, bookId, pageNumber, sentence) =>
       ipcRenderer.invoke(IPC_CHANNELS.VOCABULARY_ADD_OCCURRENCE, wordId, bookId, pageNumber, sentence),
+    export: (exportType: 'words-only' | 'words-context', entries: { word: string; sentence?: string }[]) =>
+      ipcRenderer.invoke(IPC_CHANNELS.VOCABULARY_EXPORT, { exportType, entries }),
   },
 
   // AI Services

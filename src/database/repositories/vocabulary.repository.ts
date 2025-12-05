@@ -1,5 +1,5 @@
 import { getDatabase } from '../index';
-import type { VocabularyEntry, CreateVocabularyEntry, VocabularyFilters, StoredWordOccurrence } from '../../shared/types';
+import type { VocabularyEntry, CreateVocabularyEntry, VocabularyFilters, StoredWordOccurrence, WordType, WordTypeCounts } from '../../shared/types';
 
 export class VocabularyRepository {
   private get db() {
@@ -7,11 +7,13 @@ export class VocabularyRepository {
   }
 
   async add(entry: CreateVocabularyEntry): Promise<VocabularyEntry> {
-    // Check if word already exists for this book
+    const wordType = entry.word_type || 'word';
+
+    // Check if word already exists for this book with the same type
     const existing = this.db.prepare(`
       SELECT * FROM vocabulary_entries
-      WHERE word = ? AND (book_id = ? OR book_id IS NULL)
-    `).get(entry.word.toLowerCase(), entry.book_id || null) as VocabularyEntry | undefined;
+      WHERE word = ? AND (book_id = ? OR book_id IS NULL) AND word_type = ?
+    `).get(entry.word.toLowerCase(), entry.book_id || null, wordType) as VocabularyEntry | undefined;
 
     if (existing) {
       // Update lookup count
@@ -23,12 +25,13 @@ export class VocabularyRepository {
       return { ...existing, lookup_count: existing.lookup_count + 1 };
     }
 
-    // Insert new entry
+    // Insert new entry with word_type
     const result = this.db.prepare(`
-      INSERT INTO vocabulary_entries (word, book_id, meaning, ipa_pronunciation, simplified_sentence, original_sentence)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO vocabulary_entries (word, word_type, book_id, meaning, ipa_pronunciation, simplified_sentence, original_sentence)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `).run(
       entry.word.toLowerCase(),
+      wordType,
       entry.book_id || null,
       entry.meaning || null,
       entry.ipa_pronunciation || null,
@@ -48,6 +51,11 @@ export class VocabularyRepository {
     if (filters?.bookId) {
       query += ' AND book_id = ?';
       params.push(filters.bookId);
+    }
+
+    if (filters?.wordType) {
+      query += ' AND word_type = ?';
+      params.push(filters.wordType);
     }
 
     if (filters?.search) {
@@ -70,6 +78,21 @@ export class VocabularyRepository {
     }
 
     return this.db.prepare(query).all(...params) as VocabularyEntry[];
+  }
+
+  async getCountsByType(bookId?: number): Promise<WordTypeCounts> {
+    const query = bookId
+      ? `SELECT word_type, COUNT(*) as count FROM vocabulary_entries WHERE book_id = ? GROUP BY word_type`
+      : `SELECT word_type, COUNT(*) as count FROM vocabulary_entries GROUP BY word_type`;
+
+    const params = bookId ? [bookId] : [];
+    const results = this.db.prepare(query).all(...params) as { word_type: WordType; count: number }[];
+
+    return {
+      word: results.find(r => r.word_type === 'word')?.count || 0,
+      phrasal_verb: results.find(r => r.word_type === 'phrasal_verb')?.count || 0,
+      word_group: results.find(r => r.word_type === 'word_group')?.count || 0,
+    };
   }
 
   async update(id: number, data: Partial<VocabularyEntry>): Promise<void> {

@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSettings } from '../../context/SettingsContext';
+import { useSessionVocabulary } from '../../context/SessionVocabularyContext';
 import type { CachedWordData } from '../../../shared/types/deferred-word.types';
 import { getWordBoundaryPattern } from '../../../shared/utils/text-utils';
-import type { BookLanguage } from '../../../shared/types';
+import type { BookLanguage, WordType } from '../../../shared/types';
 import type { GrammarAnalysis } from '../../../shared/types/grammar.types';
 import PronunciationButton from './PronunciationButton';
 import LoopPlayButton from './LoopPlayButton';
@@ -46,6 +47,8 @@ interface WordData {
   wordType?: string;
   // German article (der, die, das)
   germanArticle?: string;
+  // Phrasal verb detection (for multi-word phrases)
+  isPhrasalVerb?: boolean;
   loading: boolean;
   error?: string;
 }
@@ -67,6 +70,7 @@ const normalizeForTTS = (text: string): string => {
 
 const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bookId, bookLanguage = 'en', onNavigateToPage, preloadedData, isGrammarMode = false }) => {
   const { settings } = useSettings();
+  const { addSessionEntry } = useSessionVocabulary();
   const { preloadAudio, getAudio, setAudio } = useAudioCache();
   const { playAudio, stop: stopAudio, isLoading: isLoadingAudio, setIsLoading } = useAudioPlayer();
   const [wordData, setWordData] = useState<WordData>({ loading: false });
@@ -302,6 +306,8 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
         wordType: preloadedData.wordType,
         // German article
         germanArticle: preloadedData.germanArticle,
+        // Phrasal verb detection
+        isPhrasalVerb: preloadedData.isPhrasalVerb,
       });
       setSaved(false);
       return;
@@ -487,6 +493,16 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
     if (!selectedWord || !window.electronAPI) return;
 
     try {
+      // Determine word_type based on:
+      // - Single word → 'word'
+      // - Phrase + isPhrasalVerb → 'phrasal_verb'
+      // - Phrase + !isPhrasalVerb → 'word_group'
+      let wordType: WordType = 'word';
+      if (selectedWord.isPhrase) {
+        wordType = wordData.isPhrasalVerb ? 'phrasal_verb' : 'word_group';
+      }
+
+      // Save to persistent database
       await window.electronAPI.vocabulary.add({
         word: selectedWord.word,
         book_id: bookId,
@@ -494,12 +510,24 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
         ipa_pronunciation: wordData.ipa,
         simplified_sentence: wordData.simplifiedSentence,
         original_sentence: selectedWord.sentence,
+        word_type: wordType,
       });
+
+      // Also add to session vocabulary context
+      addSessionEntry({
+        word: selectedWord.word,
+        word_type: wordType,
+        book_id: bookId,
+        meaning: wordData.definition,
+        sentence: selectedWord.sentence,
+        timestamp: Date.now(),
+      });
+
       setSaved(true);
     } catch (error) {
       console.error('Failed to save to vocabulary:', error);
     }
-  }, [selectedWord, bookId, wordData]);
+  }, [selectedWord, bookId, wordData, addSessionEntry]);
 
   if (!isOpen || !selectedWord) return null;
 
