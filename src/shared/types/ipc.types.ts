@@ -49,6 +49,7 @@ export interface ElectronAPI {
     getPhraseMeaning: (phrase: string, context: string, language?: string) => Promise<PhraseMeaningResult>;
     testConnection: () => Promise<LMStudioConnectionResult>;
     testGroqConnection: () => Promise<GroqConnectionResult>;
+    getNextModel: () => Promise<string | null>;
   };
   tatoeba: {
     search: (word: string, language?: string) => Promise<TatoebaSentence[]>;

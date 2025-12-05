@@ -76,6 +76,40 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
   const [syllableModeLoading, setSyllableModeLoading] = useState(false);
   const [sentenceWordData, setSentenceWordData] = useState<Map<string, { ipa: string; syllables: string }>>(new Map());
 
+  // Retry trigger for rate limit errors
+  const [retryTrigger, setRetryTrigger] = useState(0);
+  const [retryingModel, setRetryingModel] = useState<string | null>(null);
+
+  // Format model name for display
+  const formatModelName = (model: string): string => {
+    const names: Record<string, string> = {
+      'llama-3.1-8b-instant': 'Llama 3.1 8B',
+      'llama-3.3-70b-versatile': 'Llama 3.3 70B',
+      'meta-llama/llama-4-scout-17b-16e-instruct': 'Llama 4 Scout',
+      'qwen/qwen3-32b': 'Qwen3 32B',
+    };
+    return names[model] || model;
+  };
+
+  // Handle retry when rate limited
+  const handleRetry = useCallback(async () => {
+    if (!window.electronAPI) return;
+
+    // Get next available model
+    const nextModel = await window.electronAPI.ai.getNextModel();
+    if (nextModel) {
+      setRetryingModel(nextModel);
+      // Show for 1 second, then trigger fetch
+      setTimeout(() => {
+        setRetryingModel(null);
+        setRetryTrigger(prev => prev + 1);
+      }, 1000);
+    } else {
+      // No models available, just retry anyway
+      setRetryTrigger(prev => prev + 1);
+    }
+  }, []);
+
   // Helper function to highlight the selected word/phrase in a sentence
   const highlightWord = useCallback((sentence: string, word: string) => {
     if (!word || !sentence) return <>{sentence}</>;
@@ -326,7 +360,7 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
     };
 
     fetchWordData();
-  }, [selectedWord, isOpen, bookId, settings.tatoeba_enabled, settings.tatoeba_language, preloadedData]);
+  }, [selectedWord, isOpen, bookId, settings.tatoeba_enabled, settings.tatoeba_language, preloadedData, retryTrigger]);
 
   // Handle syllable mode toggle
   const handleSyllableModeToggle = useCallback(async () => {
@@ -536,7 +570,15 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
             </div>
           ) : wordData.error ? (
             <div className="bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 p-4 rounded-lg">
-              {wordData.error}
+              <p>{wordData.error}</p>
+              {wordData.error.toLowerCase().includes('rate limit') && (
+                <button
+                  onClick={handleRetry}
+                  className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors flex items-center gap-2"
+                >
+                  🔄 Try Next AI Model
+                </button>
+              )}
             </div>
           ) : (
             <>
@@ -555,6 +597,20 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
                 <p className="text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
                   {wordData.definition || (selectedWord.isPhrase ? 'No phrase meaning available' : 'No definition available')}
                 </p>
+                {/* Retry button for rate limit errors */}
+                {retryingModel ? (
+                  <div className="mt-3 px-4 py-2 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg text-sm flex items-center gap-2">
+                    <span className="inline-block animate-spin">⏳</span>
+                    Trying {formatModelName(retryingModel)}...
+                  </div>
+                ) : wordData.definition?.toLowerCase().includes('rate limit') && (
+                  <button
+                    onClick={handleRetry}
+                    className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors flex items-center gap-2"
+                  >
+                    🔄 Try Next AI Model
+                  </button>
+                )}
               </section>
 
               {/* Original Sentence */}

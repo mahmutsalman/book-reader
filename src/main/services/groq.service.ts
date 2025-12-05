@@ -7,6 +7,20 @@
 import type { AIServiceInterface } from './ai-service.interface';
 import type { PreStudyWordEntry, ExampleSentence } from '../../shared/types/pre-study-notes.types';
 
+/**
+ * Fallback model chain ordered by priority.
+ * When rate limited, system tries the next model in sequence.
+ */
+const FALLBACK_MODELS = [
+  'llama-3.1-8b-instant',
+  'llama-3.3-70b-versatile',
+  'meta-llama/llama-4-scout-17b-16e-instruct',
+  'qwen/qwen3-32b',
+] as const;
+
+/** Cooldown duration in milliseconds (60 seconds) */
+const RATE_LIMIT_COOLDOWN_MS = 60000;
+
 interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
@@ -26,6 +40,12 @@ export class GroqService implements AIServiceInterface {
   public model: string;
   private timeout: number;
 
+  /**
+   * Static map tracking rate-limited models.
+   * Key: model name, Value: timestamp when cooldown expires
+   */
+  private static modelCooldowns: Map<string, number> = new Map();
+
   constructor(apiKey: string, model = 'llama-3.3-70b-versatile', timeout = 60000) {
     this.apiKey = apiKey;
     this.model = model;
@@ -38,6 +58,91 @@ export class GroqService implements AIServiceInterface {
 
   setModel(model: string): void {
     this.model = model;
+  }
+
+  /**
+   * Check if a model is currently rate-limited
+   */
+  private isModelRateLimited(model: string): boolean {
+    const cooldownExpiry = GroqService.modelCooldowns.get(model);
+    if (!cooldownExpiry) return false;
+
+    if (Date.now() >= cooldownExpiry) {
+      // Cooldown expired, remove from map
+      GroqService.modelCooldowns.delete(model);
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Mark a model as rate-limited
+   */
+  private markModelRateLimited(model: string): void {
+    const expiryTime = Date.now() + RATE_LIMIT_COOLDOWN_MS;
+    GroqService.modelCooldowns.set(model, expiryTime);
+    console.warn(`[Groq] Model ${model} rate-limited, cooldown until ${new Date(expiryTime).toISOString()}`);
+  }
+
+  /**
+   * Get ordered list of models to try, starting from user's preferred model.
+   * Skips models that are currently rate-limited.
+   */
+  private getAvailableModels(): string[] {
+    // Find index of user's preferred model
+    const preferredIndex = FALLBACK_MODELS.indexOf(this.model as typeof FALLBACK_MODELS[number]);
+
+    // Build ordered list: user's model first, then rest in fallback order
+    let orderedModels: string[];
+
+    if (preferredIndex >= 0) {
+      // User's model is in fallback list - start from there
+      orderedModels = [
+        ...FALLBACK_MODELS.slice(preferredIndex),
+        ...FALLBACK_MODELS.slice(0, preferredIndex),
+      ];
+    } else {
+      // User's model not in list (custom model) - try it first, then fallback chain
+      orderedModels = [this.model, ...FALLBACK_MODELS];
+    }
+
+    // Filter out rate-limited models
+    return orderedModels.filter(model => !this.isModelRateLimited(model));
+  }
+
+  /**
+   * Static method to get the next available model for retry.
+   * Used by frontend to show which model will be tried.
+   */
+  public static getNextAvailableModel(preferredModel: string): string | null {
+    // Find index of preferred model
+    const preferredIndex = FALLBACK_MODELS.indexOf(preferredModel as typeof FALLBACK_MODELS[number]);
+
+    // Build ordered list: preferred model first, then rest in fallback order
+    let orderedModels: string[];
+
+    if (preferredIndex >= 0) {
+      orderedModels = [
+        ...FALLBACK_MODELS.slice(preferredIndex),
+        ...FALLBACK_MODELS.slice(0, preferredIndex),
+      ];
+    } else {
+      orderedModels = [preferredModel, ...FALLBACK_MODELS];
+    }
+
+    // Filter out rate-limited models
+    const now = Date.now();
+    const availableModels = orderedModels.filter(model => {
+      const cooldownExpiry = GroqService.modelCooldowns.get(model);
+      if (!cooldownExpiry) return true;
+      if (now >= cooldownExpiry) {
+        GroqService.modelCooldowns.delete(model);
+        return true;
+      }
+      return false;
+    });
+
+    return availableModels[0] || null;
   }
 
   async testConnection(): Promise<{ success: boolean; models?: string[]; error?: string }> {
@@ -867,6 +972,51 @@ IMPORTANT:
       throw new Error('Groq API key not configured');
     }
 
+    const availableModels = this.getAvailableModels();
+
+    if (availableModels.length === 0) {
+      // All models are rate-limited
+      const cooldownValues = Array.from(GroqService.modelCooldowns.values());
+      const earliestCooldown = cooldownValues.length > 0 ? Math.min(...cooldownValues) : Date.now();
+      const waitSeconds = Math.ceil((earliestCooldown - Date.now()) / 1000);
+      throw new Error(
+        `All Groq models are rate-limited. Please wait ${Math.max(waitSeconds, 1)} seconds before trying again.`
+      );
+    }
+
+    let lastError: Error | null = null;
+
+    for (const modelToTry of availableModels) {
+      try {
+        const result = await this.executeChat(content, maxTokens, modelToTry);
+
+        // Log which model was used (only if different from preferred)
+        if (modelToTry !== this.model) {
+          console.log(`[Groq] Used fallback model: ${modelToTry} (preferred: ${this.model})`);
+        }
+
+        return result;
+      } catch (error) {
+        if (error instanceof Error && (error.message.includes('rate limit') || error.message.includes('429'))) {
+          this.markModelRateLimited(modelToTry);
+          lastError = error;
+          // Continue to next model
+          continue;
+        }
+        // Non-rate-limit error, throw immediately
+        throw error;
+      }
+    }
+
+    // All models failed
+    throw lastError || new Error('All Groq models failed');
+  }
+
+  /**
+   * Execute a single chat request with a specific model.
+   * Throws on rate limit (429) or other errors.
+   */
+  private async executeChat(content: string, maxTokens: number, model: string): Promise<string> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.timeout);
 
@@ -878,7 +1028,7 @@ IMPORTANT:
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: this.model,
+          model: model,
           messages: [
             { role: 'user', content } as ChatMessage,
           ],
@@ -895,7 +1045,7 @@ IMPORTANT:
           throw new Error('Invalid Groq API key');
         }
         if (response.status === 429) {
-          throw new Error('Groq rate limit exceeded. Please wait and try again.');
+          throw new Error(`Groq rate limit exceeded for model ${model}`);
         }
         throw new Error(`Groq API error: ${response.status} ${response.statusText} - ${errorBody}`);
       }

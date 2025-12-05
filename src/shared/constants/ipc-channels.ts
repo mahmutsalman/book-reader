@@ -33,6 +33,7 @@ export const IPC_CHANNELS = {
   AI_GET_PHRASE_MEANING: 'ai:get-phrase-meaning',
   AI_TEST_CONNECTION: 'ai:test-connection',
   AI_TEST_GROQ_CONNECTION: 'ai:test-groq-connection',
+  AI_GET_NEXT_MODEL: 'ai:get-next-model',
 
   // Tatoeba
   TATOEBA_SEARCH: 'tatoeba:search',

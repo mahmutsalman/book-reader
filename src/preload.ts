@@ -71,6 +71,8 @@ const electronAPI: ElectronAPI = {
       ipcRenderer.invoke(IPC_CHANNELS.AI_TEST_CONNECTION),
     testGroqConnection: () =>
       ipcRenderer.invoke(IPC_CHANNELS.AI_TEST_GROQ_CONNECTION),
+    getNextModel: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.AI_GET_NEXT_MODEL),
   },
 
   // Tatoeba

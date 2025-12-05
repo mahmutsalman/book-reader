@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron';
 import { IPC_CHANNELS } from '../../shared/constants';
 import { getAIService, getLMStudioService, getGroqService } from '../services/ai-provider.factory';
+import { GroqService } from '../services/groq.service';
 
 export function registerAIHandlers(): void {
   // Get word definition - uses selected AI provider
@@ -153,6 +154,17 @@ export function registerAIHandlers(): void {
         success: false,
         error: error instanceof Error ? error.message : 'Connection failed',
       };
+    }
+  });
+
+  // Get next available Groq model (for retry UI feedback)
+  ipcMain.handle(IPC_CHANNELS.AI_GET_NEXT_MODEL, async () => {
+    try {
+      const service = await getGroqService();
+      return GroqService.getNextAvailableModel(service.model);
+    } catch (error) {
+      console.error('Failed to get next model:', error);
+      return null;
     }
   });
 }

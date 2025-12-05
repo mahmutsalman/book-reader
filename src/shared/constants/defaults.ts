@@ -19,7 +19,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   // AI Provider settings
   ai_provider: 'local',          // Default: local LM Studio
   groq_api_key: '',              // Empty by default - user must set up
-  groq_model: 'llama-3.3-70b-versatile', // Recommended Groq model
+  groq_model: 'llama-3.1-8b-instant', // Default Groq model (faster, with automatic fallback)
 };
 
 // Zoom level constraints
