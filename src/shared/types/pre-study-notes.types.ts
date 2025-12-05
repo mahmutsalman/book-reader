@@ -15,6 +15,7 @@ export interface ExampleSentence {
   sentence: string;           // Example sentence in target language
   translation: string;        // English translation
   grammarPoint: string;       // Grammar concept demonstrated (e.g., "accusative case")
+  audio?: string;             // Base64-encoded MP3 pronunciation
 }
 
 export interface PreStudyWordEntry {
@@ -56,7 +57,7 @@ export interface PreStudyNotesResult {
   uniqueWords: number;
 }
 
-export type PreStudyPhase = 'extracting' | 'processing' | 'generating';
+export type PreStudyPhase = 'extracting' | 'processing' | 'fetching-audio' | 'generating';
 
 export interface PreStudyProgress {
   current: number;

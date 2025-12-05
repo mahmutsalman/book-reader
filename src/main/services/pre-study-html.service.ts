@@ -79,21 +79,21 @@ export class PreStudyHtmlService {
 
     // Audio playback management
     let currentAudio = null;
-    let currentButton = null;
+    let currentElement = null;
 
-    function playAudio(button, base64Audio, playbackRate = 1.0) {
+    function playAudio(element, base64Audio, playbackRate = 1.0) {
       // Stop any currently playing audio
       if (currentAudio) {
         currentAudio.pause();
         currentAudio = null;
-        if (currentButton) {
-          currentButton.classList.remove('playing');
+        if (currentElement) {
+          currentElement.classList.remove('playing');
         }
       }
 
-      // If clicking the same button, just stop
-      if (currentButton === button) {
-        currentButton = null;
+      // If clicking the same element, just stop (toggle behavior)
+      if (currentElement === element) {
+        currentElement = null;
         return;
       }
 
@@ -102,25 +102,25 @@ export class PreStudyHtmlService {
         currentAudio = new Audio('data:audio/mp3;base64,' + base64Audio);
         currentAudio.preservesPitch = true;
         currentAudio.playbackRate = playbackRate;
-        currentButton = button;
-        button.classList.add('playing');
+        currentElement = element;
+        element.classList.add('playing');
 
         currentAudio.onended = () => {
-          button.classList.remove('playing');
+          element.classList.remove('playing');
           currentAudio = null;
-          currentButton = null;
+          currentElement = null;
         };
 
         currentAudio.onerror = () => {
-          button.classList.remove('playing');
+          element.classList.remove('playing');
           currentAudio = null;
-          currentButton = null;
+          currentElement = null;
         };
 
         currentAudio.play().catch(() => {
-          button.classList.remove('playing');
+          element.classList.remove('playing');
           currentAudio = null;
-          currentButton = null;
+          currentElement = null;
         });
       }
     }
@@ -166,15 +166,13 @@ export class PreStudyHtmlService {
 
       <div class="context">
         <span class="label">Context:</span>
-        <blockquote>${highlightedSentence}</blockquote>
+        <blockquote class="${entry.sentenceAudio ? 'clickable-audio' : ''}" ${entry.sentenceAudio ? `onclick="playAudio(this, '${entry.sentenceAudio}')" title="Click to play pronunciation"` : ''}>${highlightedSentence}</blockquote>
       </div>
 
-      ${entry.wordAudio || entry.sentenceAudio ? `
+      ${entry.wordAudio ? `
       <div class="audio-controls">
-        ${entry.wordAudio ? `<button class="audio-btn" onclick="playAudio(this, '${entry.wordAudio}')">🔊 Word</button>` : ''}
-        ${entry.wordAudio ? `<button class="audio-btn slow-btn" onclick="playAudio(this, '${entry.wordAudio}', ${slowPlaybackSpeed})" title="Play word at ${slowPlaybackSpeed}x speed">🐢 Slow</button>` : ''}
-        ${entry.sentenceAudio ? `<button class="audio-btn" onclick="playAudio(this, '${entry.sentenceAudio}')">🔊 Sentence</button>` : ''}
-        ${entry.sentenceAudio ? `<button class="audio-btn slow-btn" onclick="playAudio(this, '${entry.sentenceAudio}', ${slowPlaybackSpeed})" title="Play sentence at ${slowPlaybackSpeed}x speed">🐢 Slow</button>` : ''}
+        <button class="audio-btn" onclick="playAudio(this, '${entry.wordAudio}')">🔊 Word</button>
+        <button class="audio-btn slow-btn" onclick="playAudio(this, '${entry.wordAudio}', ${slowPlaybackSpeed})" title="Play word at ${slowPlaybackSpeed}x speed">🐢 Slow</button>
       </div>
       ` : ''}
 
@@ -182,7 +180,7 @@ export class PreStudyHtmlService {
       <div class="examples-section">
         <h4 class="section-title">Example Sentences</h4>
         ${entry.exampleSentences.map(ex => `
-          <div class="example-item">
+          <div class="example-item ${ex.audio ? 'clickable-audio' : ''}" ${ex.audio ? `onclick="playAudio(this, '${ex.audio}')" title="Click to play pronunciation"` : ''}>
             <div class="example-sentence">${this.escapeHtml(ex.sentence)}</div>
             <div class="example-translation">${this.escapeHtml(ex.translation)}</div>
             <span class="grammar-tag">${this.escapeHtml(ex.grammarPoint)}</span>
@@ -660,6 +658,58 @@ export class PreStudyHtmlService {
       color: var(--accent);
       border-radius: 16px;
       font-weight: 500;
+    }
+
+    /* Clickable audio elements (sentences) */
+    .clickable-audio {
+      cursor: pointer;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+
+    .clickable-audio:hover {
+      background: var(--accent-light);
+    }
+
+    .clickable-audio:hover::after {
+      content: '🔊';
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 0.9rem;
+      opacity: 0.7;
+    }
+
+    .clickable-audio.playing {
+      background: var(--accent-light);
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent);
+    }
+
+    .clickable-audio.playing::after {
+      content: '🔊';
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 0.9rem;
+      animation: pulse 1s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    /* Blockquote clickable styling */
+    blockquote.clickable-audio {
+      padding-right: 32px;
+    }
+
+    /* Example item clickable styling */
+    .example-item.clickable-audio {
+      padding-right: 32px;
     }
 
     /* Print styles */

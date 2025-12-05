@@ -71,9 +71,8 @@ export class PreStudyNotesService {
     // Get grammar topics for the language
     const grammarTopics = await grammarTopicsService.getTopicsForPrompt(request.language);
 
-    // Phase 2: Processing words with parallel audio generation
+    // Phase 2: Processing words - Generate ALL AI entries first (Groq is fast)
     const entries: PreStudyWordEntry[] = [];
-    const audioPromises: Promise<void>[] = [];
     const total = uniqueWords.length;
 
     for (let i = 0; i < uniqueWords.length; i++) {
@@ -93,12 +92,6 @@ export class PreStudyNotesService {
         currentWord: word,
         estimatedTimeRemaining: (total - i - 1) * 2, // Rough estimate: 2 seconds per word
       });
-
-      // Start audio fetch for previous entry in parallel (non-blocking)
-      // This runs while AI is processing the current word
-      if (i > 0 && entries[i - 1]) {
-        audioPromises.push(this.fetchAudioForEntry(entries[i - 1], request.language));
-      }
 
       try {
         const entry = await service.generatePreStudyEntry(
@@ -123,15 +116,24 @@ export class PreStudyNotesService {
       }
     }
 
-    // Fetch audio for the last entry
-    if (entries.length > 0) {
-      audioPromises.push(this.fetchAudioForEntry(entries[entries.length - 1], request.language));
-    }
+    // Phase 2.5: Fetch ALL audio in batch (word, context sentence, and example sentences)
+    if (!this.isCancelled && entries.length > 0) {
+      onProgress?.({
+        current: 0,
+        total: entries.length,
+        phase: 'fetching-audio',
+      });
 
-    // Wait for all audio fetches to complete
-    console.log(`[PreStudy] Waiting for ${audioPromises.length} audio fetches to complete...`);
-    await Promise.allSettled(audioPromises);
-    console.log('[PreStudy] All audio fetches completed');
+      console.log(`[PreStudy] Fetching audio for ${entries.length} entries...`);
+      await this.fetchAllAudio(entries, request.language, (current) => {
+        onProgress?.({
+          current,
+          total: entries.length,
+          phase: 'fetching-audio',
+        });
+      });
+      console.log('[PreStudy] All audio fetches completed');
+    }
 
     // Phase 3: Generating result
     onProgress?.({
@@ -248,25 +250,76 @@ export class PreStudyNotesService {
   }
 
   /**
-   * Fetch TTS audio for a word entry (word + sentence)
-   * Runs in parallel with AI processing for efficiency
+   * Fetch ALL audio for all entries in batch
+   * This includes: word audio, context sentence audio, and example sentence audio
+   */
+  private async fetchAllAudio(
+    entries: PreStudyWordEntry[],
+    language: string,
+    onProgress?: (current: number) => void
+  ): Promise<void> {
+    // Process entries in parallel batches for efficiency
+    const BATCH_SIZE = 5; // Process 5 entries at a time to avoid overwhelming the TTS server
+
+    for (let i = 0; i < entries.length; i += BATCH_SIZE) {
+      const batch = entries.slice(i, i + BATCH_SIZE);
+
+      await Promise.all(batch.map(entry => this.fetchAudioForEntry(entry, language)));
+
+      // Report progress after each batch
+      onProgress?.(Math.min(i + BATCH_SIZE, entries.length));
+    }
+  }
+
+  /**
+   * Fetch TTS audio for a single word entry (word + context sentence + example sentences)
    */
   private async fetchAudioForEntry(entry: PreStudyWordEntry, language: string): Promise<void> {
     try {
-      // Fetch word and sentence audio in parallel
-      // Normalize sentence text to prevent newlines from causing audio pauses
-      const [wordResult, sentenceResult] = await Promise.all([
-        pronunciationService.getTTS(entry.word, language),
-        entry.contextSentence
-          ? pronunciationService.getTTS(this.normalizeForTTS(entry.contextSentence), language)
-          : Promise.resolve({ success: false } as { success: false }),
-      ]);
+      // Build array of audio fetch promises
+      const audioPromises: Promise<{ type: string; result: { success: boolean; audio_base64?: string } }>[] = [];
 
-      if (wordResult.success && wordResult.audio_base64) {
-        entry.wordAudio = wordResult.audio_base64;
+      // Word audio
+      audioPromises.push(
+        pronunciationService.getTTS(entry.word, language)
+          .then(result => ({ type: 'word', result }))
+      );
+
+      // Context sentence audio
+      if (entry.contextSentence) {
+        audioPromises.push(
+          pronunciationService.getTTS(this.normalizeForTTS(entry.contextSentence), language)
+            .then(result => ({ type: 'context', result }))
+        );
       }
-      if (sentenceResult.success && 'audio_base64' in sentenceResult && sentenceResult.audio_base64) {
-        entry.sentenceAudio = sentenceResult.audio_base64;
+
+      // Example sentences audio (for enhanced mode with Groq)
+      if (entry.exampleSentences && entry.exampleSentences.length > 0) {
+        entry.exampleSentences.forEach((example, index) => {
+          audioPromises.push(
+            pronunciationService.getTTS(this.normalizeForTTS(example.sentence), language)
+              .then(result => ({ type: `example-${index}`, result }))
+          );
+        });
+      }
+
+      // Fetch all audio in parallel
+      const results = await Promise.all(audioPromises);
+
+      // Assign audio to entry
+      for (const { type, result } of results) {
+        if (result.success && result.audio_base64) {
+          if (type === 'word') {
+            entry.wordAudio = result.audio_base64;
+          } else if (type === 'context') {
+            entry.sentenceAudio = result.audio_base64;
+          } else if (type.startsWith('example-')) {
+            const index = parseInt(type.split('-')[1], 10);
+            if (entry.exampleSentences && entry.exampleSentences[index]) {
+              entry.exampleSentences[index].audio = result.audio_base64;
+            }
+          }
+        }
       }
     } catch (error) {
       console.error(`[PreStudy] Error fetching audio for "${entry.word}":`, error);
