@@ -146,7 +146,7 @@ const LoopPlayButton: React.FC<LoopPlayButtonProps> = ({
       className={`${sizeClasses} flex items-center justify-center rounded-full transition-all ${
         isLooping
           ? 'text-blue-500 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 animate-pulse'
-          : 'text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+          : 'text-gray-500 dark:text-cream-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700'
       } ${className}`}
       title={isLooping ? 'Stop loop' : title}
       disabled={isLoadingAudio}

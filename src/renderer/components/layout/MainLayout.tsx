@@ -6,7 +6,7 @@ const MainLayout: React.FC = () => {
     `px-4 py-2 rounded-lg transition-colors no-underline ${
       isActive
         ? 'bg-primary-600 text-white'
-        : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+        : 'text-gray-600 dark:text-cream-200 hover:bg-gray-100 dark:hover:bg-gray-700'
     }`;
 
   return (
@@ -15,7 +15,7 @@ const MainLayout: React.FC = () => {
       <header className="app-drag bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 pl-20 pr-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="text-2xl">📚</span>
-          <h1 className="text-xl font-semibold text-gray-800 dark:text-gray-100">
+          <h1 className="text-xl font-semibold text-gray-800 dark:text-cream-100">
             Smart Book
           </h1>
         </div>

@@ -20,6 +20,14 @@ module.exports = {
           800: '#075985',
           900: '#0c4a6e',
         },
+        // Warm cream/sepia palette for eye-friendly dark mode reading
+        cream: {
+          100: '#E8DCC8', // Primary reading text
+          200: '#D5CBBA', // Secondary text, labels
+          300: '#C9BDAB', // Tertiary text, hints
+          400: '#A89F8F', // Muted/disabled text
+          500: '#8A8175', // Subtle/faint text
+        },
       },
       fontFamily: {
         serif: ['Georgia', 'Cambria', 'Times New Roman', 'serif'],

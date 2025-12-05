@@ -298,7 +298,7 @@
   }
 
   .panel-title {
-    color: #e0e0e0;
+    color: #E8DCC8;
   }
 
   .minimize-btn {
@@ -331,15 +331,15 @@
   .current-word .label,
   .progress-count .label,
   .time-remaining {
-    color: #888;
+    color: #A89F8F;
   }
 
   .current-word .word {
-    color: #e0e0e0;
+    color: #E8DCC8;
   }
 
   .progress-count .count {
-    color: #bbb;
+    color: #C9BDAB;
   }
 
   .progress-percent {
@@ -351,7 +351,7 @@
   }
 
   .cancel-btn {
-    color: #aaa;
+    color: #C9BDAB;
     border-color: rgba(255, 255, 255, 0.15);
   }
 

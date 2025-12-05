@@ -93,7 +93,7 @@ const LibraryPage: React.FC = () => {
   if (loading && books.length === 0) {
     return (
       <div className="h-full flex items-center justify-center">
-        <div className="text-gray-500 dark:text-gray-400">Loading books...</div>
+        <div className="text-gray-500 dark:text-cream-300">Loading books...</div>
       </div>
     );
   }
@@ -101,7 +101,7 @@ const LibraryPage: React.FC = () => {
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Your Library</h2>
+        <h2 className="text-2xl font-bold text-gray-800 dark:text-cream-100">Your Library</h2>
         <button
           onClick={handleImportBook}
           disabled={importing}
@@ -130,10 +130,10 @@ const LibraryPage: React.FC = () => {
       {books.length === 0 ? (
         <div className="text-center py-12">
           <div className="text-6xl mb-4">📖</div>
-          <h3 className="text-xl font-medium text-gray-700 dark:text-gray-300 mb-2">
+          <h3 className="text-xl font-medium text-gray-700 dark:text-cream-200 mb-2">
             No books yet
           </h3>
-          <p className="text-gray-500 dark:text-gray-400 mb-4">
+          <p className="text-gray-500 dark:text-cream-300 mb-4">
             Import a JSON or PDF book to start reading
           </p>
           <button onClick={handleImportBook} className="btn-primary">
@@ -154,7 +154,7 @@ const LibraryPage: React.FC = () => {
               <h3 className="font-medium text-gray-800 dark:text-white line-clamp-2 mb-2">
                 {book.title}
               </h3>
-              <p className="text-sm text-gray-500 dark:text-gray-300">
+              <p className="text-sm text-gray-500 dark:text-cream-200">
                 {book.total_pages} pages
               </p>
               <button
@@ -185,7 +185,7 @@ const LibraryPage: React.FC = () => {
                 {' '}OCR will be used for scanned pages if available.
               </div>
             )}
-            <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
+            <p className="text-sm text-gray-600 dark:text-cream-200 mb-4">
               Select the language of the book:
             </p>
             <select
@@ -200,7 +200,7 @@ const LibraryPage: React.FC = () => {
                 </option>
               ))}
             </select>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+            <p className="text-xs text-gray-500 dark:text-cream-300 mb-4">
               {selectedLanguage !== 'en' && (
                 <>English translations will be shown for definitions and sentences.</>
               )}
@@ -212,7 +212,7 @@ const LibraryPage: React.FC = () => {
               <div className="bg-gray-100 dark:bg-gray-700 p-3 rounded-lg mb-4">
                 <div className="flex items-center gap-2">
                   <span className="animate-spin text-lg">⏳</span>
-                  <span className="text-sm text-gray-600 dark:text-gray-300">{importProgress}</span>
+                  <span className="text-sm text-gray-600 dark:text-cream-200">{importProgress}</span>
                 </div>
               </div>
             )}
@@ -220,7 +220,7 @@ const LibraryPage: React.FC = () => {
               <button
                 onClick={handleCancelImport}
                 disabled={importing}
-                className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg disabled:opacity-50"
+                className="px-4 py-2 text-gray-600 dark:text-cream-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg disabled:opacity-50"
               >
                 Cancel
               </button>

@@ -616,7 +616,7 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
             grammarLoading ? (
               <div className="text-center py-8">
                 <div className="text-4xl animate-pulse mb-2">📚</div>
-                <div className="text-gray-500 dark:text-gray-400">
+                <div className="text-gray-500 dark:text-cream-300">
                   Analyzing grammar structure...
                 </div>
               </div>
@@ -628,13 +628,13 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
               <>
                 {/* Grammar Structure */}
                 <section>
-                  <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                  <h3 className="font-semibold text-gray-700 dark:text-cream-200 mb-2 flex items-center gap-2">
                     🏗️ Grammar Structure
                     <span className="px-2 py-0.5 text-xs rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300">
                       {grammarData.structure.type}
                     </span>
                   </h3>
-                  <p className="text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
+                  <p className="text-gray-600 dark:text-cream-200 bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
                     {grammarData.structure.description}
                   </p>
                 </section>
@@ -642,7 +642,7 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
                 {/* Parts of Speech - Color coded words from sentence */}
                 {grammarData.partsOfSpeech.length > 0 && (
                   <section>
-                    <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    <h3 className="font-semibold text-gray-700 dark:text-cream-200 mb-2">
                       🏷️ Parts of Speech
                     </h3>
                     <div className="flex flex-wrap gap-2 bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
@@ -657,7 +657,7 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
                       ))}
                     </div>
                     {/* POS Legend */}
-                    <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
+                    <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500 dark:text-cream-300">
                       <span><span className="word-pos-noun">●</span> noun</span>
                       <span><span className="word-pos-verb">●</span> verb</span>
                       <span><span className="word-pos-adjective">●</span> adj</span>
@@ -670,27 +670,27 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
 
                 {/* Rule Explanation */}
                 <section>
-                  <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  <h3 className="font-semibold text-gray-700 dark:text-cream-200 mb-2">
                     📖 Rule Explanation
                   </h3>
-                  <p className="text-gray-600 dark:text-gray-300 bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg">
+                  <p className="text-gray-600 dark:text-cream-200 bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg">
                     {grammarData.ruleExplanation}
                   </p>
                 </section>
 
                 {/* Context Analysis */}
                 <section>
-                  <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  <h3 className="font-semibold text-gray-700 dark:text-cream-200 mb-2">
                     🎯 Why This Structure?
                   </h3>
-                  <p className="text-gray-600 dark:text-gray-300 bg-purple-50 dark:bg-purple-900/30 p-3 rounded-lg">
+                  <p className="text-gray-600 dark:text-cream-200 bg-purple-50 dark:bg-purple-900/30 p-3 rounded-lg">
                     {grammarData.contextAnalysis}
                   </p>
                 </section>
 
                 {/* Pattern Template */}
                 <section>
-                  <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  <h3 className="font-semibold text-gray-700 dark:text-cream-200 mb-2">
                     📝 Reusable Pattern
                   </h3>
                   <div className="bg-gray-800 dark:bg-gray-900 text-green-400 p-3 rounded-lg font-mono text-sm overflow-x-auto">
@@ -701,7 +701,7 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
                 {/* Examples */}
                 {grammarData.examples.length > 0 && (
                   <section>
-                    <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    <h3 className="font-semibold text-gray-700 dark:text-cream-200 mb-2">
                       💡 Example Sentences
                     </h3>
                     <div className="space-y-2">
@@ -727,9 +727,9 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
                               {example.complexity}
                             </span>
                           </div>
-                          <p className="text-gray-700 dark:text-gray-300">{example.sentence}</p>
+                          <p className="text-gray-700 dark:text-cream-200">{example.sentence}</p>
                           {example.translation && (
-                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 italic">
+                            <p className="text-sm text-gray-500 dark:text-cream-300 mt-1 italic">
                               {example.translation}
                             </p>
                           )}
@@ -742,12 +742,12 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
                 {/* Common Mistakes */}
                 {grammarData.commonMistakes.length > 0 && (
                   <section>
-                    <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    <h3 className="font-semibold text-gray-700 dark:text-cream-200 mb-2">
                       ⚠️ Common Mistakes
                     </h3>
                     <ul className="space-y-2 bg-orange-50 dark:bg-orange-900/30 p-3 rounded-lg">
                       {grammarData.commonMistakes.map((mistake, idx) => (
-                        <li key={idx} className="flex items-start gap-2 text-gray-600 dark:text-gray-300">
+                        <li key={idx} className="flex items-start gap-2 text-gray-600 dark:text-cream-200">
                           <span className="text-orange-500">✗</span>
                           <span>{mistake}</span>
                         </li>
@@ -758,15 +758,15 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
 
                 {/* Practice Task */}
                 <section>
-                  <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  <h3 className="font-semibold text-gray-700 dark:text-cream-200 mb-2">
                     ✏️ Practice Task
                   </h3>
                   <div className="bg-teal-50 dark:bg-teal-900/30 p-3 rounded-lg">
-                    <p className="text-gray-700 dark:text-gray-300 mb-2">
+                    <p className="text-gray-700 dark:text-cream-200 mb-2">
                       {grammarData.practiceTask.instruction}
                     </p>
                     {grammarData.practiceTask.template && (
-                      <div className="bg-white dark:bg-gray-800 p-2 rounded border-2 border-dashed border-teal-300 dark:border-teal-600 font-mono text-sm text-gray-600 dark:text-gray-400">
+                      <div className="bg-white dark:bg-gray-800 p-2 rounded border-2 border-dashed border-teal-300 dark:border-teal-600 font-mono text-sm text-gray-600 dark:text-cream-300">
                         {grammarData.practiceTask.template}
                       </div>
                     )}
@@ -774,14 +774,14 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
                 </section>
               </>
             ) : (
-              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+              <div className="text-center py-8 text-gray-500 dark:text-cream-300">
                 Select a word or phrase to analyze grammar
               </div>
             )
           ) : wordData.loading ? (
             <div className="text-center py-8">
               <div className="text-4xl animate-pulse mb-2">🔍</div>
-              <div className="text-gray-500 dark:text-gray-400">
+              <div className="text-gray-500 dark:text-cream-300">
                 {selectedWord.isPhrase ? 'Looking up phrase...' : 'Looking up word...'}
               </div>
             </div>
@@ -801,7 +801,7 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
             <>
               {/* Definition / Phrase Meaning */}
               <section>
-                <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                <h3 className="font-semibold text-gray-700 dark:text-cream-200 mb-2">
                   {selectedWord.isPhrase ? '📖 Phrase Meaning' : '📖 Definition'}
                 </h3>
                 {/* English translation of word/phrase (for non-English books) - shown prominently */}
@@ -811,7 +811,7 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
                     <span>{selectedWord.isPhrase ? wordData.phraseTranslation : wordData.wordTranslation}</span>
                   </p>
                 )}
-                <p className="text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
+                <p className="text-gray-600 dark:text-cream-200 bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
                   {wordData.definition || (selectedWord.isPhrase ? 'No phrase meaning available' : 'No definition available')}
                 </p>
                 {/* Retry button for rate limit errors */}
@@ -833,7 +833,7 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
               {/* Original Sentence */}
               <section>
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-semibold text-gray-700 dark:text-gray-300">📝 Original Sentence</h3>
+                  <h3 className="font-semibold text-gray-700 dark:text-cream-200">📝 Original Sentence</h3>
                   <div className="flex items-center gap-0.5">
                     <PronunciationButton
                       text={normalizeForTTS(selectedWord.sentence)}
@@ -864,7 +864,7 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
                           ? 'bg-green-500 text-white hover:bg-green-600'
                           : syllableModeLoading
                             ? 'bg-gray-300 dark:bg-gray-600 text-gray-500 cursor-wait'
-                            : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700'
+                            : 'text-gray-500 dark:text-cream-300 hover:text-gray-700 dark:hover:text-cream-100 hover:bg-gray-100 dark:hover:bg-gray-700'
                       }`}
                       title={syllableModeEnabled ? 'Hide syllables' : 'Show syllables & IPA'}
                     >
@@ -906,12 +906,12 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
                             {/* Word */}
                             <span className={isHighlighted
                               ? 'text-red-600 dark:text-red-400 font-semibold not-italic'
-                              : 'text-gray-600 dark:text-gray-300'
+                              : 'text-gray-600 dark:text-cream-200'
                             }>
                               {token}
                             </span>
                             {/* Syllables below */}
-                            <span className="text-[10px] text-gray-500 dark:text-gray-400 leading-none">
+                            <span className="text-[10px] text-gray-500 dark:text-cream-300 leading-none">
                               {data?.syllables || '\u00A0'}
                             </span>
                           </div>
@@ -921,7 +921,7 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
                   </div>
                 ) : (
                   <p
-                    className="text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 p-3 rounded-lg italic cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+                    className="text-gray-600 dark:text-cream-200 bg-gray-50 dark:bg-gray-700 p-3 rounded-lg italic cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
                     onClick={() => playText(normalizeForTTS(selectedWord.sentence), bookLanguage, AudioType.SENTENCE)}
                     title="Click to hear sentence"
                   >
@@ -941,7 +941,7 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
               {!selectedWord.isPhrase && wordData.simplifiedSentence && (
                 <section>
                   <div className="flex items-center justify-between mb-2">
-                    <h3 className="font-semibold text-gray-700 dark:text-gray-300">✨ Simplified</h3>
+                    <h3 className="font-semibold text-gray-700 dark:text-cream-200">✨ Simplified</h3>
                     <div className="flex items-center gap-0.5">
                       <PronunciationButton
                         text={wordData.simplifiedSentence}
@@ -966,7 +966,7 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
                     </div>
                   </div>
                   <p
-                    className="text-gray-600 dark:text-gray-300 bg-green-50 dark:bg-green-900/30 p-3 rounded-lg cursor-pointer hover:bg-green-100 dark:hover:bg-green-900/50 transition-colors"
+                    className="text-gray-600 dark:text-cream-200 bg-green-50 dark:bg-green-900/30 p-3 rounded-lg cursor-pointer hover:bg-green-100 dark:hover:bg-green-900/50 transition-colors"
                     onClick={() => playText(wordData.simplifiedSentence!, bookLanguage, AudioType.SIMPLIFIED)}
                     title="Click to hear simplified sentence"
                   >
@@ -987,7 +987,7 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
               {/* Other Occurrences - only for single words */}
               {!selectedWord.isPhrase && wordData.occurrences && wordData.occurrences.length > 1 && (
                 <section>
-                  <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  <h3 className="font-semibold text-gray-700 dark:text-cream-200 mb-2">
                     📍 Other Occurrences ({wordData.occurrences.length})
                   </h3>
                   <div className="space-y-2 max-h-48 overflow-auto custom-scrollbar">
@@ -1000,7 +1000,7 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
                             onClose();
                           }
                         }}
-                        className="w-full text-left text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 p-2 rounded cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+                        className="w-full text-left text-sm text-gray-600 dark:text-cream-200 bg-gray-50 dark:bg-gray-700 p-2 rounded cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
                       >
                         <span className="text-xs text-primary-600 dark:text-primary-400 font-medium">Page {occ.page} →</span>
                         <p className="line-clamp-2 mt-1">"{occ.sentence}"</p>
@@ -1013,15 +1013,15 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
               {/* Tatoeba Examples - only for single words */}
               {!selectedWord.isPhrase && settings.tatoeba_enabled && wordData.tatoebaExamples && wordData.tatoebaExamples.length > 0 && (
                 <section>
-                  <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  <h3 className="font-semibold text-gray-700 dark:text-cream-200 mb-2">
                     🌐 Example Sentences (Tatoeba)
                   </h3>
                   <div className="space-y-2 max-h-48 overflow-auto">
                     {wordData.tatoebaExamples.slice(0, 5).map((ex, idx) => (
                       <div key={idx} className="text-sm bg-blue-50 dark:bg-blue-900/30 p-2 rounded">
-                        <p className="text-gray-700 dark:text-gray-300">{ex.sentence}</p>
+                        <p className="text-gray-700 dark:text-cream-200">{ex.sentence}</p>
                         {ex.translation && (
-                          <p className="text-gray-500 dark:text-gray-400 text-xs mt-1">{ex.translation}</p>
+                          <p className="text-gray-500 dark:text-cream-300 text-xs mt-1">{ex.translation}</p>
                         )}
                       </div>
                     ))}

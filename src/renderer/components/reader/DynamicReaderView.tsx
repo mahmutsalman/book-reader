@@ -783,7 +783,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
 
   // Render text with clickable words and ready indicators
   const renderText = (text: string) => {
-    if (!text) return <span className="text-gray-400 dark:text-gray-500 italic">Empty page</span>;
+    if (!text) return <span className="text-gray-400 dark:text-cream-400 italic">Empty page</span>;
 
     // Split by words while preserving whitespace and newlines
     const parts = text.split(/(\s+)/);
@@ -877,11 +877,11 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
         <div className="flex items-center gap-4">
           <button
             onClick={() => navigate('/library')}
-            className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+            className="text-gray-500 dark:text-cream-300 hover:text-gray-700 dark:hover:text-cream-100"
           >
             ← Back
           </button>
-          <div className="text-sm text-gray-600 dark:text-gray-300 max-w-md truncate">
+          <div className="text-sm text-gray-600 dark:text-cream-200 max-w-md truncate">
             {book.title}
           </div>
         </div>
@@ -892,7 +892,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
             <div className="relative">
               <button
                 onClick={() => setShowChapterMenu(!showChapterMenu)}
-                className="text-sm text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100 flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+                className="text-sm text-gray-600 dark:text-cream-200 hover:text-gray-800 dark:hover:text-cream-100 flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
               >
                 <span className="max-w-xs truncate">
                   {reflowState.chapterName || 'Select Chapter'}
@@ -915,11 +915,11 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
                           setShowChapterMenu(false);
                         }}
                         className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 ${
-                          reflowState.chapterName === chapter.name ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400' : 'text-gray-700 dark:text-gray-300'
+                          reflowState.chapterName === chapter.name ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400' : 'text-gray-700 dark:text-cream-200'
                         }`}
                       >
                         <div className="truncate">{chapter.name}</div>
-                        <div className="text-xs text-gray-400 dark:text-gray-500">Page {chapter.startPage}</div>
+                        <div className="text-xs text-gray-400 dark:text-cream-400">Page {chapter.startPage}</div>
                       </button>
                     ))}
                   </div>
@@ -929,7 +929,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
           )}
 
           {/* Original page indicator */}
-          <span className="text-xs text-gray-400 dark:text-gray-500">
+          <span className="text-xs text-gray-400 dark:text-cream-400">
             Book page: {reflowState.originalPage}
           </span>
 
@@ -939,7 +939,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
             className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200 ${
               isGrammarMode
                 ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30 ring-2 ring-indigo-400'
-                : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/30'
+                : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-cream-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/30'
             }`}
             title={isGrammarMode ? 'Grammar Mode ON - Click to disable' : 'Enable Grammar Mode'}
           >
@@ -970,7 +970,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
 
           {/* Zoom control */}
           <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500 dark:text-gray-400">Zoom:</span>
+            <span className="text-xs text-gray-500 dark:text-cream-300">Zoom:</span>
             <input
               type="range"
               min={ZOOM_LEVELS.MIN}
@@ -980,7 +980,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
               onChange={(e) => setZoom(parseFloat(e.target.value))}
               className="w-24 h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer accent-primary-600"
             />
-            <span className="text-xs text-gray-600 dark:text-gray-400 w-10">
+            <span className="text-xs text-gray-600 dark:text-cream-300 w-10">
               {zoom.toFixed(1)}x
             </span>
           </div>
@@ -991,7 +991,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
       <div className="flex-1 overflow-x-auto overflow-y-hidden p-8">
         <div
           ref={containerRef}
-          className="h-full mx-auto bg-white dark:bg-gray-800 rounded-xl shadow-sm dark:shadow-gray-900/50 p-8 reader-text overflow-y-auto text-gray-900 dark:text-gray-100"
+          className="h-full mx-auto bg-white dark:bg-gray-800 rounded-xl shadow-sm dark:shadow-gray-900/50 p-8 reader-text overflow-y-auto text-gray-900 dark:text-cream-100"
           style={{
             fontSize: `${fontSize}px`,
             lineHeight: REFLOW_SETTINGS.LINE_HEIGHT,
@@ -1013,7 +1013,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
               style={{ width: `${progressPercent}%` }}
             />
           </div>
-          <div className="text-xs text-gray-400 dark:text-gray-500 text-center mt-1">
+          <div className="text-xs text-gray-400 dark:text-cream-400 text-center mt-1">
             View {reflowState.currentPageIndex + 1} of {reflowState.totalPages} • {Math.round(progressPercent)}% complete
           </div>
         </div>
@@ -1027,7 +1027,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
             ← Previous
           </button>
 
-          <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+          <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-cream-300">
             <span>View</span>
             <span className="font-medium">{reflowState.currentPageIndex + 1}</span>
             <span>of</span>

@@ -164,7 +164,7 @@ const SettingsPage: React.FC = () => {
   if (loading) {
     return (
       <div className="p-6 max-w-2xl mx-auto">
-        <div className="text-center py-12 text-gray-500 dark:text-gray-400">Loading settings...</div>
+        <div className="text-center py-12 text-gray-500 dark:text-cream-300">Loading settings...</div>
       </div>
     );
   }
@@ -177,17 +177,17 @@ const SettingsPage: React.FC = () => {
 
   return (
     <div className="p-6 max-w-2xl mx-auto">
-      <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-6">Settings</h2>
+      <h2 className="text-2xl font-bold text-gray-800 dark:text-cream-100 mb-6">Settings</h2>
 
       {/* Appearance Settings */}
       <div className="card mb-6">
-        <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">
+        <h3 className="text-lg font-semibold text-gray-800 dark:text-cream-100 mb-4">
           🎨 Appearance
         </h3>
 
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-cream-200 mb-2">
               Theme
             </label>
             <div className="inline-flex rounded-lg border border-gray-300 dark:border-gray-600 p-1 bg-gray-100 dark:bg-gray-700">
@@ -198,7 +198,7 @@ const SettingsPage: React.FC = () => {
                   className={`px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center gap-2 ${
                     settings.theme === option.value
                       ? 'bg-primary-600 text-white shadow-sm'
-                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      : 'text-gray-700 dark:text-cream-200 hover:bg-gray-200 dark:hover:bg-gray-600'
                   }`}
                 >
                   <span>{option.icon}</span>
@@ -206,7 +206,7 @@ const SettingsPage: React.FC = () => {
                 </button>
               ))}
             </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+            <p className="text-xs text-gray-500 dark:text-cream-300 mt-2">
               Choose your preferred color scheme
             </p>
           </div>
@@ -215,14 +215,14 @@ const SettingsPage: React.FC = () => {
 
       {/* AI Provider Settings */}
       <div className="card mb-6">
-        <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">
+        <h3 className="text-lg font-semibold text-gray-800 dark:text-cream-100 mb-4">
           🤖 AI Provider
         </h3>
 
         <div className="space-y-4">
           {/* Provider Toggle */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-cream-200 mb-2">
               Select AI Provider
             </label>
             <div className="inline-flex rounded-lg border border-gray-300 dark:border-gray-600 p-1 bg-gray-100 dark:bg-gray-700">
@@ -231,7 +231,7 @@ const SettingsPage: React.FC = () => {
                 className={`px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center gap-2 ${
                   settings.ai_provider === 'local'
                     ? 'bg-primary-600 text-white shadow-sm'
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                    : 'text-gray-700 dark:text-cream-200 hover:bg-gray-200 dark:hover:bg-gray-600'
                 }`}
               >
                 <span>💻</span>
@@ -242,14 +242,14 @@ const SettingsPage: React.FC = () => {
                 className={`px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center gap-2 ${
                   settings.ai_provider === 'groq'
                     ? 'bg-primary-600 text-white shadow-sm'
-                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                    : 'text-gray-700 dark:text-cream-200 hover:bg-gray-200 dark:hover:bg-gray-600'
                 }`}
               >
                 <span>☁️</span>
                 <span>Cloud AI (Groq)</span>
               </button>
             </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+            <p className="text-xs text-gray-500 dark:text-cream-300 mt-2">
               {settings.ai_provider === 'local'
                 ? 'Uses LM Studio running locally on your computer'
                 : 'Uses Groq\'s free cloud API for enhanced AI features with example sentences and grammar explanations'}
@@ -259,13 +259,13 @@ const SettingsPage: React.FC = () => {
           {/* Local AI Settings */}
           {settings.ai_provider === 'local' && (
             <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
-              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+              <h4 className="text-sm font-medium text-gray-700 dark:text-cream-200 mb-3">
                 LM Studio Settings
               </h4>
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-cream-200 mb-1">
                     LM Studio URL
                   </label>
                   <input
@@ -273,9 +273,9 @@ const SettingsPage: React.FC = () => {
                     value={settings.lm_studio_url}
                     onChange={(e) => updateSetting('lm_studio_url', e.target.value)}
                     placeholder="http://localhost:1234"
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-cream-100"
                   />
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  <p className="text-xs text-gray-500 dark:text-cream-300 mt-1">
                     Default: http://localhost:1234
                   </p>
                 </div>
@@ -302,13 +302,13 @@ const SettingsPage: React.FC = () => {
                 {/* Model Selection */}
                 {availableModels.length > 0 && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-cream-200 mb-1">
                       AI Model
                     </label>
                     <select
                       value={settings.lm_studio_model}
                       onChange={(e) => updateSetting('lm_studio_model', e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-cream-100"
                     >
                       {availableModels.map((model) => (
                         <option key={model} value={model}>
@@ -316,14 +316,14 @@ const SettingsPage: React.FC = () => {
                         </option>
                       ))}
                     </select>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    <p className="text-xs text-gray-500 dark:text-cream-300 mt-1">
                       Select the model to use for word definitions and sentence simplification
                     </p>
                   </div>
                 )}
 
                 {settings.lm_studio_model !== 'default' && availableModels.length === 0 && (
-                  <div className="text-sm text-gray-500 dark:text-gray-400">
+                  <div className="text-sm text-gray-500 dark:text-cream-300">
                     Current model: <span className="font-medium">{settings.lm_studio_model}</span>
                     <br />
                     <span className="text-xs">Test connection to see available models</span>
@@ -336,7 +336,7 @@ const SettingsPage: React.FC = () => {
           {/* Groq Cloud AI Settings */}
           {settings.ai_provider === 'groq' && (
             <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
-              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+              <h4 className="text-sm font-medium text-gray-700 dark:text-cream-200 mb-3">
                 Groq Cloud AI Settings
               </h4>
 
@@ -362,7 +362,7 @@ const SettingsPage: React.FC = () => {
                 )}
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-cream-200 mb-1">
                     API Key
                   </label>
                   <input
@@ -370,21 +370,21 @@ const SettingsPage: React.FC = () => {
                     value={settings.groq_api_key}
                     onChange={(e) => updateSetting('groq_api_key', e.target.value)}
                     placeholder="gsk_..."
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-cream-100"
                   />
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  <p className="text-xs text-gray-500 dark:text-cream-300 mt-1">
                     Your API key is stored locally and never shared
                   </p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-cream-200 mb-1">
                     Model
                   </label>
                   <select
                     value={settings.groq_model}
                     onChange={(e) => updateSetting('groq_model', e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-cream-100"
                   >
                     {GROQ_MODELS.map((model) => (
                       <option key={model.value} value={model.value}>
@@ -392,7 +392,7 @@ const SettingsPage: React.FC = () => {
                       </option>
                     ))}
                   </select>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  <p className="text-xs text-gray-500 dark:text-cream-300 mt-1">
                     Llama 3.3 70B provides the best results for language learning
                   </p>
                 </div>
@@ -435,13 +435,13 @@ const SettingsPage: React.FC = () => {
 
       {/* Python Server Settings */}
       <div className="card mb-6">
-        <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">
+        <h3 className="text-lg font-semibold text-gray-800 dark:text-cream-100 mb-4">
           🔊 Pronunciation Server
         </h3>
 
         <div className="space-y-4">
           <div>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
+            <p className="text-sm text-gray-500 dark:text-cream-300 mb-3">
               Python server for text-to-speech and IPA transcription
             </p>
           </div>
@@ -466,7 +466,7 @@ const SettingsPage: React.FC = () => {
           </div>
 
           {pythonStatus && (
-            <div className="text-sm text-gray-500 dark:text-gray-400">
+            <div className="text-sm text-gray-500 dark:text-cream-300">
               <div>Status: {pythonStatus.running ? 'Running' : 'Stopped'}</div>
               <div>URL: {pythonStatus.url}</div>
             </div>
@@ -475,15 +475,15 @@ const SettingsPage: React.FC = () => {
           {/* IPA Language Packages */}
           {pythonStatus?.ready && (
             <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-600">
-              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+              <h4 className="text-sm font-medium text-gray-700 dark:text-cream-200 mb-3">
                 IPA Pronunciation Packages
               </h4>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+              <p className="text-xs text-gray-500 dark:text-cream-300 mb-3">
                 Install language packages for accurate IPA transcription. Without a package, AI will be used as fallback.
               </p>
 
               {loadingIpaLanguages ? (
-                <div className="text-sm text-gray-500 dark:text-gray-400">Loading languages...</div>
+                <div className="text-sm text-gray-500 dark:text-cream-300">Loading languages...</div>
               ) : (
                 <div className="grid grid-cols-2 gap-2">
                   {ipaLanguages.map((lang) => (
@@ -496,7 +496,7 @@ const SettingsPage: React.FC = () => {
                       }`}
                     >
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                        <span className="text-sm font-medium text-gray-700 dark:text-cream-200">
                           {lang.name}
                         </span>
                         <span className="text-xs text-gray-400">({lang.code})</span>
@@ -540,7 +540,7 @@ const SettingsPage: React.FC = () => {
           {/* Slow Playback Speed */}
           <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-600">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-cream-200 mb-1">
                 Slow Playback Speed: {settings.slow_playback_speed.toFixed(2)}x
               </label>
               <input
@@ -556,7 +556,7 @@ const SettingsPage: React.FC = () => {
                 <span>0.25x</span>
                 <span>2.0x</span>
               </div>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+              <p className="text-xs text-gray-500 dark:text-cream-300 mt-1">
                 Speed for slow audio playback in word panel and pre-study notes
               </p>
             </div>
@@ -566,15 +566,15 @@ const SettingsPage: React.FC = () => {
 
       {/* Tatoeba Settings */}
       <div className="card mb-6">
-        <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">
+        <h3 className="text-lg font-semibold text-gray-800 dark:text-cream-100 mb-4">
           🌐 Tatoeba (Example Sentences)
         </h3>
 
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <div className="font-medium text-gray-700 dark:text-gray-300">Enable Tatoeba</div>
-              <div className="text-sm text-gray-500 dark:text-gray-400">
+              <div className="font-medium text-gray-700 dark:text-cream-200">Enable Tatoeba</div>
+              <div className="text-sm text-gray-500 dark:text-cream-300">
                 Show example sentences from Tatoeba database
               </div>
             </div>
@@ -591,13 +591,13 @@ const SettingsPage: React.FC = () => {
 
           {settings.tatoeba_enabled && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-cream-200 mb-1">
                 Language
               </label>
               <select
                 value={settings.tatoeba_language}
                 onChange={(e) => updateSetting('tatoeba_language', e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-cream-100"
               >
                 <option value="en">English</option>
                 <option value="es">Spanish</option>
@@ -613,13 +613,13 @@ const SettingsPage: React.FC = () => {
 
       {/* Reading Settings */}
       <div className="card mb-6">
-        <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">
+        <h3 className="text-lg font-semibold text-gray-800 dark:text-cream-100 mb-4">
           📖 Reading Preferences
         </h3>
 
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-cream-200 mb-1">
               Default Zoom: {settings.default_zoom.toFixed(1)}x
             </label>
             <input
@@ -634,13 +634,13 @@ const SettingsPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-cream-200 mb-1">
               Font Family
             </label>
             <select
               value={settings.font_family}
               onChange={(e) => updateSetting('font_family', e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-cream-100"
             >
               <option value="Georgia, serif">Georgia (Serif)</option>
               <option value="'Times New Roman', serif">Times New Roman</option>
@@ -650,7 +650,7 @@ const SettingsPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-cream-200 mb-1">
               Line Height: {settings.line_height.toFixed(1)}
             </label>
             <input
@@ -668,13 +668,13 @@ const SettingsPage: React.FC = () => {
 
       {/* Pre-Study Notes Settings */}
       <div className="card">
-        <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-4">
+        <h3 className="text-lg font-semibold text-gray-800 dark:text-cream-100 mb-4">
           📚 Pre-Study Notes
         </h3>
 
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-cream-200 mb-1">
               Views to Process: {settings.pre_study_view_count}
             </label>
             <input
@@ -686,25 +686,25 @@ const SettingsPage: React.FC = () => {
               onChange={(e) => updateSetting('pre_study_view_count', parseInt(e.target.value))}
               className="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer accent-primary-600"
             />
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            <p className="text-xs text-gray-500 dark:text-cream-300 mt-1">
               How many views ahead to include in pre-study notes
             </p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-cream-200 mb-1">
               Sentences per View
             </label>
             <select
               value={settings.pre_study_sentence_limit}
               onChange={(e) => updateSetting('pre_study_sentence_limit', parseInt(e.target.value))}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-cream-100"
             >
               <option value="0">All sentences</option>
               <option value="1">First sentence only (fastest)</option>
               <option value="2">First 2 sentences</option>
             </select>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            <p className="text-xs text-gray-500 dark:text-cream-300 mt-1">
               Limit sentences for faster testing or quick previews
             </p>
           </div>
@@ -740,10 +740,10 @@ const SettingsPage: React.FC = () => {
                       1
                     </div>
                     <div>
-                      <p className="font-medium text-gray-800 dark:text-gray-200">
+                      <p className="font-medium text-gray-800 dark:text-cream-100">
                         Create a free Groq account
                       </p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                      <p className="text-sm text-gray-500 dark:text-cream-300">
                         Sign up with Google or email - it's completely free
                       </p>
                     </div>
@@ -805,7 +805,7 @@ const SettingsPage: React.FC = () => {
                       ✓
                     </div>
                     <div>
-                      <p className="font-medium text-gray-800 dark:text-gray-200">
+                      <p className="font-medium text-gray-800 dark:text-cream-100">
                         Sign in with Google or email
                       </p>
                     </div>
@@ -816,10 +816,10 @@ const SettingsPage: React.FC = () => {
                       2
                     </div>
                     <div>
-                      <p className="font-medium text-gray-800 dark:text-gray-200">
+                      <p className="font-medium text-gray-800 dark:text-cream-100">
                         Click "Create API Key"
                       </p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                      <p className="text-sm text-gray-500 dark:text-cream-300">
                         Give it any name (e.g., "BookReader")
                       </p>
                     </div>
@@ -830,10 +830,10 @@ const SettingsPage: React.FC = () => {
                       3
                     </div>
                     <div>
-                      <p className="font-medium text-gray-800 dark:text-gray-200">
+                      <p className="font-medium text-gray-800 dark:text-cream-100">
                         Copy the API key (starts with "gsk_")
                       </p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                      <p className="text-sm text-gray-500 dark:text-cream-300">
                         Click the copy button next to your new key
                       </p>
                     </div>
