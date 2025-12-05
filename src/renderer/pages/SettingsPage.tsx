@@ -7,6 +7,7 @@ type ThemeOption = AppSettings['theme'];
 
 const GROQ_MODELS = [
   { value: 'llama-3.3-70b-versatile', label: 'Llama 3.3 70B (Recommended)' },
+  { value: 'qwen/qwen3-32b', label: 'Qwen3 32B (100+ languages - Best for Russian)' },
   { value: 'llama-3.1-8b-instant', label: 'Llama 3.1 8B (Faster)' },
   { value: 'mixtral-8x7b-32768', label: 'Mixtral 8x7B' },
   { value: 'gemma2-9b-it', label: 'Gemma 2 9B' },

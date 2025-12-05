@@ -360,10 +360,19 @@ Simplified:`;
 
     // Non-English: simplify in source language AND provide English translations
     const languageName = this.getLanguageName(language);
-    const prompt = `For this ${languageName} sentence, provide:
-1. A simplified version in ${languageName} using easier words (keep it in ${languageName}, do NOT translate to English)
-2. English translation of the original sentence
-3. English translation of the simplified sentence
+    const prompt = `For this ${languageName} sentence, provide THREE things:
+
+1. SIMPLIFIED: A simplified version using easier ${languageName} words
+   - This MUST be in ${languageName}, NOT in English
+   - Replace difficult ${languageName} words with simpler ${languageName} synonyms
+   - Example for German: "Er war sehr erschöpft" → "Er war sehr müde"
+   - Example for Russian: "Он был чрезвычайно утомлён" → "Он был очень уставший"
+
+2. ORIGINAL_ENGLISH: English translation of the original sentence
+
+3. SIMPLIFIED_ENGLISH: English translation of the simplified sentence
+
+IMPORTANT: The SIMPLIFIED line must contain ${languageName} text only, NOT English.
 
 Rules for simplification:
 - Replace difficult words with easier ${languageName} synonyms
@@ -374,7 +383,7 @@ Rules for simplification:
 Original: "${sentence}"
 
 Format your response EXACTLY like this:
-SIMPLIFIED: [simplified version in ${languageName}]
+SIMPLIFIED: [simplified ${languageName} sentence - NOT English]
 ORIGINAL_ENGLISH: [English translation of original]
 SIMPLIFIED_ENGLISH: [English translation of simplified]`;
 
@@ -389,7 +398,16 @@ SIMPLIFIED_ENGLISH: [English translation of simplified]`;
     const sentenceTranslation = origEngMatch ? origEngMatch[1].trim() : undefined;
     const simplifiedTranslation = simpEngMatch ? simpEngMatch[1].trim() : undefined;
 
-    // If parsing failed (no match), try to extract the non-English sentence
+    // Validate that SIMPLIFIED is actually in the target language, not English
+    if (language !== 'en' && simpMatch && this.isLikelyEnglish(simplified)) {
+      console.warn(`[LM Studio] SIMPLIFIED appears to be English for ${language} book, extracting non-English text`);
+      const extracted = this.extractNonEnglishSentence(response, language);
+      if (extracted && extracted !== simplified && !this.isLikelyEnglish(extracted)) {
+        simplified = extracted;
+      }
+    }
+
+    // If parsing failed completely, try to extract the non-English sentence
     if (!simpMatch) {
       simplified = this.extractNonEnglishSentence(response, language);
     }
@@ -488,6 +506,34 @@ Simplified ${languageName} sentence:`;
 
     // Ultimate fallback: return first line
     return lines[0] || response;
+  }
+
+  /**
+   * Detect if text is likely English based on common English words.
+   * Used to validate that non-English simplified sentences aren't accidentally English.
+   */
+  private isLikelyEnglish(text: string): boolean {
+    const words = text.toLowerCase().split(/\s+/);
+    const englishWords = new Set([
+      'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+      'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should',
+      'may', 'might', 'must', 'shall', 'can', 'need', 'dare', 'ought',
+      'with', 'from', 'into', 'onto', 'upon', 'about', 'against', 'between',
+      'this', 'that', 'these', 'those', 'their', 'them', 'they', 'he', 'she', 'it',
+      'and', 'or', 'but', 'if', 'then', 'else', 'when', 'where', 'why', 'how',
+      'took', 'went', 'came', 'made', 'said', 'got', 'put', 'let', 'get',
+      'morning', 'next', 'parents', 'children', 'kids', 'deep', 'woods', 'forest'
+    ]);
+
+    let englishCount = 0;
+    for (const word of words) {
+      if (englishWords.has(word)) {
+        englishCount++;
+      }
+    }
+
+    // If more than 30% of words are common English words, likely English
+    return words.length > 0 && (englishCount / words.length) > 0.3;
   }
 
   async getWordEquivalent(
