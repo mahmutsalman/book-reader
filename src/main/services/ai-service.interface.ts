@@ -5,6 +5,7 @@
  */
 
 import type { PreStudyWordEntry } from '../../shared/types/pre-study-notes.types';
+import type { GrammarAnalysis } from '../../shared/types/grammar.types';
 
 export interface AIServiceInterface {
   /**
@@ -110,4 +111,14 @@ export interface AIServiceInterface {
     grammarTopicsByLevel: { a1: string; a2: string; b1: string; b2: string },
     enhanced?: boolean
   ): Promise<PreStudyWordEntry>;
+
+  /**
+   * Get comprehensive grammar analysis for a word or phrase in context
+   * Provides deep grammatical explanation including structure, rules, examples, and practice
+   */
+  getGrammarAnalysis(
+    text: string,
+    sentence: string,
+    language: string
+  ): Promise<GrammarAnalysis>;
 }

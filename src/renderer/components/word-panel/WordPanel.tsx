@@ -3,6 +3,7 @@ import { useSettings } from '../../context/SettingsContext';
 import type { CachedWordData } from '../../../shared/types/deferred-word.types';
 import { getWordBoundaryPattern } from '../../../shared/utils/text-utils';
 import type { BookLanguage } from '../../../shared/types';
+import type { GrammarAnalysis } from '../../../shared/types/grammar.types';
 import PronunciationButton from './PronunciationButton';
 import LoopPlayButton from './LoopPlayButton';
 import SlowLoopPlayButton from './SlowLoopPlayButton';
@@ -25,6 +26,7 @@ interface WordPanelProps {
   bookLanguage?: BookLanguage;
   onNavigateToPage?: (page: number) => void;
   preloadedData?: CachedWordData | null;
+  isGrammarMode?: boolean;
 }
 
 interface WordData {
@@ -63,13 +65,18 @@ const normalizeForTTS = (text: string): string => {
     .trim();
 };
 
-const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bookId, bookLanguage = 'en', onNavigateToPage, preloadedData }) => {
+const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bookId, bookLanguage = 'en', onNavigateToPage, preloadedData, isGrammarMode = false }) => {
   const { settings } = useSettings();
   const { preloadAudio, getAudio, setAudio } = useAudioCache();
   const { playAudio, stop: stopAudio, isLoading: isLoadingAudio, setIsLoading } = useAudioPlayer();
   const [wordData, setWordData] = useState<WordData>({ loading: false });
   const isNonEnglish = bookLanguage !== 'en';
   const [saved, setSaved] = useState(false);
+
+  // Grammar mode state
+  const [grammarData, setGrammarData] = useState<GrammarAnalysis | null>(null);
+  const [grammarLoading, setGrammarLoading] = useState(false);
+  const [grammarError, setGrammarError] = useState<string | null>(null);
 
   // Syllable mode state
   const [syllableModeEnabled, setSyllableModeEnabled] = useState(false);
@@ -227,6 +234,49 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
     setSyllableModeLoading(false);
     setSentenceWordData(new Map());
   }, [selectedWord?.word, selectedWord?.sentence]);
+
+  // Fetch grammar analysis when in grammar mode
+  useEffect(() => {
+    if (!isGrammarMode || !selectedWord || !isOpen) {
+      setGrammarData(null);
+      setGrammarError(null);
+      return;
+    }
+
+    const fetchGrammarAnalysis = async () => {
+      setGrammarLoading(true);
+      setGrammarError(null);
+
+      try {
+        const result = await window.electronAPI?.ai.getGrammarAnalysis(
+          selectedWord.word,
+          selectedWord.sentence,
+          bookLanguage
+        );
+
+        if (result?.success) {
+          setGrammarData({
+            partsOfSpeech: result.partsOfSpeech || [],
+            structure: result.structure || { type: 'Unknown', description: 'No structure analysis available' },
+            ruleExplanation: result.ruleExplanation || 'No rule explanation available',
+            contextAnalysis: result.contextAnalysis || 'No context analysis available',
+            pattern: result.pattern || 'No pattern available',
+            examples: result.examples || [],
+            commonMistakes: result.commonMistakes || [],
+            practiceTask: result.practiceTask || { instruction: 'No practice task available', template: '' },
+          });
+        } else {
+          setGrammarError(result?.error || 'Failed to analyze grammar');
+        }
+      } catch (error) {
+        setGrammarError(error instanceof Error ? error.message : 'Failed to fetch grammar analysis');
+      } finally {
+        setGrammarLoading(false);
+      }
+    };
+
+    fetchGrammarAnalysis();
+  }, [isGrammarMode, selectedWord?.word, selectedWord?.sentence, isOpen, bookLanguage]);
 
   // Fetch word data when word changes (or use preloaded data)
   useEffect(() => {
@@ -561,7 +611,174 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
 
         {/* Content */}
         <div className="flex-1 overflow-auto p-4 space-y-4">
-          {wordData.loading ? (
+          {/* Grammar Mode Content */}
+          {isGrammarMode ? (
+            grammarLoading ? (
+              <div className="text-center py-8">
+                <div className="text-4xl animate-pulse mb-2">📚</div>
+                <div className="text-gray-500 dark:text-gray-400">
+                  Analyzing grammar structure...
+                </div>
+              </div>
+            ) : grammarError ? (
+              <div className="bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 p-4 rounded-lg">
+                <p>{grammarError}</p>
+              </div>
+            ) : grammarData ? (
+              <>
+                {/* Grammar Structure */}
+                <section>
+                  <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                    🏗️ Grammar Structure
+                    <span className="px-2 py-0.5 text-xs rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300">
+                      {grammarData.structure.type}
+                    </span>
+                  </h3>
+                  <p className="text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
+                    {grammarData.structure.description}
+                  </p>
+                </section>
+
+                {/* Parts of Speech - Color coded words from sentence */}
+                {grammarData.partsOfSpeech.length > 0 && (
+                  <section>
+                    <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                      🏷️ Parts of Speech
+                    </h3>
+                    <div className="flex flex-wrap gap-2 bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
+                      {grammarData.partsOfSpeech.map((item, idx) => (
+                        <span
+                          key={idx}
+                          className={`px-2 py-1 rounded text-sm font-medium word-pos-${item.pos}`}
+                          title={item.pos}
+                        >
+                          {item.word}
+                        </span>
+                      ))}
+                    </div>
+                    {/* POS Legend */}
+                    <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
+                      <span><span className="word-pos-noun">●</span> noun</span>
+                      <span><span className="word-pos-verb">●</span> verb</span>
+                      <span><span className="word-pos-adjective">●</span> adj</span>
+                      <span><span className="word-pos-adverb">●</span> adv</span>
+                      <span><span className="word-pos-preposition">●</span> prep</span>
+                      <span><span className="word-pos-pronoun">●</span> pron</span>
+                    </div>
+                  </section>
+                )}
+
+                {/* Rule Explanation */}
+                <section>
+                  <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    📖 Rule Explanation
+                  </h3>
+                  <p className="text-gray-600 dark:text-gray-300 bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg">
+                    {grammarData.ruleExplanation}
+                  </p>
+                </section>
+
+                {/* Context Analysis */}
+                <section>
+                  <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    🎯 Why This Structure?
+                  </h3>
+                  <p className="text-gray-600 dark:text-gray-300 bg-purple-50 dark:bg-purple-900/30 p-3 rounded-lg">
+                    {grammarData.contextAnalysis}
+                  </p>
+                </section>
+
+                {/* Pattern Template */}
+                <section>
+                  <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    📝 Reusable Pattern
+                  </h3>
+                  <div className="bg-gray-800 dark:bg-gray-900 text-green-400 p-3 rounded-lg font-mono text-sm overflow-x-auto">
+                    {grammarData.pattern}
+                  </div>
+                </section>
+
+                {/* Examples */}
+                {grammarData.examples.length > 0 && (
+                  <section>
+                    <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                      💡 Example Sentences
+                    </h3>
+                    <div className="space-y-2">
+                      {grammarData.examples.map((example, idx) => (
+                        <div
+                          key={idx}
+                          className={`p-3 rounded-lg ${
+                            example.complexity === 'simple'
+                              ? 'bg-green-50 dark:bg-green-900/30 border-l-4 border-green-400'
+                              : example.complexity === 'medium'
+                                ? 'bg-yellow-50 dark:bg-yellow-900/30 border-l-4 border-yellow-400'
+                                : 'bg-red-50 dark:bg-red-900/30 border-l-4 border-red-400'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className={`text-xs px-1.5 py-0.5 rounded ${
+                              example.complexity === 'simple'
+                                ? 'bg-green-200 dark:bg-green-800 text-green-800 dark:text-green-200'
+                                : example.complexity === 'medium'
+                                  ? 'bg-yellow-200 dark:bg-yellow-800 text-yellow-800 dark:text-yellow-200'
+                                  : 'bg-red-200 dark:bg-red-800 text-red-800 dark:text-red-200'
+                            }`}>
+                              {example.complexity}
+                            </span>
+                          </div>
+                          <p className="text-gray-700 dark:text-gray-300">{example.sentence}</p>
+                          {example.translation && (
+                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 italic">
+                              {example.translation}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                {/* Common Mistakes */}
+                {grammarData.commonMistakes.length > 0 && (
+                  <section>
+                    <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                      ⚠️ Common Mistakes
+                    </h3>
+                    <ul className="space-y-2 bg-orange-50 dark:bg-orange-900/30 p-3 rounded-lg">
+                      {grammarData.commonMistakes.map((mistake, idx) => (
+                        <li key={idx} className="flex items-start gap-2 text-gray-600 dark:text-gray-300">
+                          <span className="text-orange-500">✗</span>
+                          <span>{mistake}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
+
+                {/* Practice Task */}
+                <section>
+                  <h3 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    ✏️ Practice Task
+                  </h3>
+                  <div className="bg-teal-50 dark:bg-teal-900/30 p-3 rounded-lg">
+                    <p className="text-gray-700 dark:text-gray-300 mb-2">
+                      {grammarData.practiceTask.instruction}
+                    </p>
+                    {grammarData.practiceTask.template && (
+                      <div className="bg-white dark:bg-gray-800 p-2 rounded border-2 border-dashed border-teal-300 dark:border-teal-600 font-mono text-sm text-gray-600 dark:text-gray-400">
+                        {grammarData.practiceTask.template}
+                      </div>
+                    )}
+                  </div>
+                </section>
+              </>
+            ) : (
+              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                Select a word or phrase to analyze grammar
+              </div>
+            )
+          ) : wordData.loading ? (
             <div className="text-center py-8">
               <div className="text-4xl animate-pulse mb-2">🔍</div>
               <div className="text-gray-500 dark:text-gray-400">

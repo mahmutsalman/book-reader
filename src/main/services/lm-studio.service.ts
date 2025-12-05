@@ -1,5 +1,6 @@
 import type { AIServiceInterface } from './ai-service.interface';
 import type { PreStudyWordEntry } from '../../shared/types/pre-study-notes.types';
+import type { GrammarAnalysis, PartOfSpeech, WordPOS, GrammarExample } from '../../shared/types/grammar.types';
 
 interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
@@ -942,6 +943,170 @@ DEFINITION: brief definition`;
       wordTranslation,
       germanArticle,
       contextSentence: sentence,
+    };
+  }
+
+  async getGrammarAnalysis(text: string, sentence: string, language = 'en'): Promise<GrammarAnalysis> {
+    const languageName = this.getLanguageName(language);
+    const isEnglish = language === 'en';
+
+    const prompt = `You are a ${languageName} grammar tutor for a B2-level learner who wants to master advanced grammar through reading.
+
+Analyze this ${languageName} sentence:
+"${sentence}"
+
+Focus on: "${text}"
+
+Provide a comprehensive grammar analysis. You MUST respond with valid JSON only (no markdown, no extra text).
+
+{
+  "partsOfSpeech": [
+    {"word": "each word", "pos": "noun|verb|adjective|adverb|preposition|conjunction|pronoun|article|interjection|particle|other"}
+  ],
+  "structure": {
+    "type": "Name the grammatical concept (e.g., passive voice, subjunctive mood, conditional clause, relative clause, participle phrase)",
+    "description": "Brief description of what this structure is"
+  },
+  "ruleExplanation": "Detailed explanation of the grammar rule. Describe how and when this structure is used. Be thorough but use clear language. Include any important variations or exceptions.",
+  "contextAnalysis": "Explain why the author chose this structure here. What effect does it create? What nuance does it add to the meaning?",
+  "pattern": "Give a formula or template the learner can reuse, e.g., '[Subject] + [have/has] + [past participle]' or 'If + [past perfect], + [would have] + [past participle]'",
+  "examples": [
+    {"sentence": "Simple example using this pattern"${!isEnglish ? ', "translation": "English translation"' : ''}, "complexity": "simple"},
+    {"sentence": "Medium complexity example"${!isEnglish ? ', "translation": "English translation"' : ''}, "complexity": "medium"},
+    {"sentence": "More complex/literary example"${!isEnglish ? ', "translation": "English translation"' : ''}, "complexity": "complex"}
+  ],
+  "commonMistakes": [
+    "First common mistake learners make with this structure",
+    "Second common mistake",
+    "Third common mistake"
+  ],
+  "practiceTask": {
+    "instruction": "Clear instruction for the practice task, e.g., 'Complete this sentence using the same pattern' or 'Transform this active sentence to passive'",
+    "template": "The sentence template with a blank or transformation task"
+  }
+}
+
+IMPORTANT:
+- Analyze ALL words in the sentence for partsOfSpeech, not just the focus word
+- Be specific about the grammar structure identified
+- Make the rule explanation detailed enough for self-study
+- Examples should progress from simple to complex
+- The practice task should reinforce the specific grammar point`;
+
+    const response = await this.chat(prompt);
+
+    try {
+      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+
+        // Validate and map partsOfSpeech
+        const partsOfSpeech: WordPOS[] = (parsed.partsOfSpeech || []).map((item: { word?: string; pos?: string }) => ({
+          word: item.word || '',
+          pos: this.normalizePartOfSpeech(item.pos || 'other'),
+        }));
+
+        // Map examples with proper typing
+        const examples: GrammarExample[] = (parsed.examples || []).map((ex: { sentence?: string; translation?: string; complexity?: string }) => ({
+          sentence: ex.sentence || '',
+          translation: ex.translation,
+          complexity: this.normalizeComplexity(ex.complexity),
+        }));
+
+        // Build the result
+        const result: GrammarAnalysis = {
+          partsOfSpeech,
+          structure: {
+            type: parsed.structure?.type || 'Grammar Structure',
+            description: parsed.structure?.description || 'Analysis not available',
+          },
+          ruleExplanation: parsed.ruleExplanation || 'Rule explanation not available',
+          contextAnalysis: parsed.contextAnalysis || 'Context analysis not available',
+          pattern: parsed.pattern || 'Pattern not available',
+          examples,
+          commonMistakes: Array.isArray(parsed.commonMistakes) ? parsed.commonMistakes : [],
+          practiceTask: {
+            instruction: parsed.practiceTask?.instruction || 'Complete the following:',
+            template: parsed.practiceTask?.template || '___',
+          },
+        };
+
+        return result;
+      }
+    } catch (e) {
+      console.error('[LM Studio] Failed to parse grammar analysis JSON:', e);
+    }
+
+    // Fallback if JSON parsing fails
+    return this.getDefaultGrammarAnalysis(text, sentence);
+  }
+
+  /**
+   * Normalize part of speech string to valid PartOfSpeech type
+   */
+  private normalizePartOfSpeech(pos: string): PartOfSpeech {
+    const normalized = pos.toLowerCase().trim();
+    const validPOS: PartOfSpeech[] = [
+      'noun', 'verb', 'adjective', 'adverb', 'preposition',
+      'conjunction', 'pronoun', 'article', 'interjection', 'particle', 'other'
+    ];
+
+    if (validPOS.includes(normalized as PartOfSpeech)) {
+      return normalized as PartOfSpeech;
+    }
+
+    // Map common variations
+    const posMap: Record<string, PartOfSpeech> = {
+      'n': 'noun', 'n.': 'noun',
+      'v': 'verb', 'v.': 'verb',
+      'adj': 'adjective', 'adj.': 'adjective',
+      'adv': 'adverb', 'adv.': 'adverb',
+      'prep': 'preposition', 'prep.': 'preposition',
+      'conj': 'conjunction', 'conj.': 'conjunction',
+      'pron': 'pronoun', 'pron.': 'pronoun',
+      'art': 'article', 'art.': 'article',
+      'interj': 'interjection', 'interj.': 'interjection',
+      'part': 'particle', 'part.': 'particle',
+      'determiner': 'article',
+      'auxiliary': 'verb',
+      'modal': 'verb',
+    };
+
+    return posMap[normalized] || 'other';
+  }
+
+  /**
+   * Normalize complexity string to valid complexity type
+   */
+  private normalizeComplexity(complexity?: string): 'simple' | 'medium' | 'complex' {
+    const normalized = (complexity || 'medium').toLowerCase().trim();
+    if (normalized === 'simple' || normalized === 'easy' || normalized === 'basic') return 'simple';
+    if (normalized === 'complex' || normalized === 'advanced' || normalized === 'hard') return 'complex';
+    return 'medium';
+  }
+
+  /**
+   * Provide a default grammar analysis when AI parsing fails
+   */
+  private getDefaultGrammarAnalysis(text: string, sentence: string): GrammarAnalysis {
+    return {
+      partsOfSpeech: sentence.split(/\s+/).map(word => ({
+        word,
+        pos: 'other' as PartOfSpeech,
+      })),
+      structure: {
+        type: 'Sentence Analysis',
+        description: `Analysis of "${text}" in context`,
+      },
+      ruleExplanation: 'Grammar analysis could not be completed. Please try again.',
+      contextAnalysis: 'Context analysis not available.',
+      pattern: 'Pattern not available.',
+      examples: [],
+      commonMistakes: [],
+      practiceTask: {
+        instruction: 'Try using this word in your own sentence.',
+        template: `Write a sentence using "${text}".`,
+      },
     };
   }
 }

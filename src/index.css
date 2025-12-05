@@ -231,6 +231,95 @@
   @apply ring-blue-500 ring-offset-gray-900;
 }
 
+/* Grammar Mode - Part of Speech Colors */
+.word-pos-noun {
+  color: #3b82f6 !important; /* blue-500 */
+}
+.word-pos-verb {
+  color: #ef4444 !important; /* red-500 */
+}
+.word-pos-adjective {
+  color: #22c55e !important; /* green-500 */
+}
+.word-pos-adverb {
+  color: #f97316 !important; /* orange-500 */
+}
+.word-pos-preposition {
+  color: #8b5cf6 !important; /* violet-500 */
+}
+.word-pos-conjunction {
+  color: #ec4899 !important; /* pink-500 */
+}
+.word-pos-pronoun {
+  color: #06b6d4 !important; /* cyan-500 */
+}
+.word-pos-article {
+  color: #78716c !important; /* stone-500 */
+}
+.word-pos-interjection {
+  color: #eab308 !important; /* yellow-500 */
+}
+.word-pos-particle {
+  color: #14b8a6 !important; /* teal-500 */
+}
+.word-pos-other {
+  color: #6b7280 !important; /* gray-500 */
+}
+
+/* Dark mode POS colors - slightly brighter variants */
+:is(html.dark .word-pos-noun) {
+  color: #60a5fa !important; /* blue-400 */
+}
+:is(html.dark .word-pos-verb) {
+  color: #f87171 !important; /* red-400 */
+}
+:is(html.dark .word-pos-adjective) {
+  color: #4ade80 !important; /* green-400 */
+}
+:is(html.dark .word-pos-adverb) {
+  color: #fb923c !important; /* orange-400 */
+}
+:is(html.dark .word-pos-preposition) {
+  color: #a78bfa !important; /* violet-400 */
+}
+:is(html.dark .word-pos-conjunction) {
+  color: #f472b6 !important; /* pink-400 */
+}
+:is(html.dark .word-pos-pronoun) {
+  color: #22d3ee !important; /* cyan-400 */
+}
+:is(html.dark .word-pos-article) {
+  color: #a8a29e !important; /* stone-400 */
+}
+:is(html.dark .word-pos-interjection) {
+  color: #facc15 !important; /* yellow-400 */
+}
+:is(html.dark .word-pos-particle) {
+  color: #2dd4bf !important; /* teal-400 */
+}
+:is(html.dark .word-pos-other) {
+  color: #9ca3af !important; /* gray-400 */
+}
+
+/* Grammar mode indicator badge */
+.grammar-mode-badge {
+  @apply inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-100 text-indigo-700
+         text-xs font-medium rounded-full;
+}
+
+:is(html.dark .grammar-mode-badge) {
+  @apply bg-indigo-900/50 text-indigo-300;
+}
+
+/* Grammar mode active reader area indicator */
+.reader-grammar-mode {
+  @apply border-l-4 border-indigo-400;
+}
+
+:is(html.dark .reader-grammar-mode) {
+  @apply border-indigo-500;
+}
+
 /* Side panel animation */
 .slide-panel {
   @apply fixed top-0 right-0 h-full bg-white shadow-2xl z-50

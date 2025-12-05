@@ -4,6 +4,15 @@ import type { AppSettings, LMStudioConnectionResult, GroqConnectionResult } from
 import type { WordDefinitionResult, IPAPronunciationResult, BatchIPAResult, SimplifiedSentenceResult, WordEquivalentResult, PhraseMeaningResult, TatoebaSentence, TatoebaStatus } from './ai.types';
 import type { TTSResponse, IPAResponse, PronunciationServerStatus, IPALanguagesResponse, InstallLanguageResponse } from './pronunciation.types';
 import type { PreStudyNotesRequest, PreStudyNotesResult, PreStudyProgress } from './pre-study-notes.types';
+import type { GrammarAnalysis } from './grammar.types';
+
+// Grammar Analysis Result with success/error handling
+export interface GrammarAnalysisResponse extends Partial<GrammarAnalysis> {
+  success: boolean;
+  text: string;
+  sentence: string;
+  error?: string;
+}
 
 // PDF Status response type
 export interface PdfStatusResponse {
@@ -47,6 +56,7 @@ export interface ElectronAPI {
     getWordEquivalent: (word: string, originalSentence: string, simplifiedSentence: string) => Promise<WordEquivalentResult>;
     resimplifyWithWord: (originalSentence: string, originalWord: string, equivalentWord: string) => Promise<SimplifiedSentenceResult>;
     getPhraseMeaning: (phrase: string, context: string, language?: string) => Promise<PhraseMeaningResult>;
+    getGrammarAnalysis: (text: string, sentence: string, language?: string) => Promise<GrammarAnalysisResponse>;
     testConnection: () => Promise<LMStudioConnectionResult>;
     testGroqConnection: () => Promise<GroqConnectionResult>;
     getNextModel: () => Promise<string | null>;

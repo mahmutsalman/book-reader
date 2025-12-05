@@ -131,6 +131,31 @@ export function registerAIHandlers(): void {
     }
   );
 
+  // Get comprehensive grammar analysis - uses selected AI provider
+  ipcMain.handle(
+    IPC_CHANNELS.AI_GET_GRAMMAR_ANALYSIS,
+    async (_, text: string, sentence: string, language = 'en') => {
+      try {
+        const service = await getAIService();
+        const result = await service.getGrammarAnalysis(text, sentence, language);
+        return {
+          success: true,
+          text,
+          sentence,
+          ...result,
+        };
+      } catch (error) {
+        console.error('Failed to get grammar analysis:', error);
+        return {
+          success: false,
+          text,
+          sentence,
+          error: error instanceof Error ? error.message : 'Unable to get grammar analysis. Please check your AI connection.',
+        };
+      }
+    }
+  );
+
   // Test LM Studio connection (always tests LM Studio, regardless of selected provider)
   ipcMain.handle(IPC_CHANNELS.AI_TEST_CONNECTION, async () => {
     try {

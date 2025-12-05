@@ -67,6 +67,8 @@ const electronAPI: ElectronAPI = {
       ipcRenderer.invoke(IPC_CHANNELS.AI_RESIMPLIFY_WITH_WORD, originalSentence, originalWord, equivalentWord),
     getPhraseMeaning: (phrase, context, language?) =>
       ipcRenderer.invoke(IPC_CHANNELS.AI_GET_PHRASE_MEANING, phrase, context, language || 'en'),
+    getGrammarAnalysis: (text: string, sentence: string, language?: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.AI_GET_GRAMMAR_ANALYSIS, text, sentence, language || 'en'),
     testConnection: () =>
       ipcRenderer.invoke(IPC_CHANNELS.AI_TEST_CONNECTION),
     testGroqConnection: () =>
