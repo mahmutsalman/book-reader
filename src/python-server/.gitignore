@@ -3,3 +3,8 @@ __pycache__/
 *.pyc
 *.pyo
 test_audio.mp3
+
+# PyInstaller build artifacts
+build/
+dist/
+*.spec.bak

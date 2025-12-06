@@ -3,15 +3,36 @@ import { MakerSquirrel } from '@electron-forge/maker-squirrel';
 import { MakerZIP } from '@electron-forge/maker-zip';
 import { MakerDeb } from '@electron-forge/maker-deb';
 import { MakerRpm } from '@electron-forge/maker-rpm';
+import { MakerDMG } from '@electron-forge/maker-dmg';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
+import { AutoUnpackNativesPlugin } from '@electron-forge/plugin-auto-unpack-natives';
+import fs from 'fs';
+import path from 'path';
+
+// Helper to copy directory recursively
+function copyDirSync(src: string, dest: string) {
+  if (!fs.existsSync(src)) return;
+  fs.mkdirSync(dest, { recursive: true });
+  const entries = fs.readdirSync(src, { withFileTypes: true });
+  for (const entry of entries) {
+    const srcPath = path.join(src, entry.name);
+    const destPath = path.join(dest, entry.name);
+    if (entry.isDirectory()) {
+      copyDirSync(srcPath, destPath);
+    } else {
+      fs.copyFileSync(srcPath, destPath);
+    }
+  }
+}
 
 const config: ForgeConfig = {
   packagerConfig: {
     asar: {
-      unpack: '**/node_modules/better-sqlite3/**',
+      unpack: '{**/node_modules/better-sqlite3/**,**/node_modules/bindings/**,**/node_modules/file-uri-to-path/**}',
     },
+    icon: 'assets/icon',
     // Include bundled Python server binary in resources
     extraResource: [
       // macOS/Linux binary
@@ -23,13 +44,36 @@ const config: ForgeConfig = {
   rebuildConfig: {
     force: true,
   },
+  hooks: {
+    packageAfterCopy: async (_config, buildPath) => {
+      // Copy native modules to the build directory
+      const nodeModulesSrc = path.resolve(__dirname, 'node_modules');
+      const nodeModulesDest = path.join(buildPath, 'node_modules');
+
+      // Copy better-sqlite3 and its dependencies
+      const modulesToCopy = ['better-sqlite3', 'bindings', 'file-uri-to-path'];
+      for (const mod of modulesToCopy) {
+        const src = path.join(nodeModulesSrc, mod);
+        const dest = path.join(nodeModulesDest, mod);
+        if (fs.existsSync(src)) {
+          copyDirSync(src, dest);
+          console.log(`Copied ${mod} to build`);
+        }
+      }
+    },
+  },
   makers: [
     new MakerSquirrel({}),
     new MakerZIP({}, ['darwin']),
+    new MakerDMG({
+      format: 'ULFO',
+      icon: 'assets/icon.icns',
+    }),
     new MakerRpm({}),
     new MakerDeb({}),
   ],
   plugins: [
+    new AutoUnpackNativesPlugin({}),
     new VitePlugin({
       // `build` can specify multiple entry builds, which can be Main process, Preload scripts, Worker process, etc.
       // If you are familiar with Vite configuration, it will look really familiar.
@@ -62,7 +106,7 @@ const config: ForgeConfig = {
       [FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false,
       [FuseV1Options.EnableNodeCliInspectArguments]: false,
       [FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: true,
-      [FuseV1Options.OnlyLoadAppFromAsar]: true,
+      [FuseV1Options.OnlyLoadAppFromAsar]: false,
     }),
   ],
 };

@@ -10,7 +10,14 @@ if (started) {
   app.quit();
 }
 
+// Ensure single instance
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+}
+
 let mainWindow: BrowserWindow | null = null;
+let isAppReady = false;
 
 const createWindow = () => {
   // Create the browser window.
@@ -55,6 +62,14 @@ const createWindow = () => {
   });
 };
 
+// Handle second instance - focus existing window
+app.on('second-instance', () => {
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.focus();
+  }
+});
+
 // Initialize database and IPC handlers when app is ready
 app.on('ready', async () => {
   try {
@@ -74,6 +89,9 @@ app.on('ready', async () => {
     registerAllIpcHandlers();
     console.log('IPC handlers registered');
 
+    // Mark app as ready
+    isAppReady = true;
+
     // Create window
     createWindow();
   } catch (error) {
@@ -90,7 +108,8 @@ app.on('window-all-closed', () => {
 
 app.on('activate', () => {
   // On macOS, re-create window when dock icon is clicked and no other windows open.
-  if (BrowserWindow.getAllWindows().length === 0) {
+  // Only create if app is fully initialized
+  if (BrowserWindow.getAllWindows().length === 0 && isAppReady) {
     createWindow();
   }
 });
