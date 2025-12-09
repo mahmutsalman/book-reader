@@ -57,6 +57,12 @@ export class BookRepository {
     const book = await this.getById(id);
     if (!book) return null;
 
+    // Check if the JSON file exists before attempting to read
+    if (!fs.existsSync(book.json_path)) {
+      console.error(`Book content file not found: ${book.json_path}. The file may have been deleted.`);
+      return null;
+    }
+
     try {
       const content = fs.readFileSync(book.json_path, 'utf-8');
       return JSON.parse(content) as BookData;

@@ -4,7 +4,7 @@
  */
 import fs from 'fs';
 import path from 'path';
-import os from 'os';
+import { app } from 'electron';
 import { pythonManager } from './python-manager.service';
 import { bookRepository } from '../../database/repositories';
 import type { Book, BookData, BookPage, BookLanguage } from '../../shared/types';
@@ -192,14 +192,14 @@ class PdfImportService {
     // Convert to BookData format
     const bookData = this.convertToBookData(extractResult, pdfPath);
 
-    // Create temp JSON file
-    const tempDir = path.join(os.tmpdir(), 'bookreader-pdf-imports');
-    if (!fs.existsSync(tempDir)) {
-      fs.mkdirSync(tempDir, { recursive: true });
+    // Create JSON file in permanent user data directory (not temp)
+    const booksDir = path.join(app.getPath('userData'), 'books');
+    if (!fs.existsSync(booksDir)) {
+      fs.mkdirSync(booksDir, { recursive: true });
     }
 
     const jsonFileName = `${path.basename(pdfPath, '.pdf')}_${Date.now()}.json`;
-    const jsonPath = path.join(tempDir, jsonFileName);
+    const jsonPath = path.join(booksDir, jsonFileName);
 
     // Write BookData to JSON file
     fs.writeFileSync(jsonPath, JSON.stringify(bookData, null, 2), 'utf-8');
