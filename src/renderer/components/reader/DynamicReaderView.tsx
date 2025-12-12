@@ -13,6 +13,8 @@ import { cleanWord, createWordBoundaryRegex } from '../../../shared/utils/text-u
 import WordPanel from '../word-panel/WordPanel';
 import PreStudyNotesButton from './PreStudyNotesButton';
 import { FloatingProgressPanel } from './FloatingProgressPanel';
+import { ThemeContextMenu } from './ThemeContextMenu';
+import { readerThemes } from '../../config/readerThemes';
 
 const MAX_PHRASE_WORDS = 10;
 
@@ -46,8 +48,16 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
   const navigate = useNavigate();
   const { updateProgress } = useBooks();
   const { queueWord, isWordReady, getWordData, getWordStatus, fetchingCount, pendingCount } = useDeferredWords();
-  const { settings } = useSettings();
+  const { settings, updateSetting } = useSettings();
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Determine if system is in dark mode
+  const isDarkMode = useMemo(() => {
+    if (settings.theme === 'dark') return true;
+    if (settings.theme === 'light') return false;
+    // 'system' - check OS preference
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  }, [settings.theme]);
 
   const [zoom, setZoom] = useState(initialProgress?.zoom_level || ZOOM_LEVELS.DEFAULT);
   const [selectedWord, setSelectedWord] = useState<SelectedWord | null>(null);
@@ -79,6 +89,10 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
   // Pre-study notes state
   const [isGeneratingNotes, setIsGeneratingNotes] = useState(false);
   const [notesProgress, setNotesProgress] = useState<PreStudyProgress | null>(null);
+
+  // Theme context menu state
+  const [showThemeMenu, setShowThemeMenu] = useState(false);
+  const [themeMenuPosition, setThemeMenuPosition] = useState({ x: 0, y: 0 });
 
   // Map word indices to their actual words for phrase construction
   const wordIndexMapRef = useRef<Map<number, string>>(new Map());
@@ -350,6 +364,29 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
     // Clear selection
     setSelectedIndices([]);
   }, [selectedIndices, buildPhraseFromIndices, extractSentenceFromCurrentView, reflowState.originalPage, book.id, isWordReady, getWordData, queueWord]);
+
+  // Handle context menu for theme selection
+  const handleContextMenu = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    // Only show theme menu if right-click is on the left 40% of the container
+    const rect = event.currentTarget.getBoundingClientRect();
+    const clickX = event.clientX - rect.left;
+    const containerWidth = rect.width;
+
+    if (clickX <= containerWidth * 0.4) {
+      event.preventDefault();
+      setThemeMenuPosition({ x: event.clientX, y: event.clientY });
+      setShowThemeMenu(true);
+    }
+  }, []);
+
+  // Handle theme selection
+  const handleThemeSelect = useCallback(async (themeId: string) => {
+    try {
+      await updateSetting('reader_theme', themeId);
+    } catch (error) {
+      console.error('Failed to update reader theme:', error);
+    }
+  }, [updateSetting]);
 
   // Handle word click with deferred lookup behavior and phrase selection
   const handleWordClick = useCallback((word: string, wordIndex: number, event: React.MouseEvent) => {
@@ -997,12 +1034,25 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
       <div className="flex-1 overflow-x-auto overflow-y-hidden p-8">
         <div
           ref={containerRef}
-          className="h-full mx-auto bg-white dark:bg-gray-800 rounded-xl shadow-sm dark:shadow-gray-900/50 p-8 reader-text overflow-y-auto text-gray-900 dark:text-cream-100"
+          className="h-full mx-auto rounded-xl shadow-sm p-8 reader-text overflow-y-auto transition-colors duration-300"
+          onContextMenu={handleContextMenu}
           style={{
             fontSize: `${fontSize}px`,
             lineHeight: REFLOW_SETTINGS.LINE_HEIGHT,
             width: '768px',
             minWidth: '768px',
+            backgroundColor: (isDarkMode
+              ? readerThemes[settings.reader_theme]?.dark?.background
+              : readerThemes[settings.reader_theme]?.light?.background)
+              || readerThemes.darkComfort.dark.background,
+            color: (isDarkMode
+              ? readerThemes[settings.reader_theme]?.dark?.text
+              : readerThemes[settings.reader_theme]?.light?.text)
+              || readerThemes.darkComfort.dark.text,
+            boxShadow: `0 1px 3px ${(isDarkMode
+              ? readerThemes[settings.reader_theme]?.dark?.shadow
+              : readerThemes[settings.reader_theme]?.light?.shadow)
+              || readerThemes.darkComfort.dark.shadow}`,
           }}
         >
           {renderText(reflowState.currentText)}
@@ -1071,6 +1121,17 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
         isVisible={isGeneratingNotes}
         onCancel={handleCancelPreStudyNotes}
       />
+
+      {/* Theme Context Menu */}
+      {showThemeMenu && (
+        <ThemeContextMenu
+          x={themeMenuPosition.x}
+          y={themeMenuPosition.y}
+          currentTheme={settings.reader_theme}
+          onThemeSelect={handleThemeSelect}
+          onClose={() => setShowThemeMenu(false)}
+        />
+      )}
     </div>
   );
 };

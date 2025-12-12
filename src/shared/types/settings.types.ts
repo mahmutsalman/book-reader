@@ -9,6 +9,7 @@ export interface AppSettings {
   tatoeba_language: string;
   default_zoom: number;
   theme: 'light' | 'dark' | 'system';
+  reader_theme: string;  // Reader-specific theme (sepiaClassic, darkComfort, trueBlack, oceanBlue, forestGreen, purpleTwilight)
   font_family: string;
   line_height: number;
   page_margin: number;

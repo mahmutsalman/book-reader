@@ -8,6 +8,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   tatoeba_language: 'en',
   default_zoom: 1.0,
   theme: 'light',
+  reader_theme: 'darkComfort',  // Default reader theme
   font_family: 'Georgia, serif',
   line_height: 1.8,
   page_margin: 40,
