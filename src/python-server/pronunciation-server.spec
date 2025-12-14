@@ -19,7 +19,13 @@ a = Analysis(
     ['server.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=[
+        # Include Piper TTS voice models
+        ('models/*.onnx', 'models'),
+        ('models/*.json', 'models'),
+        # Include espeak-ng-data for Piper TTS phoneme generation
+        ('venv/lib/python3.13/site-packages/piper/espeak-ng-data', 'piper/espeak-ng-data'),
+    ],
     hiddenimports=[
         # FastAPI and dependencies
         'fastapi',
@@ -43,9 +49,10 @@ a = Analysis(
         'anyio',
         'anyio._backends',
         'anyio._backends._asyncio',
-        # Edge TTS
-        'edge_tts',
-        'edge_tts.communicate',
+        # Piper TTS (offline neural voices)
+        'piper',
+        'piper.voice',
+        'onnxruntime',
         # gruut for IPA
         'gruut',
         'gruut.lang',
@@ -67,7 +74,7 @@ a = Analysis(
         # Exclude unnecessary modules to reduce size
         'tkinter',
         'matplotlib',
-        'numpy',
+        # numpy is required by piper-tts for ONNX operations - DO NOT EXCLUDE
         'pandas',
         'scipy',
         'PIL',
