@@ -184,19 +184,36 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
 
     if (isLoadingAudio) return; // Only skip if we're still loading/fetching
     setIsLoading(true);
+
     try {
       // Check cache first
       const cached = await getAudio(text, language, audioType);
       if (cached) {
+        console.log('[WordPanel] Cache hit for', audioType);
         await playAudio(cached);
         return;
       }
+
       // Fetch from server
+      console.log('[WordPanel] Fetching audio:', { text: text.substring(0, 50), language, audioType });
       const response = await window.electronAPI?.pronunciation.getTTS(text, language);
-      if (response?.success && response.audio_base64) {
-        await setAudio(text, language, audioType, response.audio_base64);
-        await playAudio(response.audio_base64);
+
+      if (!response?.success || !response.audio_base64) {
+        const errorMsg = response?.error || 'Server returned no audio data';
+        console.error('[WordPanel] TTS failed:', {
+          text: text.substring(0, 50),
+          language,
+          error: errorMsg,
+          response
+        });
+        throw new Error(errorMsg);
       }
+
+      await setAudio(text, language, audioType, response.audio_base64);
+      await playAudio(response.audio_base64);
+    } catch (error) {
+      console.error('[WordPanel] playText error:', error);
+      // Silent failure - could add toast notification here in future
     } finally {
       setIsLoading(false);
     }

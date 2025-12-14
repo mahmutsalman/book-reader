@@ -20,9 +20,10 @@ class PronunciationService {
    */
   async getTTS(text: string, language: string = 'en'): Promise<TTSResponse> {
     if (!pythonManager.ready) {
+      console.error('[PronunciationService] Server not ready');
       return {
         success: false,
-        error: 'Pronunciation server is not ready',
+        error: 'Pronunciation server is not ready. Please wait for server to start.',
       };
     }
 
@@ -37,17 +38,29 @@ class PronunciationService {
       });
 
       if (!response.ok) {
+        const errorBody = await response.text();
+        console.error('[PronunciationService] HTTP error:', {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorBody,
+          url: `${pythonManager.baseUrl}/api/tts`
+        });
         return {
           success: false,
-          error: `Server error: ${response.status}`,
+          error: `Server error ${response.status}: ${response.statusText}`,
         };
       }
 
       const data = (await response.json()) as TTSResponse;
       return data;
-    } catch (error) {
+    } catch (error: unknown) {
+      console.error('[PronunciationService] getTTS error:', {
+        error,
+        text: text.substring(0, 50),
+        language,
+        url: `${pythonManager.baseUrl}/api/tts`
+      });
       const message = error instanceof Error ? error.message : 'Unknown error';
-      console.error('[PronunciationService] TTS error:', message);
       return {
         success: false,
         error: message,

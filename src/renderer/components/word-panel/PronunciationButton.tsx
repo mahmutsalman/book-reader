@@ -30,6 +30,7 @@ const PronunciationButton: React.FC<PronunciationButtonProps> = ({
   const { playAudio, stop, isPlaying, isLoading, setIsLoading, error } = useAudioPlayer();
   const { getAudio, setAudio } = useAudioCache();
   const [serverError, setServerError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleClick = useCallback(async () => {
     if (isPlaying) {
@@ -65,8 +66,24 @@ const PronunciationButton: React.FC<PronunciationButtonProps> = ({
       console.log('[Pronunciation] Cache miss, fetching from server:', { text: text.substring(0, 30), language });
       const response = await window.electronAPI.pronunciation.getTTS(text, language);
 
+      // Log full response for debugging
+      console.log('[Pronunciation] Response received:', {
+        success: response.success,
+        hasAudio: !!response.audio_base64,
+        audioLength: response.audio_base64?.length,
+        error: response.error,
+        format: response.format
+      });
+
       if (!response.success || !response.audio_base64) {
-        throw new Error(response.error || 'Failed to generate audio');
+        const errorDetail = response.error || 'Unknown error - no audio generated';
+        console.error('[Pronunciation] Server returned error:', {
+          success: response.success,
+          hasAudio: !!response.audio_base64,
+          error: response.error,
+          fullResponse: response
+        });
+        throw new Error(`Audio generation failed: ${errorDetail}`);
       }
 
       // 4. Store in cache for future use
@@ -75,7 +92,9 @@ const PronunciationButton: React.FC<PronunciationButtonProps> = ({
       // 5. Play the audio
       await playAudio(response.audio_base64);
     } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Unknown error';
       console.error('[Pronunciation] Error:', err);
+      setErrorMessage(errorMsg);
       setServerError(true);
     } finally {
       setIsLoading(false);
@@ -122,7 +141,7 @@ const PronunciationButton: React.FC<PronunciationButtonProps> = ({
       <button
         type="button"
         className={`${sizeClasses} flex items-center justify-center rounded-full text-gray-400 cursor-not-allowed ${className}`}
-        title="Pronunciation unavailable"
+        title={errorMessage || "Pronunciation unavailable"}
         disabled
       >
         <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5 opacity-50">

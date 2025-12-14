@@ -33,7 +33,7 @@ VOICE_ALTERNATIVES = {
 
 async def generate_audio(text: str, language: str = "en") -> Optional[str]:
     """
-    Generate MP3 audio from text using Edge TTS.
+    Generate MP3 audio with enhanced error handling.
 
     Args:
         text: Text to synthesize (words, phrases, or sentences)
@@ -43,46 +43,58 @@ async def generate_audio(text: str, language: str = "en") -> Optional[str]:
         Base64-encoded MP3 audio string, or None if generation fails
     """
     if not text or not text.strip():
+        print("[TTS] Error: Empty text provided")
         return None
 
-    # Get voice for language, default to English
     voice = VOICES.get(language, VOICES["en"])
-
-    # Create a temporary file for the audio
     temp_file = None
+
     try:
-        # Create temp file with .mp3 extension
         fd, temp_file = tempfile.mkstemp(suffix='.mp3')
         os.close(fd)
 
-        # Debug logging
         text_preview = text[:50] + '...' if len(text) > 50 else text
-        print(f"[TTS] Generating audio: text='{text_preview}' language={language} voice={voice}")
+        print(f"[TTS] Generating: text='{text_preview}' lang={language} voice={voice}")
 
-        # Generate audio using Edge TTS
         communicate = edge_tts.Communicate(text, voice)
         await communicate.save(temp_file)
 
-        # Read the audio file and encode to base64
+        # Verify file was created and has content
+        if not os.path.exists(temp_file):
+            print(f"[TTS] Error: Temp file not created")
+            return None
+
+        file_size = os.path.getsize(temp_file)
+        if file_size == 0:
+            print(f"[TTS] Error: Generated file is empty")
+            return None
+
+        print(f"[TTS] Generated audio: {file_size} bytes")
+
         with open(temp_file, 'rb') as f:
             audio_data = f.read()
 
         if not audio_data:
+            print(f"[TTS] Error: Could not read audio data")
             return None
 
-        return base64.b64encode(audio_data).decode('utf-8')
+        base64_data = base64.b64encode(audio_data).decode('utf-8')
+        print(f"[TTS] Success: Encoded to base64 ({len(base64_data)} chars)")
+        return base64_data
 
     except Exception as e:
-        print(f"[TTS] Error generating audio: {e}")
+        error_type = type(e).__name__
+        print(f"[TTS] Error ({error_type}): {e}")
+        import traceback
+        traceback.print_exc()
         return None
 
     finally:
-        # Clean up temp file
         if temp_file and os.path.exists(temp_file):
             try:
                 os.remove(temp_file)
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[TTS] Warning: Could not remove temp file: {e}")
 
 
 def generate_audio_sync(text: str, language: str = "en") -> Optional[str]:

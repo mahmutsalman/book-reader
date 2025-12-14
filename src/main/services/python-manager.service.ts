@@ -65,7 +65,7 @@ class PythonManager {
 
         this.process = spawn(pythonPath, [scriptPath], {
           cwd: serverDir,
-          env: { ...process.env, PORT: String(this.port) },
+          env: { ...process.env, PORT: String(this.port), PYTHONUNBUFFERED: '1' },
           stdio: ['ignore', 'pipe', 'pipe'],
         });
       } else {
@@ -76,18 +76,20 @@ class PythonManager {
 
         this.process = spawn(binaryPath, [], {
           cwd: path.dirname(binaryPath),
-          env: { ...process.env, PORT: String(this.port) },
+          env: { ...process.env, PORT: String(this.port), PYTHONUNBUFFERED: '1' },
           stdio: ['ignore', 'pipe', 'pipe'],
         });
       }
 
       // Handle process output
       this.process.stdout?.on('data', (data) => {
-        console.log(`[Python] ${data.toString().trim()}`);
+        const msg = data.toString().trim();
+        console.log(`[Python:${new Date().toISOString()}] ${msg}`);
       });
 
       this.process.stderr?.on('data', (data) => {
-        console.error(`[Python] ${data.toString().trim()}`);
+        const msg = data.toString().trim();
+        console.error(`[Python:ERROR:${new Date().toISOString()}] ${msg}`);
       });
 
       this.process.on('error', (err) => {
@@ -198,16 +200,29 @@ class PythonManager {
    */
   private async waitForReady(): Promise<void> {
     const startTime = Date.now();
+    let attemptCount = 0;
+
+    console.log('[PythonManager] Waiting for server to be ready...');
 
     while (Date.now() - startTime < STARTUP_TIMEOUT) {
+      attemptCount++;
+      const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+
       if (await this.checkHealth()) {
+        console.log(`[PythonManager] Server ready after ${elapsed}s (${attemptCount} attempts)`);
         this.isReady = true;
         return;
       }
+
+      if (attemptCount % 5 === 0) {
+        console.log(`[PythonManager] Still waiting... ${elapsed}s elapsed (${attemptCount} attempts)`);
+      }
+
       await this.sleep(500);
     }
 
-    throw new Error('Server startup timeout');
+    console.error('[PythonManager] Server startup timeout after 30s');
+    throw new Error('Server startup timeout - check Python server logs for details');
   }
 
   /**

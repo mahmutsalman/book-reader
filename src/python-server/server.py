@@ -324,7 +324,7 @@ async def health_check():
 @app.post("/api/tts", response_model=TTSResponse)
 async def text_to_speech(request: TTSRequest):
     """
-    Generate audio from text.
+    Generate audio from text with enhanced error logging.
 
     Args:
         request: TTSRequest with text and language
@@ -332,33 +332,32 @@ async def text_to_speech(request: TTSRequest):
     Returns:
         TTSResponse with base64-encoded MP3 audio
     """
+    request_id = id(request)  # Unique ID for tracking
+
+    print(f"[TTS:{request_id}] Request: lang={request.language}, len={len(request.text)}, preview='{request.text[:50]}...'")
+
     if not request.text or not request.text.strip():
-        return TTSResponse(
-            success=False,
-            error="Text is required"
-        )
+        print(f"[TTS:{request_id}] Error: Empty text")
+        return TTSResponse(success=False, error="Text is required")
 
     try:
-        print(f"[Server TTS] Received request: language={request.language}, text={request.text[:50]}...")
+        print(f"[TTS:{request_id}] Starting audio generation...")
         audio_base64 = await generate_audio(request.text, request.language)
 
         if audio_base64:
-            return TTSResponse(
-                success=True,
-                audio_base64=audio_base64,
-                format="mp3"
-            )
+            print(f"[TTS:{request_id}] Success: {len(audio_base64)} bytes")
+            return TTSResponse(success=True, audio_base64=audio_base64, format="mp3")
         else:
-            return TTSResponse(
-                success=False,
-                error="Failed to generate audio"
-            )
+            print(f"[TTS:{request_id}] Error: generate_audio returned None")
+            return TTSResponse(success=False, error="Audio generation failed - check logs")
 
     except Exception as e:
-        return TTSResponse(
-            success=False,
-            error=str(e)
-        )
+        error_type = type(e).__name__
+        error_msg = str(e)
+        print(f"[TTS:{request_id}] Exception: {error_type}: {error_msg}")
+        import traceback
+        traceback.print_exc()
+        return TTSResponse(success=False, error=f"{error_type}: {error_msg}")
 
 
 @app.get("/api/tts/{language}/{text}", response_model=TTSResponse)
