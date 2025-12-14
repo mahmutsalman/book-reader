@@ -96,3 +96,20 @@ out/
 
 # Local resources (scripts, etc.)
 localResources/
+
+# Python Server
+src/python-server/venv/
+src/python-server/__pycache__/
+src/python-server/*.pyc
+src/python-server/build/
+src/python-server/dist/
+src/python-server/*.spec.bak
+
+# Voice Models (downloaded separately via download_models.py)
+# Do not commit - 181MB total, users download via script
+src/python-server/models/
+
+# Test files and temporary outputs
+test_*.wav
+test_*.py
+*.wav
