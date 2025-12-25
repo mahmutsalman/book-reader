@@ -79,6 +79,11 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
   const [isShiftHeld, setIsShiftHeld] = useState(false);
   const [phraseRanges, setPhraseRanges] = useState<Map<string, PhraseRange>>(new Map());
 
+  // Drag selection state
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStartIndex, setDragStartIndex] = useState<number | null>(null);
+  const dragTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   // Grammar perspective mode state
   const [isGrammarMode, setIsGrammarMode] = useState(false);
 
@@ -415,13 +420,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
           return prev.filter(idx => idx !== wordIndex);
         }
 
-        // Check max phrase length
-        if (prev.length >= MAX_PHRASE_WORDS) {
-          // Max reached - ignore
-          return prev;
-        }
-
-        // Add to selection
+        // Add to selection (unlimited - no max phrase length)
         return [...prev, wordIndex];
       });
       return;
@@ -497,6 +496,67 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
     }
   }, [extractSentenceFromCurrentView, reflowState.originalPage, book.id, isWordReady, getWordData, getWordStatus, queueWord, selectedIndices, phraseRanges]);
 
+  // === DRAG SELECTION HANDLERS ===
+  // Implements Android gallery-style drag-to-select for phrase creation
+
+  // Handler 1: Initiate drag on mouseDown
+  const handleWordMouseDown = useCallback((wordIndex: number, event: React.MouseEvent) => {
+    // Ignore if Shift held (preserve Shift+Click behavior)
+    if (event.shiftKey) return;
+
+    // Prevent default text selection immediately
+    event.preventDefault();
+
+    // Clear any existing timeout
+    if (dragTimeoutRef.current) {
+      clearTimeout(dragTimeoutRef.current);
+    }
+
+    // Set timeout for drag detection (150ms)
+    dragTimeoutRef.current = setTimeout(() => {
+      setIsDragging(true);
+      setDragStartIndex(wordIndex);
+      setSelectedIndices([wordIndex]);
+    }, 150);
+  }, []);
+
+  // Handler 2: Extend selection range during drag
+  const handleWordMouseEnter = useCallback((wordIndex: number, event: React.MouseEvent) => {
+    if (!isDragging || dragStartIndex === null) return;
+
+    event.preventDefault();
+
+    // Build continuous range from start to current
+    const start = Math.min(dragStartIndex, wordIndex);
+    const end = Math.max(dragStartIndex, wordIndex);
+
+    // Create array of all indices in range (unlimited selection)
+    const range = Array.from({length: end - start + 1}, (_, i) => start + i);
+
+    setSelectedIndices(range);
+  }, [isDragging, dragStartIndex]);
+
+  // Handler 3: Finalize selection on mouseUp
+  const handleWordMouseUp = useCallback((event: React.MouseEvent) => {
+    // Clear drag timeout
+    if (dragTimeoutRef.current) {
+      clearTimeout(dragTimeoutRef.current);
+      dragTimeoutRef.current = null;
+    }
+
+    // If drag was active, finalize phrase
+    if (isDragging && selectedIndices.length > 1) {
+      finalizePhrase();
+    } else {
+      // Was a click, not a drag - clear selection
+      setSelectedIndices([]);
+    }
+
+    // Reset drag state
+    setIsDragging(false);
+    setDragStartIndex(null);
+  }, [isDragging, selectedIndices, finalizePhrase]);
+
   // Keyboard navigation and Shift key handling
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -561,6 +621,27 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
       window.removeEventListener('keyup', handleKeyUp);
     };
   }, [goToNextPage, goToPrevPage, selectedIndices, finalizePhrase, extractSentenceFromCurrentView, reflowState.originalPage, book.id, isWordReady, getWordData, getWordStatus, queueWord]);
+
+  // Global mouseup listener for drag selection cleanup
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      if (isDragging) {
+        handleWordMouseUp({ preventDefault: () => {} } as React.MouseEvent);
+      }
+    };
+
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+    return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
+  }, [isDragging, handleWordMouseUp]);
+
+  // Cleanup drag timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (dragTimeoutRef.current) {
+        clearTimeout(dragTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Clear loading positions when words become ready
   useEffect(() => {
@@ -633,6 +714,14 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
     // Always clear selection and word index map on page change
     setSelectedIndices([]);
     wordIndexMapRef.current.clear();
+
+    // Reset drag state on page change
+    setIsDragging(false);
+    setDragStartIndex(null);
+    if (dragTimeoutRef.current) {
+      clearTimeout(dragTimeoutRef.current);
+      dragTimeoutRef.current = null;
+    }
 
     // Update previous page ref
     prevPageIndexRef.current = currentPageIndex;
@@ -863,6 +952,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
         wordIsReady && !phraseInfo.isInPhrase ? 'word-ready' : '',
         isPulsing ? 'word-queued-pulse' : '',
         isShiftHeld ? 'word-shift-mode' : '',
+        isDragging ? 'word-drag-mode' : '',
         isCurrentlySelected ? 'word-phrase-selected word-phrase-selecting' : '',
         phraseInfo.isInPhrase ? 'word-phrase-selected' : '',
       ].filter(Boolean).join(' ');
@@ -897,6 +987,9 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
         <span
           key={index}
           onClick={(e) => handleWordClick(part, index, e)}
+          onMouseDown={(e) => handleWordMouseDown(index, e)}
+          onMouseEnter={(e) => handleWordMouseEnter(index, e)}
+          onMouseUp={(e) => handleWordMouseUp(e)}
           className={classes}
         >
           {part}

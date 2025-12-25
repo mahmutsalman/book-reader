@@ -229,6 +229,21 @@
   @apply bg-blue-600/40;
 }
 
+/* Drag selection mode - prevent text selection */
+.word-drag-mode {
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: pointer !important;
+}
+
+.word-drag-mode:hover {
+  @apply bg-blue-100;
+}
+
+:is(html.dark .word-drag-mode:hover) {
+  @apply bg-blue-600/40;
+}
+
 /* Phrase selection active indicator - subtle border */
 .word-phrase-selecting {
   @apply ring-2 ring-blue-400 ring-offset-1;
