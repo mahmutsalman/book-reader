@@ -94,6 +94,9 @@ out/
 # User notes
 .notes/
 
+# VS Code workspace settings (personal preferences)
+.vscode/
+
 # Local resources (scripts, etc.)
 localResources/
 
