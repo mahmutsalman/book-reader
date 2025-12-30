@@ -5,7 +5,7 @@ import type {
   QueuedWordStatus,
   CachedWordData,
 } from '../../shared/types/deferred-word.types';
-import { generateWordKey, generatePhraseKey } from '../../shared/types/deferred-word.types';
+import { generateWordKey, generatePhraseKey, CACHE_VERSION } from '../../shared/types/deferred-word.types';
 import { cleanWord } from '../../shared/utils/text-utils';
 import type { BookLanguage } from '../../shared/types';
 
@@ -57,7 +57,7 @@ export const DeferredWordProvider: React.FC<DeferredWordProviderProps> = ({ chil
   // Use ref to track active fetches without causing re-renders
   const activeFetchesRef = useRef<Set<string>>(new Set());
 
-  // Clean up expired entries periodically
+  // Clean up expired entries and old cache versions periodically
   useEffect(() => {
     const cleanup = () => {
       const now = Date.now();
@@ -67,7 +67,15 @@ export const DeferredWordProvider: React.FC<DeferredWordProviderProps> = ({ chil
 
         for (const [key, entry] of newMap) {
           if (entry.status === 'ready' && entry.fetchCompletedAt) {
+            // Remove if expired by time
             if (now - entry.fetchCompletedAt > CACHE_EXPIRATION_MS) {
+              newMap.delete(key);
+              hasChanges = true;
+              continue;
+            }
+
+            // Remove if cache version is outdated or missing
+            if (!entry.data?.cacheVersion || entry.data.cacheVersion < CACHE_VERSION) {
               newMap.delete(key);
               hasChanges = true;
             }
@@ -79,6 +87,7 @@ export const DeferredWordProvider: React.FC<DeferredWordProviderProps> = ({ chil
     };
 
     const interval = setInterval(cleanup, 60000); // Check every minute
+    cleanup(); // Run immediately on mount to clear old cache versions
     return () => clearInterval(interval);
   }, []);
 
@@ -136,6 +145,7 @@ export const DeferredWordProvider: React.FC<DeferredWordProviderProps> = ({ chil
       }
 
       const results: CachedWordData = {
+        cacheVersion: CACHE_VERSION,
         fetchedAt: Date.now(),
       };
 
@@ -152,8 +162,12 @@ export const DeferredWordProvider: React.FC<DeferredWordProviderProps> = ({ chil
             entry.language
           );
           console.log('[PHRASE DEBUG] AI phrase response:', phraseMeaningResult);
+          if (phraseMeaningResult.shortMeaning !== undefined) {
+            results.shortMeaning = phraseMeaningResult.shortMeaning;
+          }
           if (phraseMeaningResult.meaning) {
             results.definition = phraseMeaningResult.meaning;
+            results.meaning = phraseMeaningResult.meaning;
           }
           if (phraseMeaningResult.phraseTranslation) {
             results.phraseTranslation = phraseMeaningResult.phraseTranslation;
@@ -178,6 +192,9 @@ export const DeferredWordProvider: React.FC<DeferredWordProviderProps> = ({ chil
         ]);
 
         if (defResult.status === 'fulfilled') {
+          if (defResult.value.shortDefinition !== undefined) {
+            results.shortDefinition = defResult.value.shortDefinition;
+          }
           results.definition = defResult.value.definition;
           if (defResult.value.wordTranslation) {
             results.wordTranslation = defResult.value.wordTranslation;

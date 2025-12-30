@@ -34,10 +34,20 @@ export function normalizeSentence(sentence: string): string {
 export type QueuedWordStatus = 'pending' | 'fetching' | 'ready' | 'error';
 
 /**
+ * Current cache version - increment this when CachedWordData structure changes
+ * This invalidates old cache entries with incompatible data structures
+ */
+export const CACHE_VERSION = 4; // v4: Include shortDefinition/shortMeaning in cached data
+
+/**
  * Cached AI data for a word
  */
 export interface CachedWordData {
-  definition?: string;
+  cacheVersion?: number;           // Cache version for invalidation on schema changes
+  shortDefinition?: string;        // 1-3 word concise meaning (for single words)
+  shortMeaning?: string;           // 1-3 word brief meaning (for phrases)
+  definition?: string;             // Detailed definition (for single words)
+  meaning?: string;                // Detailed explanation (for phrases)
   ipa?: string;
   syllables?: string;
   simplifiedSentence?: string;
