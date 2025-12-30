@@ -389,9 +389,13 @@ Rules:
 
 Original: "${sentence}"
 
-Simplified:`;
+IMPORTANT: Output ONLY the SIMPLIFIED line. No preamble or explanation.
 
-      const simplified = await this.chat(prompt);
+Format your response EXACTLY like this:
+SIMPLIFIED: [simplified sentence only]`;
+
+      const response = await this.chat(prompt);
+      const simplified = this.extractEnglishSimplifiedSentence(response);
       return { simplified };
     }
 
@@ -447,6 +451,46 @@ SIMPLIFIED_ENGLISH: [English translation of simplified]`;
     }
 
     return { simplified, sentenceTranslation, simplifiedTranslation };
+  }
+
+  private extractEnglishSimplifiedSentence(response: string): string {
+    const simpMatch = response.match(/SIMPLIFIED:\s*([^\n\r]+)/i);
+    let cleaned = simpMatch ? simpMatch[1].trim() : response.trim();
+
+    cleaned = cleaned
+      .replace(/^(?:the\s+)?simplified\s+(?:answer|version|sentence)\s*(?:would be|is)?[:\-]\s*/i, '')
+      .replace(/^here(?:'s| is)\s+the\s+(?:simplified|rewritten)\s+(?:version|sentence)[:\-]\s*/i, '')
+      .replace(/^simplified[:\-]\s*/i, '')
+      .trim();
+
+    const quotedMatch = cleaned.match(/"([\s\S]+?)"/);
+    if (quotedMatch && quotedMatch[1]) {
+      cleaned = quotedMatch[1].trim();
+    }
+
+    const lines = cleaned.split('\n').map(line => line.trim()).filter(Boolean);
+    if (lines.length > 1) {
+      const stopIndex = lines.findIndex((line, index) => index > 0 && this.isSimplificationExplanationLine(line));
+      const keptLines = stopIndex === -1 ? lines : lines.slice(0, stopIndex);
+      cleaned = keptLines.join(' ');
+    } else {
+      cleaned = lines[0] || cleaned;
+    }
+
+    const inlineExplanation = cleaned.match(/^([\s\S]+?[.!?])\s+(?:i|we)\s+(?:replaced|changed|simplified|kept|used|made|did)\b/i);
+    if (inlineExplanation && inlineExplanation[1]) {
+      cleaned = inlineExplanation[1].trim();
+    }
+
+    return this.cleanMarkdownFormatting(cleaned);
+  }
+
+  private isSimplificationExplanationLine(line: string): boolean {
+    return /^(?:i|we)\s+(?:replaced|changed|simplified|kept|used|made|did|preserved|maintained)\b/i.test(line)
+      || /^the sentence structure\b/i.test(line)
+      || /^no concepts?\s+or\s+meanings?\b/i.test(line)
+      || /^this (?:keeps|retains|preserves|maintains)\b/i.test(line)
+      || /^(?:explanation|note|reason)[:\-]/i.test(line);
   }
 
   async getWordEquivalent(
