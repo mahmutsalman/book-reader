@@ -181,6 +181,7 @@ export class GroqService implements AIServiceInterface {
   }
 
   async getWordDefinition(word: string, context: string, language = 'en'): Promise<{
+    shortDefinition: string;
     definition: string;
     wordTranslation?: string;
     wordType?: string;
@@ -192,82 +193,93 @@ export class GroqService implements AIServiceInterface {
 Context: "${context}"
 
 Format your response EXACTLY like this:
+SHORT: [1-3 word concise meaning]
 DEFINITION: [2-3 sentence definition suitable for a language learner]
 TYPE: [part of speech: noun, verb, adjective, adverb, preposition, conjunction, interjection, pronoun, article, phrasal verb, idiom, or collocation]`;
 
       const response = await this.chat(prompt);
+      const shortMatch = response.match(/SHORT:\s*(.+?)(?=DEFINITION:|TYPE:|$)/is);
       const defMatch = response.match(/DEFINITION:\s*(.+?)(?=TYPE:|$)/is);
       const typeMatch = response.match(/TYPE:\s*([^\n]+)/i);
 
+      const shortDefinition = shortMatch ? shortMatch[1].trim() : '';
       let definition = defMatch ? defMatch[1].trim() : response;
       if (!defMatch) {
-        definition = definition.replace(/^TYPE:\s*[^\n]+\n?/im, '').trim();
+        definition = definition.replace(/^(SHORT|TYPE):\s*[^\n]+\n?/gim, '').trim();
         definition = definition.replace(/^DEFINITION:\s*/i, '').trim();
       }
       const wordType = typeMatch ? this.normalizeWordType(typeMatch[1].trim()) : undefined;
 
-      return { definition, wordType };
+      return { shortDefinition, definition, wordType };
     }
 
     if (language === 'de') {
       const prompt = `For the German word "${word}" in this context, provide:
-1. A definition in English explaining what this word means (2-3 sentences, write the definition in ENGLISH)
-2. The English translation of the word (single word or short phrase)
-3. The part of speech (noun, verb, adjective, adverb, preposition, conjunction, interjection, pronoun, article, phrasal verb, idiom, or collocation)
-4. If it's a noun, provide the definite article (der, die, or das)
+1. A SHORT definition (1-3 words in English showing core meaning)
+2. A full definition in English explaining what this word means (2-3 sentences, write the definition in ENGLISH)
+3. The English translation of the word (single word or short phrase)
+4. The part of speech (noun, verb, adjective, adverb, preposition, conjunction, interjection, pronoun, article, phrasal verb, idiom, or collocation)
+5. If it's a noun, provide the definite article (der, die, or das)
 
 Context: "${context}"
 
 Format your response EXACTLY like this:
+SHORT: [1-3 word concise meaning in English]
 DEFINITION: [definition in English]
 ENGLISH: [English translation of the word]
 TYPE: [part of speech]
 ARTICLE: [der/die/das - ONLY if it's a noun, otherwise leave empty or omit]`;
 
       const response = await this.chat(prompt);
+      const shortMatch = response.match(/SHORT:\s*(.+?)(?=DEFINITION:|ENGLISH:|TYPE:|ARTICLE:|$)/is);
       const defMatch = response.match(/DEFINITION:\s*(.+?)(?=ENGLISH:|TYPE:|ARTICLE:|$)/is);
       const engMatch = response.match(/ENGLISH:\s*(.+?)(?=TYPE:|ARTICLE:|$)/is);
       const typeMatch = response.match(/TYPE:\s*([^\n]+)/i);
       const articleMatch = response.match(/ARTICLE:\s*([^\n]+)/i);
 
+      const shortDefinition = shortMatch ? shortMatch[1].trim() : '';
       let definition = defMatch ? defMatch[1].trim() : response;
       if (!defMatch) {
-        definition = definition.replace(/^(DEFINITION|ENGLISH|TYPE|ARTICLE):\s*[^\n]*\n?/gim, '').trim();
+        definition = definition.replace(/^(SHORT|DEFINITION|ENGLISH|TYPE|ARTICLE):\s*[^\n]*\n?/gim, '').trim();
       }
       const wordTranslation = engMatch ? engMatch[1].trim() : undefined;
       const wordType = typeMatch ? this.normalizeWordType(typeMatch[1].trim()) : undefined;
       const germanArticle = articleMatch ? this.normalizeGermanArticle(articleMatch[1].trim()) : undefined;
 
-      return { definition, wordTranslation, wordType, germanArticle };
+      return { shortDefinition, definition, wordTranslation, wordType, germanArticle };
     }
 
     // Other non-English languages
     const languageName = this.getLanguageName(language);
     const prompt = `For the ${languageName} word "${word}" in this context, provide:
-1. A definition in English explaining what this word means (2-3 sentences, write the definition in ENGLISH)
-2. The English translation of the word (single word or short phrase)
-3. The part of speech (noun, verb, adjective, adverb, preposition, conjunction, interjection, pronoun, article, phrasal verb, idiom, or collocation)
+1. A SHORT definition (1-3 words in English showing core meaning)
+2. A full definition in English explaining what this word means (2-3 sentences, write the definition in ENGLISH)
+3. The English translation of the word (single word or short phrase)
+4. The part of speech (noun, verb, adjective, adverb, preposition, conjunction, interjection, pronoun, article, phrasal verb, idiom, or collocation)
 
 Context: "${context}"
 
 Format your response EXACTLY like this:
+SHORT: [1-3 word concise meaning in English]
 DEFINITION: [definition in English]
 ENGLISH: [English translation of the word]
 TYPE: [part of speech]`;
 
     const response = await this.chat(prompt);
+    const shortMatch = response.match(/SHORT:\s*(.+?)(?=DEFINITION:|ENGLISH:|TYPE:|$)/is);
     const defMatch = response.match(/DEFINITION:\s*(.+?)(?=ENGLISH:|TYPE:|$)/is);
     const engMatch = response.match(/ENGLISH:\s*(.+?)(?=TYPE:|$)/is);
     const typeMatch = response.match(/TYPE:\s*([^\n]+)/i);
 
+    const shortDefinition = shortMatch ? shortMatch[1].trim() : '';
     let definition = defMatch ? defMatch[1].trim() : response;
     if (!defMatch) {
-      definition = definition.replace(/^(DEFINITION|ENGLISH|TYPE):\s*[^\n]*\n?/gim, '').trim();
+      definition = definition.replace(/^(SHORT|DEFINITION|ENGLISH|TYPE):\s*[^\n]*\n?/gim, '').trim();
     }
     const wordTranslation = engMatch ? engMatch[1].trim() : undefined;
     const wordType = typeMatch ? this.normalizeWordType(typeMatch[1].trim()) : undefined;
 
-    return { definition, wordTranslation, wordType };
+    return { shortDefinition, definition, wordTranslation, wordType };
   }
 
   async getIPAPronunciation(word: string, language = 'en'): Promise<{ ipa: string; syllables: string }> {
@@ -518,6 +530,7 @@ Simplified ${languageName} sentence:`;
   }
 
   async getPhraseMeaning(phrase: string, context: string, language = 'en'): Promise<{
+    shortMeaning: string;
     meaning: string;
     phraseTranslation?: string;
     isPhrasalVerb: boolean;
@@ -531,26 +544,30 @@ Simplified ${languageName} sentence:`;
 
     const prompt = `For the ${languageName} phrase "${phrase}" in this context, analyze and provide:
 
-1. A clear explanation of what this phrase means (focus on idiomatic usage if applicable)
-${!isEnglish ? '2. The English translation of the phrase' : ''}
-${isEnglish ? '2' : '3'}. Is this a PHRASAL VERB? A phrasal verb is a verb combined with a preposition or adverb that creates a meaning different from the original verb (e.g., "give up" = surrender, "look forward to" = anticipate, "break down" = stop working)
-${isEnglish ? '3' : '4'}. If it IS a phrasal verb, identify the base verb and particle(s)
+1. A SHORT explanation (1-3 words or very brief phrase showing what it means in this context)
+2. A clear detailed explanation of what this phrase means (focus on idiomatic usage if applicable)
+${!isEnglish ? '3. The English translation of the phrase' : ''}
+${isEnglish ? '3' : '4'}. Is this a PHRASAL VERB? A phrasal verb is a verb combined with a preposition or adverb that creates a meaning different from the original verb (e.g., "give up" = surrender, "look forward to" = anticipate, "break down" = stop working)
+${isEnglish ? '4' : '5'}. If it IS a phrasal verb, identify the base verb and particle(s)
 
 Context: "${context}"
 
 Format your response EXACTLY like this:
-MEANING: [explanation of the phrase meaning]${!isEnglish ? '\nENGLISH: [English translation]' : ''}
+SHORT: [1-3 word brief meaning]
+MEANING: [detailed explanation of the phrase meaning]${!isEnglish ? '\nENGLISH: [English translation]' : ''}
 IS_PHRASAL_VERB: [yes/no]
 BASE_VERB: [base verb if phrasal verb, otherwise leave empty]
 PARTICLE: [particle(s) if phrasal verb, otherwise leave empty]`;
 
     const response = await this.chat(prompt);
+    const shortMatch = response.match(/SHORT:\s*(.+?)(?=MEANING:|ENGLISH:|IS_PHRASAL_VERB:|$)/is);
     const meaningMatch = response.match(/MEANING:\s*(.+?)(?=ENGLISH:|IS_PHRASAL_VERB:|$)/is);
     const engMatch = response.match(/ENGLISH:\s*(.+?)(?=IS_PHRASAL_VERB:|$)/is);
     const isPhrasalMatch = response.match(/IS_PHRASAL_VERB:\s*(\w+)/i);
     const baseVerbMatch = response.match(/BASE_VERB:\s*([^\n]+)/i);
     const particleMatch = response.match(/PARTICLE:\s*([^\n]+)/i);
 
+    const shortMeaning = shortMatch ? shortMatch[1].trim() : '';
     let meaning = meaningMatch ? meaningMatch[1].trim() : response.trim();
     const phraseTranslation = engMatch ? engMatch[1].trim() : undefined;
 
@@ -569,7 +586,7 @@ PARTICLE: [particle(s) if phrasal verb, otherwise leave empty]`;
       particle: particleMatch?.[1]?.trim() || '',
     } : undefined;
 
-    return { meaning, phraseTranslation, isPhrasalVerb, phrasalVerbInfo };
+    return { shortMeaning, meaning, phraseTranslation, isPhrasalVerb, phrasalVerbInfo };
   }
 
   async generatePreStudyEntry(

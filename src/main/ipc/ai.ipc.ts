@@ -13,6 +13,7 @@ export function registerAIHandlers(): void {
         const result = await service.getWordDefinition(word, context, language);
         return {
           word,
+          shortDefinition: result.shortDefinition,
           definition: result.definition,
           context,
           wordTranslation: result.wordTranslation,
@@ -113,9 +114,10 @@ export function registerAIHandlers(): void {
       try {
         const service = await getAIService();
         const result = await service.getPhraseMeaning(phrase, context, language);
-        console.log('[PHRASE IPC] getPhraseMeaning response:', { phrase, meaning: result.meaning });
+        console.log('[PHRASE IPC] getPhraseMeaning response:', { phrase, shortMeaning: result.shortMeaning, meaning: result.meaning });
         return {
           phrase,
+          shortMeaning: result.shortMeaning,
           meaning: result.meaning,
           context,
           phraseTranslation: result.phraseTranslation,

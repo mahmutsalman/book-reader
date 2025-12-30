@@ -31,7 +31,10 @@ interface WordPanelProps {
 }
 
 interface WordData {
+  shortDefinition?: string;        // 1-3 word concise meaning (for single words)
+  shortMeaning?: string;           // 1-3 word brief meaning (for phrases)
   definition?: string;
+  meaning?: string;                // Detailed explanation (for phrases)
   ipa?: string;
   syllables?: string;
   simplifiedSentence?: string;
@@ -307,7 +310,10 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
     if (preloadedData) {
       setWordData({
         loading: false,
+        shortDefinition: preloadedData.shortDefinition,
+        shortMeaning: preloadedData.shortMeaning,
         definition: preloadedData.definition,
+        meaning: preloadedData.meaning,
         ipa: preloadedData.ipa,
         syllables: preloadedData.syllables,
         simplifiedSentence: preloadedData.simplifiedSentence,
@@ -347,7 +353,11 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
           ]);
 
           if (defResult.status === 'fulfilled') {
+            results.shortDefinition = defResult.value.shortDefinition;
             results.definition = defResult.value.definition;
+            results.wordTranslation = defResult.value.wordTranslation;
+            results.wordType = defResult.value.wordType;
+            results.germanArticle = defResult.value.germanArticle;
           }
           if (ipaResult.status === 'fulfilled') {
             results.ipa = ipaResult.value.ipa;
@@ -849,6 +859,16 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
                 <h3 className="font-semibold text-gray-700 dark:text-cream-200 mb-2">
                   {selectedWord.isPhrase ? '📖 Phrase Meaning' : '📖 Definition'}
                 </h3>
+
+                {/* Short Definition - Prominent Display */}
+                {(wordData.shortDefinition || (selectedWord.isPhrase && wordData.shortMeaning)) && (
+                  <div className="mb-3 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border-l-4 border-blue-500">
+                    <p className="text-xl font-bold text-blue-900 dark:text-blue-100">
+                      {selectedWord.isPhrase ? wordData.shortMeaning : wordData.shortDefinition}
+                    </p>
+                  </div>
+                )}
+
                 {/* English translation of word/phrase (for non-English books) - shown prominently */}
                 {isNonEnglish && (wordData.wordTranslation || wordData.phraseTranslation) && (
                   <p className="text-sm text-blue-600 dark:text-blue-400 mb-2 flex items-center gap-1 font-medium">
@@ -856,9 +876,17 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
                     <span>{selectedWord.isPhrase ? wordData.phraseTranslation : wordData.wordTranslation}</span>
                   </p>
                 )}
-                <p className="text-gray-600 dark:text-cream-200 bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
-                  {wordData.definition || (selectedWord.isPhrase ? 'No phrase meaning available' : 'No definition available')}
-                </p>
+
+                {/* Detailed Definition - Below short version */}
+                <div className="mt-3">
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-1 font-medium">
+                    Detailed Explanation:
+                  </p>
+                  <p className="text-gray-600 dark:text-cream-200 bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
+                    {wordData.definition || (selectedWord.isPhrase ? wordData.meaning : null) || 'No definition available'}
+                  </p>
+                </div>
+
                 {/* Retry button for rate limit errors */}
                 {retryingModel ? (
                   <div className="mt-3 px-4 py-2 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg text-sm flex items-center gap-2">
