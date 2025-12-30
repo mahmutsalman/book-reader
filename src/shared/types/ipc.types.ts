@@ -43,6 +43,7 @@ export interface ElectronAPI {
   book: {
     import: (filePath: string, language?: BookLanguage) => Promise<Book>;
     importPdf: (pdfPath: string, language?: BookLanguage, useOcr?: boolean) => Promise<Book>;
+    importTxt: (txtPath: string, language?: BookLanguage) => Promise<Book>;
     getPdfStatus: () => Promise<PdfStatusResponse>;
     getAll: () => Promise<Book[]>;
     getById: (id: number) => Promise<Book | null>;

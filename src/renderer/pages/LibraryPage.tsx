@@ -17,6 +17,8 @@ const LibraryPage: React.FC = () => {
   const [importProgress, setImportProgress] = useState<string>('');
   const [pendingFilePath, setPendingFilePath] = useState<string | null>(null);
   const [isPdfFile, setIsPdfFile] = useState(false);
+  const [isTxtFile, setIsTxtFile] = useState(false);
+  const [showFormatDialog, setShowFormatDialog] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState<BookLanguage>('en');
   const [collapsedSections, setCollapsedSections] = useState<Set<BookLanguage>>(new Set());
 
@@ -49,25 +51,32 @@ const LibraryPage: React.FC = () => {
     loadBooks();
   }, [loadBooks]);
 
-  const handleImportBook = async () => {
+  const handleImportBook = () => {
+    // Show format selection dialog
+    setShowFormatDialog(true);
+  };
+
+  const handleFormatSelect = async (format: 'pdf' | 'txt') => {
+    setShowFormatDialog(false);
+
     if (!window.electronAPI) {
       alert('Electron API not available');
       return;
     }
 
     try {
-      const filePath = await window.electronAPI.dialog.openFile({
-        filters: [
-          { name: 'Books', extensions: ['json', 'pdf'] },
-          { name: 'JSON Books', extensions: ['json'] },
-          { name: 'PDF Documents', extensions: ['pdf'] },
-        ],
-      });
+      const filters = format === 'pdf'
+        ? [{ name: 'PDF Documents', extensions: ['pdf'] }]
+        : [{ name: 'Text Files', extensions: ['txt'] }];
+
+      const filePath = await window.electronAPI.dialog.openFile({ filters });
 
       if (filePath) {
-        // Detect if PDF file
-        const isPdf = filePath.toLowerCase().endsWith('.pdf');
+        const isPdf = format === 'pdf';
+        const isTxt = format === 'txt';
+
         setIsPdfFile(isPdf);
+        setIsTxtFile(isTxt);
         setPendingFilePath(filePath);
         setSelectedLanguage('en');
       }
@@ -90,12 +99,20 @@ const LibraryPage: React.FC = () => {
         // Reload books to show the new import
         await loadBooks();
         setImportProgress('');
+      } else if (isTxtFile) {
+        // TXT import
+        setImportProgress('Parsing text file...');
+        await window.electronAPI.book.importTxt(pendingFilePath, selectedLanguage);
+        // Reload books to show the new import
+        await loadBooks();
+        setImportProgress('');
       } else {
         // JSON import
         await importBook(pendingFilePath, selectedLanguage);
       }
       setPendingFilePath(null);
       setIsPdfFile(false);
+      setIsTxtFile(false);
     } catch (err) {
       console.error('Import failed:', err);
       const message = err instanceof Error ? err.message : 'Failed to import book';
@@ -109,6 +126,7 @@ const LibraryPage: React.FC = () => {
   const handleCancelImport = () => {
     setPendingFilePath(null);
     setIsPdfFile(false);
+    setIsTxtFile(false);
   };
 
   const handleOpenBook = (book: Book) => {
@@ -243,6 +261,51 @@ const LibraryPage: React.FC = () => {
         </div>
       )}
 
+      {/* Format Selection Dialog */}
+      {showFormatDialog && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/50 z-40"
+            onClick={() => setShowFormatDialog(false)}
+          />
+          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-gray-800 rounded-lg shadow-xl z-50 p-6 w-full max-w-md">
+            <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Import Book</h2>
+            <p className="text-gray-600 dark:text-gray-400 mb-6">Choose the format of your book:</p>
+
+            <div className="space-y-3 mb-6">
+              <button
+                onClick={() => handleFormatSelect('pdf')}
+                className="w-full p-4 border-2 border-blue-500 dark:border-blue-600 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 flex items-center gap-3 transition-colors"
+              >
+                <span className="text-3xl">📄</span>
+                <div className="text-left flex-1">
+                  <div className="font-semibold text-gray-800 dark:text-white">Import PDF Document</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">With OCR support for scanned PDFs</div>
+                </div>
+              </button>
+
+              <button
+                onClick={() => handleFormatSelect('txt')}
+                className="w-full p-4 border-2 border-green-500 dark:border-green-600 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/20 flex items-center gap-3 transition-colors"
+              >
+                <span className="text-3xl">📝</span>
+                <div className="text-left flex-1">
+                  <div className="font-semibold text-gray-800 dark:text-white">Import Plain Text (TXT)</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">For Project Gutenberg and text books</div>
+                </div>
+              </button>
+            </div>
+
+            <button
+              onClick={() => setShowFormatDialog(false)}
+              className="w-full px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </>
+      )}
+
       {/* Language Selection Dialog */}
       {pendingFilePath && (
         <>
@@ -252,12 +315,17 @@ const LibraryPage: React.FC = () => {
           />
           <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-gray-800 rounded-lg shadow-xl z-50 p-6 w-96">
             <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">
-              Import {isPdfFile ? 'PDF' : 'Book'}
+              Import {isPdfFile ? 'PDF' : isTxtFile ? 'Text File' : 'Book'}
             </h3>
             {isPdfFile && (
               <div className="bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 p-3 rounded-lg mb-4 text-sm">
                 <span className="font-medium">PDF Import:</span> Text will be extracted from the PDF.
                 {' '}OCR will be used for scanned pages if available.
+              </div>
+            )}
+            {isTxtFile && (
+              <div className="bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 p-3 rounded-lg mb-4 text-sm">
+                <span className="font-medium">TXT Import:</span> Text will be parsed into chapters. The app will automatically detect chapter boundaries and create responsive pagination based on your zoom level.
               </div>
             )}
             <p className="text-sm text-gray-600 dark:text-cream-200 mb-4">

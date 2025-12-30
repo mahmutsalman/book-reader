@@ -2,6 +2,7 @@ import { ipcMain } from 'electron';
 import { IPC_CHANNELS } from '../../shared/constants';
 import { bookRepository } from '../../database/repositories';
 import { pdfImportService } from '../services/pdf-import.service';
+import { txtImportService } from '../services/txt-import.service';
 import type { BookLanguage } from '../../shared/types';
 
 export function registerBookHandlers(): void {
@@ -16,6 +17,11 @@ export function registerBookHandlers(): void {
 
   ipcMain.handle(IPC_CHANNELS.BOOK_PDF_STATUS, async () => {
     return pdfImportService.checkStatus();
+  });
+
+  // TXT Import handler
+  ipcMain.handle(IPC_CHANNELS.BOOK_IMPORT_TXT, async (_, txtPath: string, language: BookLanguage = 'en') => {
+    return txtImportService.importTxt(txtPath, language);
   });
 
   ipcMain.handle(IPC_CHANNELS.BOOK_GET_ALL, async () => {
