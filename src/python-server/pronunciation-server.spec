@@ -12,7 +12,27 @@ Output:
 """
 
 import sys
+import glob
 from pathlib import Path
+
+# Auto-detect espeak-ng-data path (cross-platform)
+def find_espeak_data():
+    """Find espeak-ng-data in venv, handling both Windows and Unix paths."""
+    # Try Windows path first (venv/Lib with capital L)
+    windows_paths = glob.glob('venv/Lib/python*/site-packages/piper/espeak-ng-data')
+    if windows_paths:
+        return windows_paths[0]
+
+    # Try Unix/macOS path (venv/lib lowercase)
+    unix_paths = glob.glob('venv/lib/python*/site-packages/piper/espeak-ng-data')
+    if unix_paths:
+        return unix_paths[0]
+
+    # Fallback: print warning and return None
+    print("WARNING: espeak-ng-data not found in venv. Piper TTS may not work!")
+    return None
+
+espeak_data_path = find_espeak_data()
 
 # Analysis: Collect all Python files and dependencies
 a = Analysis(
@@ -23,9 +43,8 @@ a = Analysis(
         # Include Piper TTS voice models
         ('models/*.onnx', 'models'),
         ('models/*.json', 'models'),
-        # Include espeak-ng-data for Piper TTS phoneme generation
-        ('venv/lib/python3.13/site-packages/piper/espeak-ng-data', 'piper/espeak-ng-data'),
-    ],
+        # Include espeak-ng-data for Piper TTS phoneme generation (cross-platform)
+    ] + ([(espeak_data_path, 'piper/espeak-ng-data')] if espeak_data_path else []),
     hiddenimports=[
         # FastAPI and dependencies
         'fastapi',

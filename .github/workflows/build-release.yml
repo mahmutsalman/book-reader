@@ -1,0 +1,147 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Trigger on version tags (v1.0.0, v1.0.1, etc.)
+  workflow_dispatch:  # Allow manual trigger from GitHub Actions tab
+    inputs:
+      prerelease:
+        description: 'Create pre-release'
+        required: true
+        default: 'true'
+        type: boolean
+
+jobs:
+  build:
+    name: Build ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Python server (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          cd src/python-server
+          chmod +x build.sh
+          ./build.sh
+
+      - name: Build Python server (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cd src/python-server
+          ./build.bat
+        shell: cmd
+
+      - name: Build Electron app
+        run: npm run make
+
+      - name: List build outputs (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          echo "=== Build outputs ==="
+          find out/make -type f -name "*.dmg" -o -name "*.zip"
+        shell: bash
+
+      - name: List build outputs (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          echo "=== Build outputs ==="
+          dir out\make\squirrel.windows\x64\*.exe
+          dir out\make\squirrel.windows\x64\RELEASES
+        shell: cmd
+
+      - name: Upload artifacts (macOS)
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-build
+          path: |
+            out/make/**/*.dmg
+            out/make/**/*.zip
+          retention-days: 30
+
+      - name: Upload artifacts (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-build
+          path: |
+            out/make/squirrel.windows/x64/*.exe
+            out/make/squirrel.windows/x64/RELEASES
+            out/make/squirrel.windows/x64/*.nupkg
+          retention-days: 30
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Download macOS artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-build
+          path: ./artifacts/macos
+
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-build
+          path: ./artifacts/windows
+
+      - name: Display artifact structure
+        run: |
+          echo "=== Artifact structure ==="
+          ls -R ./artifacts/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            ./artifacts/macos/**/*.dmg
+            ./artifacts/windows/**/*.exe
+            ./artifacts/windows/**/RELEASES
+          prerelease: ${{ github.event.inputs.prerelease == 'true' || contains(github.ref, 'beta') || contains(github.ref, 'alpha') }}
+          generate_release_notes: true
+          draft: false
+          name: Release ${{ github.ref_name }}
+          body: |
+            ## Smart Book Reader ${{ github.ref_name }}
+
+            ### Downloads
+            - **Windows**: Download the `.exe` installer
+            - **macOS**: Download the `.dmg` file
+
+            ### Installation
+            - **Windows**: Run the installer. You may see "Unknown Publisher" warning (expected without code signing).
+            - **macOS**: Open the DMG and drag to Applications folder.
+
+            ### What's New
+            See release notes below for details.
+
+            ---
+            **Note**: First-time installation may take a few moments as dependencies are set up.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

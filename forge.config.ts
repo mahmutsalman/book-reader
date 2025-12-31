@@ -63,7 +63,14 @@ const config: ForgeConfig = {
     },
   },
   makers: [
-    new MakerSquirrel({}),
+    new MakerSquirrel({
+      name: 'SmartBook',
+      authors: 'Mahmut Salman',
+      description: 'A smart book reader with AI-powered word lookup and vocabulary tracking',
+      setupIcon: 'assets/icon.ico',
+      // Note: iconUrl should point to a publicly accessible URL for auto-updates
+      // For now, leaving it undefined. Add when hosting releases on GitHub.
+    }),
     new MakerZIP({}, ['darwin']),
     new MakerDMG({
       format: 'ULFO',
