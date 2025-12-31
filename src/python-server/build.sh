@@ -85,25 +85,40 @@ check_models() {
         echo "   Pronunciation feature requires voice models (~180MB total)"
         echo "   Models: English (US), German, Russian"
         echo ""
-        echo "Would you like to download them now? [Y/n]"
-        read -r response
 
-        if [[ ! "$response" =~ ^[Nn]$ ]]; then
-            echo ""
-            echo "Downloading voice models from HuggingFace..."
+        # In CI environment, skip interactive prompt and download automatically
+        if [ -n "$CI" ] || [ -n "$GITHUB_ACTIONS" ]; then
+            echo "CI environment detected - downloading models automatically..."
             python download_models.py
 
             if [ $? -eq 0 ]; then
                 echo "✅ Voice models downloaded successfully!"
             else
-                echo "❌ Failed to download models. You can try again later with:"
-                echo "   cd src/python-server && python download_models.py"
+                echo "⚠️  Failed to download models in CI. Continuing without models."
+                echo "   App will work but pronunciation feature may be limited."
             fi
         else
-            echo ""
-            echo "⏭️  Skipping model download."
-            echo "   To download later, run:"
-            echo "   cd src/python-server && python download_models.py"
+            # Interactive mode - ask user
+            echo "Would you like to download them now? [Y/n]"
+            read -r response
+
+            if [[ ! "$response" =~ ^[Nn]$ ]]; then
+                echo ""
+                echo "Downloading voice models from HuggingFace..."
+                python download_models.py
+
+                if [ $? -eq 0 ]; then
+                    echo "✅ Voice models downloaded successfully!"
+                else
+                    echo "❌ Failed to download models. You can try again later with:"
+                    echo "   cd src/python-server && python download_models.py"
+                fi
+            else
+                echo ""
+                echo "⏭️  Skipping model download."
+                echo "   To download later, run:"
+                echo "   cd src/python-server && python download_models.py"
+            fi
         fi
     else
         model_count=$(ls -1 models/*.onnx 2>/dev/null | wc -l | tr -d ' ')
