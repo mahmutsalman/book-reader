@@ -13,6 +13,8 @@ const electronAPI: ElectronAPI = {
       ipcRenderer.invoke(IPC_CHANNELS.BOOK_IMPORT_PDF, pdfPath, language || 'en', useOcr ?? true),
     importTxt: (txtPath: string, language?: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.BOOK_IMPORT_TXT, txtPath, language || 'en'),
+    importEpub: (epubPath: string, language?: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BOOK_IMPORT_EPUB, epubPath, language || 'en'),
     getPdfStatus: () =>
       ipcRenderer.invoke(IPC_CHANNELS.BOOK_PDF_STATUS),
     getAll: () =>

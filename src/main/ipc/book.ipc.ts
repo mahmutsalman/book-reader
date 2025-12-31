@@ -3,6 +3,7 @@ import { IPC_CHANNELS } from '../../shared/constants';
 import { bookRepository } from '../../database/repositories';
 import { pdfImportService } from '../services/pdf-import.service';
 import { txtImportService } from '../services/txt-import.service';
+import { epubImportService } from '../services/epub-import.service';
 import type { BookLanguage } from '../../shared/types';
 
 export function registerBookHandlers(): void {
@@ -22,6 +23,11 @@ export function registerBookHandlers(): void {
   // TXT Import handler
   ipcMain.handle(IPC_CHANNELS.BOOK_IMPORT_TXT, async (_, txtPath: string, language: BookLanguage = 'en') => {
     return txtImportService.importTxt(txtPath, language);
+  });
+
+  // EPUB Import handler
+  ipcMain.handle(IPC_CHANNELS.BOOK_IMPORT_EPUB, async (_, epubPath: string, language: BookLanguage = 'en') => {
+    return epubImportService.importEpub(epubPath, language);
   });
 
   ipcMain.handle(IPC_CHANNELS.BOOK_GET_ALL, async () => {

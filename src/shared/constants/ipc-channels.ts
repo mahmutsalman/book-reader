@@ -4,6 +4,7 @@ export const IPC_CHANNELS = {
   BOOK_IMPORT: 'book:import',
   BOOK_IMPORT_PDF: 'book:import-pdf',
   BOOK_IMPORT_TXT: 'book:import-txt',
+  BOOK_IMPORT_EPUB: 'book:import-epub',
   BOOK_PDF_STATUS: 'book:pdf-status',
   BOOK_GET_ALL: 'book:get-all',
   BOOK_GET_BY_ID: 'book:get-by-id',

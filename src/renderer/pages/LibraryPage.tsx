@@ -18,6 +18,7 @@ const LibraryPage: React.FC = () => {
   const [pendingFilePath, setPendingFilePath] = useState<string | null>(null);
   const [isPdfFile, setIsPdfFile] = useState(false);
   const [isTxtFile, setIsTxtFile] = useState(false);
+  const [isEpubFile, setIsEpubFile] = useState(false);
   const [showFormatDialog, setShowFormatDialog] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState<BookLanguage>('en');
   const [collapsedSections, setCollapsedSections] = useState<Set<BookLanguage>>(new Set());
@@ -56,7 +57,7 @@ const LibraryPage: React.FC = () => {
     setShowFormatDialog(true);
   };
 
-  const handleFormatSelect = async (format: 'pdf' | 'txt') => {
+  const handleFormatSelect = async (format: 'pdf' | 'txt' | 'epub') => {
     setShowFormatDialog(false);
 
     if (!window.electronAPI) {
@@ -67,16 +68,20 @@ const LibraryPage: React.FC = () => {
     try {
       const filters = format === 'pdf'
         ? [{ name: 'PDF Documents', extensions: ['pdf'] }]
-        : [{ name: 'Text Files', extensions: ['txt'] }];
+        : format === 'txt'
+        ? [{ name: 'Text Files', extensions: ['txt'] }]
+        : [{ name: 'EPUB Documents', extensions: ['epub'] }];
 
       const filePath = await window.electronAPI.dialog.openFile({ filters });
 
       if (filePath) {
         const isPdf = format === 'pdf';
         const isTxt = format === 'txt';
+        const isEpub = format === 'epub';
 
         setIsPdfFile(isPdf);
         setIsTxtFile(isTxt);
+        setIsEpubFile(isEpub);
         setPendingFilePath(filePath);
         setSelectedLanguage('en');
       }
@@ -106,6 +111,13 @@ const LibraryPage: React.FC = () => {
         // Reload books to show the new import
         await loadBooks();
         setImportProgress('');
+      } else if (isEpubFile) {
+        // EPUB import
+        setImportProgress('Parsing EPUB file...');
+        await window.electronAPI.book.importEpub(pendingFilePath, selectedLanguage);
+        // Reload books to show the new import
+        await loadBooks();
+        setImportProgress('');
       } else {
         // JSON import
         await importBook(pendingFilePath, selectedLanguage);
@@ -113,6 +125,7 @@ const LibraryPage: React.FC = () => {
       setPendingFilePath(null);
       setIsPdfFile(false);
       setIsTxtFile(false);
+      setIsEpubFile(false);
     } catch (err) {
       console.error('Import failed:', err);
       const message = err instanceof Error ? err.message : 'Failed to import book';
@@ -127,6 +140,7 @@ const LibraryPage: React.FC = () => {
     setPendingFilePath(null);
     setIsPdfFile(false);
     setIsTxtFile(false);
+    setIsEpubFile(false);
   };
 
   const handleOpenBook = (book: Book) => {
@@ -294,6 +308,17 @@ const LibraryPage: React.FC = () => {
                   <div className="text-sm text-gray-600 dark:text-gray-400">For Project Gutenberg and text books</div>
                 </div>
               </button>
+
+              <button
+                onClick={() => handleFormatSelect('epub')}
+                className="w-full p-4 border-2 border-purple-500 dark:border-purple-600 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20 flex items-center gap-3 transition-colors"
+              >
+                <span className="text-3xl">📚</span>
+                <div className="text-left flex-1">
+                  <div className="font-semibold text-gray-800 dark:text-white">Import EPUB Document</div>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">For digital books and ebooks</div>
+                </div>
+              </button>
             </div>
 
             <button
@@ -315,7 +340,7 @@ const LibraryPage: React.FC = () => {
           />
           <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-gray-800 rounded-lg shadow-xl z-50 p-6 w-96">
             <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">
-              Import {isPdfFile ? 'PDF' : isTxtFile ? 'Text File' : 'Book'}
+              Import {isPdfFile ? 'PDF' : isTxtFile ? 'Text File' : isEpubFile ? 'EPUB' : 'Book'}
             </h3>
             {isPdfFile && (
               <div className="bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 p-3 rounded-lg mb-4 text-sm">
@@ -326,6 +351,11 @@ const LibraryPage: React.FC = () => {
             {isTxtFile && (
               <div className="bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 p-3 rounded-lg mb-4 text-sm">
                 <span className="font-medium">TXT Import:</span> Text will be parsed into chapters. The app will automatically detect chapter boundaries and create responsive pagination based on your zoom level.
+              </div>
+            )}
+            {isEpubFile && (
+              <div className="bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 p-3 rounded-lg mb-4 text-sm">
+                <span className="font-medium">EPUB Import:</span> Chapters and metadata will be extracted from the EPUB file.
               </div>
             )}
             <p className="text-sm text-gray-600 dark:text-cream-200 mb-4">
