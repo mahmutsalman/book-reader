@@ -50,7 +50,7 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           cd src/python-server
-          ./build.bat
+          call build.bat
         shell: cmd
 
       - name: Build Electron app
