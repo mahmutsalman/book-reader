@@ -100,8 +100,14 @@ app.on('ready', async () => {
 });
 
 // Quit when all windows are closed, except on macOS.
-app.on('window-all-closed', () => {
+app.on('window-all-closed', async () => {
   if (process.platform !== 'darwin') {
+    console.log('All windows closed - stopping Python server...');
+    try {
+      await pythonManager.stop();
+    } catch (error) {
+      console.error('Error stopping Python server:', error);
+    }
     app.quit();
   }
 });
@@ -114,8 +120,36 @@ app.on('activate', () => {
   }
 });
 
+// Track app quit state to avoid interfering with server restart
+let isQuitting = false;
+
 // Cleanup before quitting
-app.on('before-quit', async () => {
-  console.log('Stopping pronunciation server...');
-  await pythonManager.stop();
+app.on('before-quit', async (event) => {
+  if (isQuitting) return;
+
+  event.preventDefault();
+  isQuitting = true;
+
+  console.log('App before-quit - stopping pronunciation server...');
+
+  try {
+    await pythonManager.stop();
+  } catch (error) {
+    console.error('Error stopping Python server:', error);
+  }
+
+  // Allow app to quit after cleanup
+  app.quit();
+});
+
+// Final cleanup for edge cases (system shutdown, forced quit)
+app.on('will-quit', async () => {
+  console.log('App will-quit - final cleanup check...');
+
+  // Don't prevent quit, just ensure cleanup happened
+  try {
+    await pythonManager.stop();
+  } catch (error) {
+    console.error('Error in will-quit cleanup:', error);
+  }
 });

@@ -182,6 +182,3 @@ export class GrammarTopicsService {
     this.topicsCache.clear();
   }
 }
-
-// Export singleton instance
-export const grammarTopicsService = GrammarTopicsService.getInstance();

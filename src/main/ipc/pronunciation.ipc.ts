@@ -4,6 +4,7 @@
 import { ipcMain } from 'electron';
 import { IPC_CHANNELS } from '../../shared/constants/ipc-channels';
 import { pronunciationService } from '../services/pronunciation.service';
+import { pythonManager } from '../services/python-manager.service';
 
 export function registerPronunciationHandlers(): void {
   // Get TTS audio
@@ -61,4 +62,16 @@ export function registerPronunciationHandlers(): void {
       return pronunciationService.deleteVoiceModel(language);
     }
   );
+
+  // Restart pronunciation server
+  ipcMain.handle(IPC_CHANNELS.PRONUNCIATION_RESTART_SERVER, async () => {
+    try {
+      await pythonManager.restart();
+      return { success: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[IPC] Failed to restart pronunciation server:', message);
+      return { success: false, error: message };
+    }
+  });
 }

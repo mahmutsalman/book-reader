@@ -1,5 +1,5 @@
 import { getAIService, isEnhancedModeEnabled } from './ai-provider.factory';
-import { grammarTopicsService } from './grammar-topics.service';
+import { GrammarTopicsService } from './grammar-topics.service';
 import { pronunciationService } from './pronunciation.service';
 import { settingsRepository } from '../../database/repositories';
 import type {
@@ -69,7 +69,7 @@ export class PreStudyNotesService {
     console.log(`[PreStudy] Found ${uniqueWords.length} unique words to process`);
 
     // Get grammar topics for the language
-    const grammarTopics = await grammarTopicsService.getTopicsForPrompt(request.language);
+    const grammarTopics = await GrammarTopicsService.getInstance().getTopicsForPrompt(request.language);
 
     // Phase 2: Processing words - Generate ALL AI entries first (Groq is fast)
     const entries: PreStudyWordEntry[] = [];

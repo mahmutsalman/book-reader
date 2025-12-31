@@ -19,6 +19,7 @@ const SettingsPage: React.FC = () => {
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [pythonStatus, setPythonStatus] = useState<{ running: boolean; ready: boolean; url: string } | null>(null);
   const [testingPython, setTestingPython] = useState(false);
+  const [restartingPython, setRestartingPython] = useState(false);
   const [ipaLanguages, setIpaLanguages] = useState<IPALanguageInfo[]>([]);
   const [loadingIpaLanguages, setLoadingIpaLanguages] = useState(false);
   const [installingLanguage, setInstallingLanguage] = useState<string | null>(null);
@@ -115,6 +116,30 @@ const SettingsPage: React.FC = () => {
       setPythonStatus({ running: false, ready: false, url: 'N/A' });
     } finally {
       setTestingPython(false);
+    }
+  };
+
+  const handleRestartPythonServer = async () => {
+    if (!window.electronAPI) return;
+
+    setRestartingPython(true);
+    try {
+      const result = await window.electronAPI.pronunciation.restartServer();
+
+      if (result.success) {
+        // Wait then check status
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        const status = await window.electronAPI.pronunciation.getServerStatus();
+        setPythonStatus(status);
+      } else {
+        console.error('Failed to restart server:', result.error);
+        alert(`Failed to restart server: ${result.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error restarting Python server:', error);
+      alert('Error restarting server. Check console for details.');
+    } finally {
+      setRestartingPython(false);
     }
   };
 
@@ -519,11 +544,21 @@ const SettingsPage: React.FC = () => {
           <div className="flex items-center gap-4">
             <button
               onClick={handleTestPythonServer}
-              disabled={testingPython}
+              disabled={testingPython || restartingPython}
               className="btn-secondary"
             >
               {testingPython ? 'Checking...' : 'Check Status'}
             </button>
+
+            <button
+              onClick={handleRestartPythonServer}
+              disabled={testingPython || restartingPython}
+              className="btn-secondary"
+              title="Force restart the pronunciation server (kills all related processes)"
+            >
+              {restartingPython ? 'Restarting...' : '🔄 Restart Server'}
+            </button>
+
             {pythonStatus && (
               <span
                 className={`text-sm ${

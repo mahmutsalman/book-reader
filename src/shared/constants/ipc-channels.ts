@@ -61,6 +61,7 @@ export const IPC_CHANNELS = {
   PRONUNCIATION_GET_VOICE_MODELS: 'pronunciation:get-voice-models',
   PRONUNCIATION_DOWNLOAD_VOICE_MODEL: 'pronunciation:download-voice-model',
   PRONUNCIATION_DELETE_VOICE_MODEL: 'pronunciation:delete-voice-model',
+  PRONUNCIATION_RESTART_SERVER: 'pronunciation:restart-server',
 
   // Pre-Study Notes
   PRE_STUDY_GENERATE_NOTES: 'pre-study:generate-notes',

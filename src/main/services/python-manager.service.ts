@@ -18,6 +18,7 @@ class PythonManager {
   private isReady: boolean = false;
   private healthCheckInterval: NodeJS.Timeout | null = null;
   private startupPromise: Promise<void> | null = null;
+  private isRestarting: boolean = false;
 
   /**
    * Get the base URL of the Python server.
@@ -121,6 +122,12 @@ class PythonManager {
    * Stop the Python server.
    */
   async stop(): Promise<void> {
+    // Don't interfere if we're in the middle of a restart
+    if (this.isRestarting) {
+      console.log('[PythonManager] Restart in progress, skipping stop');
+      return;
+    }
+
     // Stop health checks
     if (this.healthCheckInterval) {
       clearInterval(this.healthCheckInterval);
@@ -137,8 +144,22 @@ class PythonManager {
       const timeout = setTimeout(() => {
         // Force kill if graceful shutdown fails
         if (this.process) {
-          console.log('[PythonManager] Force killing server...');
-          this.process.kill('SIGKILL');
+          console.log('[PythonManager] Graceful shutdown timeout, force killing...');
+
+          if (process.platform === 'win32') {
+            // Windows: Use taskkill with /T to kill process tree
+            const pid = this.process.pid;
+            if (pid) {
+              exec(`taskkill /F /PID ${pid} /T`, () => {
+                this.process = null;
+                this.isReady = false;
+                this.startupPromise = null;
+              });
+            }
+          } else {
+            // Unix: SIGKILL
+            this.process.kill('SIGKILL');
+          }
         }
         resolve();
       }, SHUTDOWN_TIMEOUT);
@@ -160,6 +181,77 @@ class PythonManager {
         resolve();
       }
     });
+  }
+
+  /**
+   * Force cleanup: kill current process AND any port conflicts.
+   */
+  private async forceCleanup(): Promise<void> {
+    console.log('[PythonManager] Force cleanup initiated...');
+
+    // Stop health checks
+    if (this.healthCheckInterval) {
+      clearInterval(this.healthCheckInterval);
+      this.healthCheckInterval = null;
+    }
+
+    // Kill current process if running
+    if (this.process) {
+      try {
+        if (process.platform === 'win32') {
+          const pid = this.process.pid;
+          if (pid) {
+            exec(`taskkill /F /PID ${pid} /T`, () => {
+              // Fire-and-forget cleanup
+            });
+          }
+        } else {
+          this.process.kill('SIGKILL');
+        }
+      } catch (error) {
+        console.error('[PythonManager] Error force killing process:', error);
+      }
+
+      this.process = null;
+    }
+
+    // Clean up port
+    await this.killExistingProcess();
+
+    // Reset state
+    this.isReady = false;
+    this.startupPromise = null;
+
+    console.log('[PythonManager] Force cleanup complete');
+  }
+
+  /**
+   * Restart the Python server with force cleanup.
+   */
+  async restart(): Promise<void> {
+    console.log('[PythonManager] Restarting server...');
+
+    // Set flag to prevent interference from app quit handlers
+    this.isRestarting = true;
+
+    try {
+      // Force cleanup any existing processes
+      await this.forceCleanup();
+
+      // Wait for port to be released
+      await this.sleep(1000);
+
+      // Start fresh
+      await this.start();
+
+      console.log('[PythonManager] Server restarted successfully');
+    } catch (error) {
+      console.error('[PythonManager] Failed to restart server:', error);
+      throw error;
+    } finally {
+      // Clear flag after restart completes (success or failure)
+      this.isRestarting = false;
+    }
   }
 
   /**
@@ -271,16 +363,58 @@ class PythonManager {
   }
 
   /**
-   * Kill any existing process on the port.
+   * Kill process on Windows by port number using netstat + taskkill.
    */
-  private async killExistingProcess(): Promise<void> {
+  private async killProcessOnPortWindows(): Promise<void> {
     return new Promise((resolve) => {
-      // Try to find and kill any process on the port
-      exec(`lsof -ti:${this.port} | xargs kill -9 2>/dev/null || true`, () => {
-        // Wait a bit for the port to be released
-        setTimeout(resolve, 500);
+      // Find PID using port 8766
+      exec(`netstat -ano | findstr :${this.port}`, (error, stdout) => {
+        if (error || !stdout) {
+          resolve();
+          return;
+        }
+
+        // Extract PIDs from netstat output
+        const lines = stdout.split('\n');
+        const pids = new Set<string>();
+
+        for (const line of lines) {
+          const match = line.match(/\s+(\d+)\s*$/);
+          if (match && match[1]) {
+            pids.add(match[1]);
+          }
+        }
+
+        if (pids.size === 0) {
+          resolve();
+          return;
+        }
+
+        // Kill all PIDs forcefully
+        const pidList = Array.from(pids).join(' /PID ');
+        exec(`taskkill /F /PID ${pidList}`, () => {
+          setTimeout(resolve, 500);
+        });
       });
     });
+  }
+
+  /**
+   * Kill any existing process on the port (cross-platform).
+   */
+  private async killExistingProcess(): Promise<void> {
+    console.log(`[PythonManager] Cleaning up port ${this.port}...`);
+
+    if (process.platform === 'win32') {
+      await this.killProcessOnPortWindows();
+    } else {
+      // macOS/Linux
+      return new Promise((resolve) => {
+        exec(`lsof -ti:${this.port} | xargs kill -9 2>/dev/null || true`, () => {
+          setTimeout(resolve, 500);
+        });
+      });
+    }
   }
 
   /**

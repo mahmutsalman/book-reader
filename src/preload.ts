@@ -128,6 +128,8 @@ const electronAPI: ElectronAPI = {
       ipcRenderer.invoke(IPC_CHANNELS.PRONUNCIATION_DOWNLOAD_VOICE_MODEL, language),
     deleteVoiceModel: (language: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.PRONUNCIATION_DELETE_VOICE_MODEL, language),
+    restartServer: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.PRONUNCIATION_RESTART_SERVER),
   },
 
   // Pre-Study Notes

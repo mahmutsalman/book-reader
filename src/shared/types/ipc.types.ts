@@ -2,7 +2,7 @@ import type { Book, BookData, ReadingProgress, BookLanguage } from './book.types
 import type { VocabularyEntry, CreateVocabularyEntry, VocabularyFilters, StoredWordOccurrence, WordTypeCounts } from './vocabulary.types';
 import type { AppSettings, LMStudioConnectionResult, GroqConnectionResult } from './settings.types';
 import type { WordDefinitionResult, IPAPronunciationResult, BatchIPAResult, SimplifiedSentenceResult, WordEquivalentResult, PhraseMeaningResult, TatoebaSentence, TatoebaStatus } from './ai.types';
-import type { TTSResponse, IPAResponse, PronunciationServerStatus, IPALanguagesResponse, InstallLanguageResponse } from './pronunciation.types';
+import type { TTSResponse, IPAResponse, PronunciationServerStatus, IPALanguagesResponse, InstallLanguageResponse, VoiceModelsResponse, DownloadModelResponse, DeleteModelResponse } from './pronunciation.types';
 import type { PreStudyNotesRequest, PreStudyNotesResult, PreStudyProgress } from './pre-study-notes.types';
 import type { GrammarAnalysis } from './grammar.types';
 
@@ -98,6 +98,10 @@ export interface ElectronAPI {
     getServerStatus: () => Promise<PronunciationServerStatus>;
     getIPALanguages: () => Promise<IPALanguagesResponse>;
     installIPALanguage: (language: string) => Promise<InstallLanguageResponse>;
+    getVoiceModels: () => Promise<VoiceModelsResponse>;
+    downloadVoiceModel: (language: string) => Promise<DownloadModelResponse>;
+    deleteVoiceModel: (language: string) => Promise<DeleteModelResponse>;
+    restartServer: () => Promise<{ success: boolean; error?: string }>;
   };
   preStudy: {
     generateNotes: (request: PreStudyNotesRequest) => Promise<PreStudyNotesResult>;
