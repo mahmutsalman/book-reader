@@ -1,15 +1,30 @@
 # Smart Book Reader
 
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Code Signing](https://img.shields.io/badge/code%20signing-SignPath-green)
+
 A smart book reader application with dynamic text wrapping, AI-powered word lookup, offline pronunciation audio, and vocabulary tracking.
 
 ## Features
 
-- **Dynamic Text Wrapping**: Automatic text reflow and hyphenation for optimal reading
-- **AI Word Lookup**: Instant definitions, translations, and word context using Claude AI
-- **Offline Pronunciation**: Neural text-to-speech in English, German, and Russian (no internet required)
-- **Vocabulary Tracking**: Track learned words and build your vocabulary
-- **Multi-Format Support**: EPUB, PDF, and text files
-- **Adaptive Themes**: Multiple reading themes with automatic adjustment
+- **Dynamic Text Wrapping**: Automatic text reflow and hyphenation for optimal reading.
+- **AI Word Lookup**: Instant definitions, translations, and word context using Groq API.
+- **Offline Pronunciation**: Neural text-to-speech in English, German, and Russian (no internet required).
+- **Vocabulary Tracking**: Track learned words and build your vocabulary.
+- **Multi-Format Support**: EPUB, PDF, and text files.
+- **Adaptive Themes**: Multiple reading themes with automatic adjustment.
+
+---
+
+## 📋 Governance & Security
+
+This project follows professional open-source standards to ensure user safety and build integrity:
+
+* **Code Signing**: This project uses code signing services provided by [SignPath Foundation](https://signpath.org/). See our [Code Signing Policy](CODESIGNING.md) for details.
+* **Privacy**: Your reading data stays on your device. Read our [Privacy Policy](PRIVACY.md) regarding local storage and optional AI lookups.
+* **Community**: We are committed to a welcoming environment. Please review our [Code of Conduct](CODE_OF_CONDUCT.md).
+
+---
 
 ## Prerequisites
 
@@ -22,8 +37,8 @@ A smart book reader application with dynamic text wrapping, AI-powered word look
 ### 1. Clone and Install
 
 ```bash
-git clone https://github.com/yourusername/BookReader.git
-cd BookReader
+git clone https://github.com/mahmutsalman/book-reader.git
+cd book-reader
 npm install
 ```
 
@@ -36,17 +51,20 @@ npm run python:setup
 ```
 
 This will:
+
 - Create a Python virtual environment
 - Install Python dependencies
-- **Prompt you to download voice models** (~180MB for all 3 languages)
+- Prompt you to download voice models (~180MB for all 3 languages)
 
-> **Note:** Voice models are optional but required for pronunciation features. The app works without them, but pronunciation buttons will be disabled.
+> **Note**: Voice models are optional but required for pronunciation features. The app works without them, but pronunciation buttons will be disabled.
 
 ### 3. Run the App
 
 ```bash
 npm start
 ```
+
+---
 
 ## Development
 
@@ -55,14 +73,14 @@ npm start
 ```
 BookReader/
 ├── src/
-│   ├── main/              # Electron main process
-│   ├── renderer/          # React frontend
-│   ├── python-server/     # Python pronunciation server
-│   │   ├── server.py      # FastAPI server
-│   │   ├── generators/    # TTS and IPA generators
-│   │   ├── models/        # Piper TTS voice models (downloaded separately)
-│   │   └── build.sh       # Python server build script
-│   └── shared/            # Shared TypeScript types
+│   ├── main/             # Electron main process
+│   ├── renderer/         # React frontend
+│   ├── python-server/    # Python pronunciation server
+│   │   ├── server.py     # FastAPI server
+│   │   ├── generators/   # TTS and IPA generators
+│   │   ├── models/       # Piper TTS voice models (downloaded separately)
+│   │   └── build.sh      # Python server build script
+│   └── shared/           # Shared TypeScript types
 ├── package.json
 └── README.md
 ```
@@ -84,179 +102,62 @@ npm run package            # Package app for current platform
 npm run make               # Create distributable packages
 ```
 
-### Python Server Development
+### Voice Models
 
-The pronunciation server uses:
-- **Piper TTS**: Offline neural text-to-speech
-- **gruut**: IPA (phonetic) transcription
-- **FastAPI**: REST API server
+The app uses Piper TTS for offline pronunciation. Voice models are downloaded from HuggingFace.
 
-**Setup for Python development:**
+**Included Languages:**
 
-```bash
-cd src/python-server
+| Language | Voice | Size |
+|----------|-------|------|
+| English (US) | Lessac | ~60MB |
+| German | Thorsten | ~60MB |
+| Russian | Dmitri | ~60MB |
 
-# Activate virtual environment
-source venv/bin/activate  # macOS/Linux
-# or
-venv\Scripts\activate     # Windows
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Download voice models (if not already downloaded)
-python download_models.py
-
-# Run development server
-python server.py
-```
-
-**API Endpoints:**
-- `GET /health` - Health check
-- `POST /api/tts` - Generate pronunciation audio (text → base64 WAV)
-- `POST /api/ipa` - Get IPA phonetic transcription
-
-## Voice Models
-
-The app uses **Piper TTS** for offline pronunciation. Voice models are downloaded from HuggingFace.
-
-### Included Languages
-
-- **English (US)** - Lessac voice (~60MB)
-- **German** - Thorsten voice (~60MB)
-- **Russian** - Dmitri voice (~60MB)
-
-### Manual Download
-
-If automatic download fails or you skipped it:
-
-```bash
-cd src/python-server
-python download_models.py
-```
-
-### Model Storage
-
-- **Development**: `src/python-server/models/`
-- **Production**: Bundled into the PyInstaller executable
-
-Models are cached in memory after first load for performance.
+---
 
 ## Building for Production
 
 ### macOS/Linux
 
 ```bash
-# Build Python server binary
 npm run python:build
-
-# Package Electron app
 npm run package
-
-# Create distributable
 npm run make
 ```
 
 ### Windows
 
 ```bash
-# Build Python server binary
 npm run python:build:win
-
-# Package and distribute
 npm run package
 npm run make
 ```
 
-## Troubleshooting
-
-### Pronunciation Not Working
-
-**Symptom:** No audio plays when clicking pronunciation buttons.
-
-**Solution:**
-```bash
-cd src/python-server
-python download_models.py
-```
-
-Then restart the app.
-
-### Python Server Won't Start
-
-**Check Python version:**
-```bash
-python3 --version  # Should be 3.9+
-```
-
-**Rebuild the server:**
-```bash
-npm run python:setup
-```
-
-### "Model not found" Errors
-
-The Python server logs model errors to the console. Check for:
-```
-[TTS] Error: Model not found: /path/to/models/en_US-lessac-medium.onnx
-[TTS] Please run: python download_models.py
-```
-
-Run the suggested command to download missing models.
-
-### Import Errors
-
-If you see errors about missing modules during development:
-
-```bash
-cd src/python-server
-source venv/bin/activate
-pip install -r requirements.txt
-```
-
-## Configuration
-
-### Python Server Port
-
-Default port: `8766`
-
-Change in `src/main/services/python-manager.service.ts`:
-```typescript
-const PORT = 8766; // Change this
-```
-
-### Voice Model Languages
-
-To add more languages, edit `src/python-server/download_models.py` and add models from the [Piper TTS repository](https://github.com/rhasspy/piper).
+---
 
 ## Architecture
 
 ### Offline-First Design
 
 The app is designed to work completely offline:
+
 - ✅ Book reading and text rendering
-- ✅ AI word lookup (uses local Claude API)
+- ✅ AI word lookup (Groq API)
 - ✅ Pronunciation audio (Piper TTS)
 - ✅ IPA transcription (gruut)
 - ✅ Vocabulary tracking
 
 ### Tech Stack
 
-**Frontend:**
-- Electron 33
-- React 18
-- TypeScript
-- Vite
+- **Frontend**: Electron 33, React 18, TypeScript, Vite
+- **Backend**: Python 3.13, FastAPI, Piper TTS (ONNX models)
 
-**Backend:**
-- Python 3.13
-- FastAPI
-- Piper TTS (ONNX models)
-- PyInstaller (for distribution)
+---
 
 ## Contributing
 
-Contributions are welcome! Please:
+Contributions are welcome! Please read our [Contributing Guidelines](CONTRIBUTING.md) before submitting a Pull Request.
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
@@ -264,19 +165,27 @@ Contributions are welcome! Please:
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
+---
+
 ## License
 
 MIT License - see [LICENSE](LICENSE) file for details.
 
+---
+
 ## Acknowledgments
 
-- **Piper TTS** - High-quality offline neural voices by Rhasspy
-- **Claude AI** - AI-powered word definitions and context
-- **gruut** - IPA phonetic transcription library
+- [SignPath Foundation](https://signpath.org/) - For providing free code signing for open-source projects.
+- [Piper TTS](https://github.com/rhasspy/piper) - High-quality offline neural voices by Rhasspy.
+- [Groq](https://groq.com/) - Fast AI inference for word definitions and context.
+- [gruut](https://github.com/rhasspy/gruut) - IPA phonetic transcription library.
+
+---
 
 ## Support
 
 For issues and questions:
-- 🐛 [Report a bug](https://github.com/yourusername/BookReader/issues)
-- 💡 [Request a feature](https://github.com/yourusername/BookReader/issues)
+
+- 🐛 [Report a bug](https://github.com/mahmutsalman/book-reader/issues/new?template=bug_report.md)
+- 💡 [Request a feature](https://github.com/mahmutsalman/book-reader/issues/new?template=feature_request.md)
 - 📧 Email: csmahmutsalman@gmail.com
