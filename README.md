@@ -22,6 +22,7 @@ This project follows professional open-source standards to ensure user safety an
 
 * **Code Signing**: This project uses code signing services provided by [SignPath Foundation](https://signpath.org/). See our [Code Signing Policy](CODESIGNING.md) for details.
 * **Privacy**: Your reading data stays on your device. Read our [Privacy Policy](PRIVACY.md) regarding local storage and optional AI lookups.
+* **Licensing**: All third-party components and their licenses are documented in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 * **Community**: We are committed to a welcoming environment. Please review our [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ---
@@ -108,11 +109,13 @@ The app uses Piper TTS for offline pronunciation. Voice models are downloaded fr
 
 **Included Languages:**
 
-| Language | Voice | Size |
-|----------|-------|------|
-| English (US) | Lessac | ~60MB |
-| German | Thorsten | ~60MB |
-| Russian | Dmitri | ~60MB |
+| Language | Voice | Size | License | Source |
+|----------|-------|------|---------|--------|
+| English (US) | Lessac | ~60MB | MIT | [HuggingFace](https://huggingface.co/rhasspy/piper-voices) |
+| German | Thorsten | ~60MB | MIT | [HuggingFace](https://huggingface.co/rhasspy/piper-voices) |
+| Russian | Dmitri | ~60MB | MIT | [HuggingFace](https://huggingface.co/rhasspy/piper-voices) |
+
+**Attribution:** Voice models are part of the [Piper TTS](https://github.com/rhasspy/piper) open-source project by Rhasspy. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for complete licensing information.
 
 ---
 
