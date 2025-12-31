@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSettings } from '../context/SettingsContext';
 import type { AppSettings } from '../../shared/types';
-import type { IPALanguageInfo } from '../../shared/types/pronunciation.types';
+import type { IPALanguageInfo, VoiceModelInfo } from '../../shared/types/pronunciation.types';
 
 type ThemeOption = AppSettings['theme'];
 
@@ -23,6 +23,12 @@ const SettingsPage: React.FC = () => {
   const [loadingIpaLanguages, setLoadingIpaLanguages] = useState(false);
   const [installingLanguage, setInstallingLanguage] = useState<string | null>(null);
   const [installResult, setInstallResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  // Voice Model state
+  const [voiceModels, setVoiceModels] = useState<VoiceModelInfo[]>([]);
+  const [loadingVoiceModels, setLoadingVoiceModels] = useState(false);
+  const [downloadingModel, setDownloadingModel] = useState<string | null>(null);
+  const [downloadResult, setDownloadResult] = useState<{ success: boolean; message: string } | null>(null);
   const [testingGroqConnection, setTestingGroqConnection] = useState(false);
   const [groqConnectionResult, setGroqConnectionResult] = useState<{ success: boolean; message: string } | null>(null);
   const [showGroqSetupModal, setShowGroqSetupModal] = useState(false);
@@ -128,6 +134,69 @@ const SettingsPage: React.FC = () => {
     }
   };
 
+  const loadVoiceModels = async () => {
+    if (!window.electronAPI) return;
+
+    setLoadingVoiceModels(true);
+    try {
+      const result = await window.electronAPI.pronunciation.getVoiceModels();
+      if (result.success) {
+        setVoiceModels(result.models);
+      }
+    } catch (error) {
+      console.error('Failed to load voice models:', error);
+    } finally {
+      setLoadingVoiceModels(false);
+    }
+  };
+
+  const handleDownloadModel = async (language: string) => {
+    if (!window.electronAPI || downloadingModel) return;
+
+    setDownloadingModel(language);
+    setDownloadResult(null);
+
+    try {
+      const result = await window.electronAPI.pronunciation.downloadVoiceModel(language);
+      setDownloadResult({
+        success: result.success,
+        message: result.success ? result.message : (result.error || 'Download failed'),
+      });
+      if (result.success) {
+        // Refresh the models list
+        loadVoiceModels();
+      }
+    } catch (error) {
+      setDownloadResult({
+        success: false,
+        message: error instanceof Error ? error.message : 'Download failed',
+      });
+    } finally {
+      setDownloadingModel(null);
+    }
+  };
+
+  const handleDeleteModel = async (language: string) => {
+    if (!window.electronAPI) return;
+
+    try {
+      const result = await window.electronAPI.pronunciation.deleteVoiceModel(language);
+      setDownloadResult({
+        success: result.success,
+        message: result.success ? result.message : (result.error || 'Delete failed'),
+      });
+      if (result.success) {
+        // Refresh the models list
+        loadVoiceModels();
+      }
+    } catch (error) {
+      setDownloadResult({
+        success: false,
+        message: error instanceof Error ? error.message : 'Delete failed',
+      });
+    }
+  };
+
   const handleInstallLanguage = async (langCode: string) => {
     if (!window.electronAPI || installingLanguage) return;
 
@@ -154,10 +223,11 @@ const SettingsPage: React.FC = () => {
     }
   };
 
-  // Load IPA languages when Python server is ready
+  // Load IPA languages and voice models when Python server is ready
   useEffect(() => {
     if (pythonStatus?.ready) {
       loadIpaLanguages();
+      loadVoiceModels();
     }
   }, [pythonStatus?.ready]);
 
@@ -534,6 +604,92 @@ const SettingsPage: React.FC = () => {
                   {installResult.message}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Voice Models */}
+          {pythonStatus?.ready && (
+            <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-600">
+              <h4 className="text-sm font-medium text-gray-700 dark:text-cream-200 mb-3">
+                Voice Models for Text-to-Speech
+              </h4>
+              <p className="text-xs text-gray-500 dark:text-cream-300 mb-3">
+                Download neural voice models for offline pronunciation (~63 MB each). Models are stored on your device and work without internet.
+              </p>
+
+              {loadingVoiceModels ? (
+                <div className="text-sm text-gray-500 dark:text-cream-300">Loading models...</div>
+              ) : (
+                <div className="space-y-2">
+                  {voiceModels.map((model) => (
+                    <div
+                      key={model.language}
+                      className={`flex items-center justify-between p-3 rounded-lg border ${
+                        model.downloaded
+                          ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20'
+                          : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700'
+                      }`}
+                    >
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-gray-700 dark:text-cream-200">
+                            {model.name}
+                          </span>
+                          <span className="text-xs text-gray-400">({model.language.toUpperCase()})</span>
+                        </div>
+                        {model.downloaded && model.size && (
+                          <div className="text-xs text-gray-500 dark:text-cream-300 mt-1">
+                            Size: {(model.size / (1024 * 1024)).toFixed(1)} MB
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {model.downloaded ? (
+                          <>
+                            <span className="text-xs text-green-600 dark:text-green-400 font-medium">
+                              ✓ Downloaded
+                            </span>
+                            <button
+                              onClick={() => handleDeleteModel(model.language)}
+                              className="text-xs px-2 py-1 rounded bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50"
+                            >
+                              Delete
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => handleDownloadModel(model.language)}
+                            disabled={downloadingModel !== null}
+                            className={`text-xs px-3 py-1 rounded ${
+                              downloadingModel === model.language
+                                ? 'bg-gray-200 dark:bg-gray-600 text-gray-500'
+                                : 'bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 hover:bg-primary-200 dark:hover:bg-primary-900/50'
+                            }`}
+                          >
+                            {downloadingModel === model.language ? 'Downloading...' : 'Download'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {downloadResult && (
+                <div
+                  className={`mt-3 p-2 rounded text-sm ${
+                    downloadResult.success
+                      ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
+                      : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
+                  }`}
+                >
+                  {downloadResult.message}
+                </div>
+              )}
+
+              <div className="mt-3 text-xs text-gray-500 dark:text-cream-300">
+                💡 Tip: Without voice models, pronunciation features will show placeholders. Download models to enable offline text-to-speech.
+              </div>
             </div>
           )}
 

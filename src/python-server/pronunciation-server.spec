@@ -34,20 +34,11 @@ def find_espeak_data():
 
 espeak_data_path = find_espeak_data()
 
-# Check if model files exist (optional - app works without them)
-def find_model_files():
-    """Find voice model files if they exist."""
-    model_files = []
-    if Path('models').exists():
-        onnx_files = list(Path('models').glob('*.onnx'))
-        json_files = list(Path('models').glob('*.json'))
-        if onnx_files:
-            model_files.append(('models/*.onnx', 'models'))
-        if json_files:
-            model_files.append(('models/*.json', 'models'))
-    return model_files
-
-model_data_files = find_model_files()
+# IMPORTANT: Voice models are NOT bundled in the executable
+# They will be downloaded on-demand by the user through the app UI
+# This significantly reduces the bundle size (~180MB saved)
+# Models will be stored in user's app data directory
+model_data_files = []  # Empty - no models bundled
 
 # Analysis: Collect all Python files and dependencies
 a = Analysis(

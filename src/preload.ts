@@ -121,6 +121,13 @@ const electronAPI: ElectronAPI = {
       ipcRenderer.invoke(IPC_CHANNELS.PRONUNCIATION_GET_IPA_LANGUAGES),
     installIPALanguage: (language: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.PRONUNCIATION_INSTALL_IPA_LANGUAGE, language),
+    // Voice Model Management
+    getVoiceModels: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.PRONUNCIATION_GET_VOICE_MODELS),
+    downloadVoiceModel: (language: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PRONUNCIATION_DOWNLOAD_VOICE_MODEL, language),
+    deleteVoiceModel: (language: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.PRONUNCIATION_DELETE_VOICE_MODEL, language),
   },
 
   // Pre-Study Notes

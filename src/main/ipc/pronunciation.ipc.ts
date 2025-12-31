@@ -39,4 +39,26 @@ export function registerPronunciationHandlers(): void {
       return pronunciationService.installIPALanguage(language);
     }
   );
+
+  // Voice Model Management
+  // Get voice models list
+  ipcMain.handle(IPC_CHANNELS.PRONUNCIATION_GET_VOICE_MODELS, async () => {
+    return pronunciationService.getVoiceModels();
+  });
+
+  // Download voice model
+  ipcMain.handle(
+    IPC_CHANNELS.PRONUNCIATION_DOWNLOAD_VOICE_MODEL,
+    async (_, language: string) => {
+      return pronunciationService.downloadVoiceModel(language);
+    }
+  );
+
+  // Delete voice model
+  ipcMain.handle(
+    IPC_CHANNELS.PRONUNCIATION_DELETE_VOICE_MODEL,
+    async (_, language: string) => {
+      return pronunciationService.deleteVoiceModel(language);
+    }
+  );
 }

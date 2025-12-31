@@ -19,8 +19,10 @@ from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from generators.tts import generate_audio
+from generators.tts import generate_audio, MODELS_DIR, VOICE_MODELS
 from generators.ipa import generate_ipa
+import urllib.request
+import json
 
 # PDF processing imports (lazy loaded to handle missing dependencies)
 try:
@@ -146,6 +148,46 @@ class TesseractStatusResponse(BaseModel):
     pdf_available: bool
     ocr_available: bool
     tesseract_path: Optional[str] = None
+    error: Optional[str] = None
+
+
+# Voice Model Management Models
+class VoiceModelInfo(BaseModel):
+    language: str
+    name: str
+    model_file: str
+    config_file: str
+    size: Optional[int] = None  # Size in bytes if downloaded
+    downloaded: bool
+    download_url_model: Optional[str] = None
+    download_url_config: Optional[str] = None
+
+
+class VoiceModelsResponse(BaseModel):
+    success: bool
+    models: List[VoiceModelInfo] = []
+    models_directory: str = ""
+    error: Optional[str] = None
+
+
+class DownloadModelRequest(BaseModel):
+    language: str
+
+
+class DownloadModelResponse(BaseModel):
+    success: bool
+    message: str
+    progress: Optional[int] = None  # 0-100
+    error: Optional[str] = None
+
+
+class DeleteModelRequest(BaseModel):
+    language: str
+
+
+class DeleteModelResponse(BaseModel):
+    success: bool
+    message: str
     error: Optional[str] = None
 
 
@@ -503,6 +545,255 @@ async def install_ipa_language(request: InstallLanguageRequest):
             return InstallLanguageResponse(success=False, message="Installation failed", error=message)
     finally:
         _installing_languages[lang] = False
+
+
+# Voice Model Management Endpoints
+# HuggingFace model URLs
+VOICE_MODEL_URLS = {
+    "en": {
+        "model_url": "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/lessac/medium/en_US-lessac-medium.onnx",
+        "config_url": "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/lessac/medium/en_US-lessac-medium.onnx.json",
+    },
+    "de": {
+        "model_url": "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/de/de_DE/thorsten/medium/de_DE-thorsten-medium.onnx",
+        "config_url": "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/de/de_DE/thorsten/medium/de_DE-thorsten-medium.onnx.json",
+    },
+    "ru": {
+        "model_url": "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/ru/ru_RU/dmitri/medium/ru_RU-dmitri-medium.onnx",
+        "config_url": "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/ru/ru_RU/dmitri/medium/ru_RU-dmitri-medium.onnx.json",
+    },
+}
+
+# Track ongoing downloads
+_downloading_models: Dict[str, bool] = {}
+
+
+def get_model_files(language: str) -> tuple[Path, Path]:
+    """Get file paths for model and config."""
+    voice_info = VOICE_MODELS.get(language)
+    if not voice_info:
+        raise ValueError(f"Unknown language: {language}")
+
+    model_path = MODELS_DIR / voice_info["model"]
+    config_path = MODELS_DIR / voice_info["config"]
+    return model_path, config_path
+
+
+def is_model_downloaded(language: str) -> bool:
+    """Check if voice model files exist for a language."""
+    try:
+        model_path, config_path = get_model_files(language)
+        return model_path.exists() and config_path.exists()
+    except:
+        return False
+
+
+def download_file_sync(url: str, destination: Path) -> bool:
+    """Download file with progress logging."""
+    try:
+        print(f"[Voice Model] Downloading: {destination.name}")
+        urllib.request.urlretrieve(url, destination)
+        size_mb = destination.stat().st_size / (1024 * 1024)
+        print(f"[Voice Model] Downloaded {size_mb:.1f} MB")
+        return True
+    except Exception as e:
+        print(f"[Voice Model] Download failed: {e}")
+        if destination.exists():
+            destination.unlink()  # Clean up partial download
+        return False
+
+
+@app.get("/api/voice/models", response_model=VoiceModelsResponse)
+async def get_voice_models():
+    """
+    Get list of available voice models and their download status.
+
+    Returns:
+        VoiceModelsResponse with list of models
+    """
+    try:
+        models = []
+        for lang_code, voice_info in VOICE_MODELS.items():
+            model_path, config_path = get_model_files(lang_code)
+            downloaded = model_path.exists() and config_path.exists()
+
+            # Get file size if downloaded
+            size = None
+            if downloaded:
+                size = model_path.stat().st_size + config_path.stat().st_size
+
+            # Get download URLs
+            urls = VOICE_MODEL_URLS.get(lang_code, {})
+
+            models.append(VoiceModelInfo(
+                language=lang_code,
+                name=voice_info["name"],
+                model_file=voice_info["model"],
+                config_file=voice_info["config"],
+                size=size,
+                downloaded=downloaded,
+                download_url_model=urls.get("model_url"),
+                download_url_config=urls.get("config_url")
+            ))
+
+        # Sort: downloaded first, then by language code
+        models.sort(key=lambda x: (not x.downloaded, x.language))
+
+        return VoiceModelsResponse(
+            success=True,
+            models=models,
+            models_directory=str(MODELS_DIR)
+        )
+    except Exception as e:
+        print(f"[Voice Model] Error listing models: {e}")
+        return VoiceModelsResponse(
+            success=False,
+            error=str(e)
+        )
+
+
+@app.post("/api/voice/download", response_model=DownloadModelResponse)
+async def download_voice_model(request: DownloadModelRequest):
+    """
+    Download a voice model from HuggingFace.
+
+    Args:
+        request: DownloadModelRequest with language code
+
+    Returns:
+        DownloadModelResponse with download result
+    """
+    lang = request.language
+
+    # Validate language
+    if lang not in VOICE_MODELS:
+        return DownloadModelResponse(
+            success=False,
+            message=f"Unknown language: {lang}",
+            error=f"Supported languages: {', '.join(VOICE_MODELS.keys())}"
+        )
+
+    # Check if already downloaded
+    if is_model_downloaded(lang):
+        return DownloadModelResponse(
+            success=True,
+            message=f"{VOICE_MODELS[lang]['name']} is already downloaded",
+            progress=100
+        )
+
+    # Check if download is already in progress
+    if _downloading_models.get(lang):
+        return DownloadModelResponse(
+            success=False,
+            message="Download already in progress",
+            error="Please wait for the current download to complete"
+        )
+
+    # Get URLs
+    urls = VOICE_MODEL_URLS.get(lang)
+    if not urls:
+        return DownloadModelResponse(
+            success=False,
+            message="Download URLs not configured",
+            error=f"No download URLs found for {lang}"
+        )
+
+    # Mark as downloading
+    _downloading_models[lang] = True
+
+    try:
+        model_path, config_path = get_model_files(lang)
+
+        # Ensure directory exists
+        MODELS_DIR.mkdir(parents=True, exist_ok=True)
+
+        # Download model file
+        print(f"[Voice Model] Starting download: {VOICE_MODELS[lang]['name']}")
+        if not download_file_sync(urls["model_url"], model_path):
+            raise Exception("Failed to download model file")
+
+        # Download config file
+        if not download_file_sync(urls["config_url"], config_path):
+            raise Exception("Failed to download config file")
+
+        print(f"[Voice Model] Download complete: {VOICE_MODELS[lang]['name']}")
+        return DownloadModelResponse(
+            success=True,
+            message=f"Successfully downloaded {VOICE_MODELS[lang]['name']}",
+            progress=100
+        )
+
+    except Exception as e:
+        print(f"[Voice Model] Download failed: {e}")
+        # Clean up partial downloads
+        try:
+            model_path, config_path = get_model_files(lang)
+            if model_path.exists():
+                model_path.unlink()
+            if config_path.exists():
+                config_path.unlink()
+        except:
+            pass
+
+        return DownloadModelResponse(
+            success=False,
+            message="Download failed",
+            error=str(e)
+        )
+    finally:
+        _downloading_models[lang] = False
+
+
+@app.post("/api/voice/delete", response_model=DeleteModelResponse)
+async def delete_voice_model(request: DeleteModelRequest):
+    """
+    Delete a downloaded voice model.
+
+    Args:
+        request: DeleteModelRequest with language code
+
+    Returns:
+        DeleteModelResponse with deletion result
+    """
+    lang = request.language
+
+    # Validate language
+    if lang not in VOICE_MODELS:
+        return DeleteModelResponse(
+            success=False,
+            message=f"Unknown language: {lang}",
+            error=f"Supported languages: {', '.join(VOICE_MODELS.keys())}"
+        )
+
+    # Check if model exists
+    if not is_model_downloaded(lang):
+        return DeleteModelResponse(
+            success=True,
+            message=f"{VOICE_MODELS[lang]['name']} is not installed"
+        )
+
+    try:
+        model_path, config_path = get_model_files(lang)
+
+        # Delete files
+        if model_path.exists():
+            model_path.unlink()
+        if config_path.exists():
+            config_path.unlink()
+
+        print(f"[Voice Model] Deleted: {VOICE_MODELS[lang]['name']}")
+        return DeleteModelResponse(
+            success=True,
+            message=f"Successfully deleted {VOICE_MODELS[lang]['name']}"
+        )
+
+    except Exception as e:
+        print(f"[Voice Model] Delete failed: {e}")
+        return DeleteModelResponse(
+            success=False,
+            message="Delete failed",
+            error=str(e)
+        )
 
 
 # PDF Extraction Endpoints

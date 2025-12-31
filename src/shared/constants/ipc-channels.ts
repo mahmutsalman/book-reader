@@ -58,6 +58,9 @@ export const IPC_CHANNELS = {
   PRONUNCIATION_SERVER_STATUS: 'pronunciation:server-status',
   PRONUNCIATION_GET_IPA_LANGUAGES: 'pronunciation:get-ipa-languages',
   PRONUNCIATION_INSTALL_IPA_LANGUAGE: 'pronunciation:install-ipa-language',
+  PRONUNCIATION_GET_VOICE_MODELS: 'pronunciation:get-voice-models',
+  PRONUNCIATION_DOWNLOAD_VOICE_MODEL: 'pronunciation:download-voice-model',
+  PRONUNCIATION_DELETE_VOICE_MODEL: 'pronunciation:delete-voice-model',
 
   // Pre-Study Notes
   PRE_STUDY_GENERATE_NOTES: 'pre-study:generate-notes',

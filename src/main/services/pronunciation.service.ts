@@ -9,6 +9,9 @@ import type {
   PronunciationServerStatus,
   IPALanguagesResponse,
   InstallLanguageResponse,
+  VoiceModelsResponse,
+  DownloadModelResponse,
+  DeleteModelResponse,
 } from '../../shared/types/pronunciation.types';
 
 const TTS_TIMEOUT = 15000; // 15 seconds for TTS (sentences can be long)
@@ -193,6 +196,137 @@ class PronunciationService {
       return {
         success: false,
         message: 'Installation failed',
+        error: message,
+      };
+    }
+  }
+
+  /**
+   * Get list of available voice models and their download status.
+   */
+  async getVoiceModels(): Promise<VoiceModelsResponse> {
+    if (!pythonManager.ready) {
+      return {
+        success: false,
+        models: [],
+        models_directory: '',
+        error: 'Pronunciation server is not ready',
+      };
+    }
+
+    try {
+      const response = await fetch(`${pythonManager.baseUrl}/api/voice/models`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        signal: AbortSignal.timeout(5000),
+      });
+
+      if (!response.ok) {
+        return {
+          success: false,
+          models: [],
+          models_directory: '',
+          error: `Server error: ${response.status}`,
+        };
+      }
+
+      return (await response.json()) as VoiceModelsResponse;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[PronunciationService] getVoiceModels error:', message);
+      return {
+        success: false,
+        models: [],
+        models_directory: '',
+        error: message,
+      };
+    }
+  }
+
+  /**
+   * Download a voice model from HuggingFace.
+   */
+  async downloadVoiceModel(language: string): Promise<DownloadModelResponse> {
+    if (!pythonManager.ready) {
+      return {
+        success: false,
+        message: 'Pronunciation server is not ready',
+        error: 'Server not ready',
+      };
+    }
+
+    try {
+      console.log(`[PronunciationService] Downloading voice model: ${language}`);
+      const response = await fetch(`${pythonManager.baseUrl}/api/voice/download`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ language }),
+        signal: AbortSignal.timeout(300000), // 5 minutes for download
+      });
+
+      if (!response.ok) {
+        return {
+          success: false,
+          message: 'Download failed',
+          error: `Server error: ${response.status}`,
+        };
+      }
+
+      const result = (await response.json()) as DownloadModelResponse;
+      console.log(`[PronunciationService] Download result:`, result);
+      return result;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[PronunciationService] downloadVoiceModel error:', message);
+      return {
+        success: false,
+        message: 'Download failed',
+        error: message,
+      };
+    }
+  }
+
+  /**
+   * Delete a downloaded voice model.
+   */
+  async deleteVoiceModel(language: string): Promise<DeleteModelResponse> {
+    if (!pythonManager.ready) {
+      return {
+        success: false,
+        message: 'Pronunciation server is not ready',
+        error: 'Server not ready',
+      };
+    }
+
+    try {
+      const response = await fetch(`${pythonManager.baseUrl}/api/voice/delete`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ language }),
+        signal: AbortSignal.timeout(5000),
+      });
+
+      if (!response.ok) {
+        return {
+          success: false,
+          message: 'Delete failed',
+          error: `Server error: ${response.status}`,
+        };
+      }
+
+      return (await response.json()) as DeleteModelResponse;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      console.error('[PronunciationService] deleteVoiceModel error:', message);
+      return {
+        success: false,
+        message: 'Delete failed',
         error: message,
       };
     }

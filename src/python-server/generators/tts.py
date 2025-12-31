@@ -47,15 +47,38 @@ except Exception as e:
 # Now import piper after setting environment variable
 from piper import PiperVoice
 
-# Model directory - handles both development and production
-if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
-    # Production: PyInstaller bundle
-    MODELS_DIR = Path(sys._MEIPASS) / "models"
-else:
-    # Development: Relative to this file
-    MODELS_DIR = Path(__file__).parent.parent / "models"
+# Model directory - Use user's app data directory for cross-platform compatibility
+# This allows models to be downloaded on-demand after installation
+def get_models_directory() -> Path:
+    """Get platform-specific models directory in user's app data."""
+    if sys.platform == 'win32':
+        # Windows: %APPDATA%/BookReader/models
+        base_dir = Path(os.environ.get('APPDATA', Path.home() / 'AppData' / 'Roaming'))
+    elif sys.platform == 'darwin':
+        # macOS: ~/Library/Application Support/BookReader/models
+        base_dir = Path.home() / 'Library' / 'Application Support'
+    else:
+        # Linux: ~/.local/share/BookReader/models
+        base_dir = Path.home() / '.local' / 'share'
 
-print(f"[TTS] Models directory: {MODELS_DIR}")
+    models_dir = base_dir / 'BookReader' / 'models'
+    models_dir.mkdir(parents=True, exist_ok=True)
+    return models_dir
+
+# Development override: Use local models directory if it exists
+if not getattr(sys, 'frozen', False):
+    # Development mode - check for local models first
+    dev_models = Path(__file__).parent.parent / "models"
+    if dev_models.exists() and any(dev_models.glob('*.onnx')):
+        MODELS_DIR = dev_models
+        print(f"[TTS] Using development models directory: {MODELS_DIR}")
+    else:
+        MODELS_DIR = get_models_directory()
+        print(f"[TTS] Using app data models directory: {MODELS_DIR}")
+else:
+    # Production mode - always use app data directory
+    MODELS_DIR = get_models_directory()
+    print(f"[TTS] Using app data models directory: {MODELS_DIR}")
 
 # Voice model mapping
 VOICE_MODELS = {
