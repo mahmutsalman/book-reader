@@ -34,17 +34,27 @@ def find_espeak_data():
 
 espeak_data_path = find_espeak_data()
 
+# Check if model files exist (optional - app works without them)
+def find_model_files():
+    """Find voice model files if they exist."""
+    model_files = []
+    if Path('models').exists():
+        onnx_files = list(Path('models').glob('*.onnx'))
+        json_files = list(Path('models').glob('*.json'))
+        if onnx_files:
+            model_files.append(('models/*.onnx', 'models'))
+        if json_files:
+            model_files.append(('models/*.json', 'models'))
+    return model_files
+
+model_data_files = find_model_files()
+
 # Analysis: Collect all Python files and dependencies
 a = Analysis(
     ['server.py'],
     pathex=[],
     binaries=[],
-    datas=[
-        # Include Piper TTS voice models
-        ('models/*.onnx', 'models'),
-        ('models/*.json', 'models'),
-        # Include espeak-ng-data for Piper TTS phoneme generation (cross-platform)
-    ] + ([(espeak_data_path, 'piper/espeak-ng-data')] if espeak_data_path else []),
+    datas=model_data_files + ([(espeak_data_path, 'piper/espeak-ng-data')] if espeak_data_path else []),
     hiddenimports=[
         # FastAPI and dependencies
         'fastapi',
