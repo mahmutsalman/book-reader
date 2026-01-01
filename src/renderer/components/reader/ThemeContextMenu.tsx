@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { readerThemes, type ReaderTheme } from '../../config/readerThemes';
 import { useSettings } from '../../context/SettingsContext';
 import { useReaderTheme } from '../../hooks/useReaderTheme';
+import { addAlpha } from '../../utils/colorUtils';
 
 interface ThemeContextMenuProps {
   x: number;
@@ -66,15 +67,21 @@ export const ThemeContextMenu: React.FC<ThemeContextMenuProps> = ({
   return (
     <div
       ref={menuRef}
-      className="fixed z-50 bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-gray-200 dark:border-gray-700 py-2 min-w-[260px]"
+      className="fixed z-50 rounded-lg shadow-2xl border py-2 min-w-[260px]"
       style={{
         left: `${adjustedX}px`,
         top: `${adjustedY}px`,
         animation: 'fadeIn 0.15s ease-out',
+        backgroundColor: currentThemeColors.panel,
+        borderColor: currentThemeColors.panelBorder,
+        color: currentThemeColors.text,
       }}
     >
-      <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700">
-        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+      <div
+        className="px-3 py-2 border-b"
+        style={{ borderBottomColor: currentThemeColors.border }}
+      >
+        <h3 className="text-sm font-semibold" style={{ color: currentThemeColors.text }}>
           Reading Themes
         </h3>
       </div>
@@ -83,20 +90,27 @@ export const ThemeContextMenu: React.FC<ThemeContextMenuProps> = ({
         <button
           key={theme.id}
           onClick={() => handleThemeClick(theme.id)}
-          className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          className="w-full flex items-center gap-3 px-3 py-2.5 transition-colors"
+          onMouseEnter={(event) => {
+            event.currentTarget.style.backgroundColor = currentThemeColors.wordHover || addAlpha(currentThemeColors.panel, 0.6);
+          }}
+          onMouseLeave={(event) => {
+            event.currentTarget.style.backgroundColor = 'transparent';
+          }}
         >
           {/* Theme color preview swatch */}
           <div
-            className="w-8 h-8 rounded-md border-2 border-gray-300 dark:border-gray-600 flex-shrink-0 shadow-sm"
+            className="w-8 h-8 rounded-md border-2 flex-shrink-0 shadow-sm"
             style={{
               background: `linear-gradient(135deg, ${isDarkMode ? theme.dark.background : theme.light.background} 0%, ${isDarkMode ? theme.dark.background : theme.light.background} 50%, ${isDarkMode ? theme.dark.text : theme.light.text} 50%, ${isDarkMode ? theme.dark.text : theme.light.text} 100%)`,
+              borderColor: currentThemeColors.border,
             }}
           />
 
           {/* Theme info */}
           <div className="flex-1 text-left">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+              <span className="text-sm font-medium" style={{ color: currentThemeColors.text }}>
                 {theme.name}
               </span>
               {currentTheme === theme.id && (
@@ -114,7 +128,7 @@ export const ThemeContextMenu: React.FC<ThemeContextMenuProps> = ({
                 </svg>
               )}
             </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+            <p className="text-xs mt-0.5" style={{ color: currentThemeColors.textSecondary }}>
               {theme.description}
             </p>
           </div>

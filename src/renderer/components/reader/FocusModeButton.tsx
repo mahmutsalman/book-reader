@@ -1,5 +1,7 @@
 import React from 'react';
 import './FocusModeButton.css';
+import { useReaderTheme } from '../../hooks/useReaderTheme';
+import { addAlpha, adjustColor, getContrastColor } from '../../utils/colorUtils';
 
 interface FocusModeButtonProps {
   onClick: () => void;
@@ -14,9 +16,37 @@ export const FocusModeButton: React.FC<FocusModeButtonProps> = ({
   onClick,
   isFocusMode,
 }) => {
+  const theme = useReaderTheme();
+  const accentTextColor = getContrastColor(theme.accent);
+  const baseBackground = theme.panelBorder;
+  const hoverBackground = adjustColor(theme.panelBorder, 6);
+  const activeBackground = adjustColor(theme.panelBorder, -6);
+  const activeModeBackground = theme.accent;
+  const activeModeHover = adjustColor(theme.accent, 8);
+  const baseShadow = `0 2px 4px ${addAlpha(theme.text, 0.2)}`;
+  const hoverShadow = `0 4px 8px ${addAlpha(theme.text, 0.25)}`;
+  const activeShadow = `0 2px 4px ${addAlpha(theme.accent, 0.25)}`;
+  const activeHoverShadow = `0 4px 8px ${addAlpha(theme.accent, 0.35)}`;
+
   const getTooltipText = (): string => {
     return isFocusMode ? 'Exit Focus Mode (ESC)' : 'Enter Focus Mode';
   };
+
+  const buttonStyle = {
+    '--focus-bg': baseBackground,
+    '--focus-bg-hover': hoverBackground,
+    '--focus-bg-active': activeBackground,
+    '--focus-text': theme.textSecondary,
+    '--focus-border': theme.border,
+    '--focus-shadow': baseShadow,
+    '--focus-shadow-hover': hoverShadow,
+    '--focus-active-bg': activeModeBackground,
+    '--focus-active-bg-hover': activeModeHover,
+    '--focus-active-text': accentTextColor,
+    '--focus-active-border': activeModeBackground,
+    '--focus-active-shadow': activeShadow,
+    '--focus-active-shadow-hover': activeHoverShadow,
+  } as React.CSSProperties;
 
   return (
     <button
@@ -24,6 +54,7 @@ export const FocusModeButton: React.FC<FocusModeButtonProps> = ({
       onClick={onClick}
       title={getTooltipText()}
       aria-label={getTooltipText()}
+      style={buttonStyle}
     >
       <span className="button-icon">
         {isFocusMode ? (

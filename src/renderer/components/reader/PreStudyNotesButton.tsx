@@ -1,6 +1,8 @@
 import React from 'react';
 import type { PreStudyProgress } from '../../../shared/types/pre-study-notes.types';
 import './PreStudyNotesButton.css';
+import { useReaderTheme } from '../../hooks/useReaderTheme';
+import { addAlpha, adjustColor, getContrastColor } from '../../utils/colorUtils';
 
 interface PreStudyNotesButtonProps {
   onClick: () => void;
@@ -19,6 +21,19 @@ export const PreStudyNotesButton: React.FC<PreStudyNotesButtonProps> = ({
   progress,
   disabled = false,
 }) => {
+  const theme = useReaderTheme();
+  const accentTextColor = getContrastColor(theme.accent);
+  const baseBackground = theme.accent;
+  const hoverBackground = adjustColor(theme.accent, 8);
+  const activeBackground = adjustColor(theme.accent, -8);
+  const disabledBackground = theme.panelBorder;
+  const disabledBorder = theme.border;
+  const disabledText = theme.textSecondary;
+  const shadow = addAlpha(theme.accent, 0.25);
+  const shadowHover = addAlpha(theme.accent, 0.35);
+  const progressTrack = addAlpha(accentTextColor, 0.2);
+  const progressFill = addAlpha(accentTextColor, 0.8);
+
   const getTooltipText = (): string => {
     if (disabled) return 'Please wait for current lookups to finish';
     if (isGenerating && progress) {
@@ -33,6 +48,21 @@ export const PreStudyNotesButton: React.FC<PreStudyNotesButtonProps> = ({
     return (progress.current / progress.total) * 100;
   };
 
+  const buttonStyle = {
+    '--prestudy-bg': baseBackground,
+    '--prestudy-bg-hover': hoverBackground,
+    '--prestudy-bg-active': activeBackground,
+    '--prestudy-border': baseBackground,
+    '--prestudy-text': accentTextColor,
+    '--prestudy-shadow': `0 2px 8px ${shadow}`,
+    '--prestudy-shadow-hover': `0 4px 12px ${shadowHover}`,
+    '--prestudy-disabled-bg': disabledBackground,
+    '--prestudy-disabled-border': disabledBorder,
+    '--prestudy-disabled-text': disabledText,
+    '--prestudy-progress-track': progressTrack,
+    '--prestudy-progress-fill': progressFill,
+  } as React.CSSProperties;
+
   return (
     <button
       className={`pre-study-button ${isGenerating ? 'generating' : ''} ${disabled ? 'disabled' : ''}`}
@@ -40,6 +70,7 @@ export const PreStudyNotesButton: React.FC<PreStudyNotesButtonProps> = ({
       disabled={disabled || isGenerating}
       title={getTooltipText()}
       aria-label={getTooltipText()}
+      style={buttonStyle}
     >
       <span className="button-icon">
         {isGenerating ? (

@@ -5,6 +5,7 @@ import VocabularyTabs, { type VocabularyTab } from '../components/vocabulary/Voc
 import BookFilter from '../components/vocabulary/BookFilter';
 import { ExportContextMenu } from '../components/vocabulary/ExportContextMenu';
 import { useReaderTheme } from '../hooks/useReaderTheme';
+import { addAlpha, adjustColor, getContrastColor } from '../utils/colorUtils';
 
 const VocabularyPage: React.FC = () => {
   const [vocabulary, setVocabulary] = useState<VocabularyEntry[]>([]);
@@ -185,10 +186,25 @@ const VocabularyPage: React.FC = () => {
     }
   };
 
+  const getTypeColor = useCallback((type: WordType) => {
+    switch (type) {
+      case 'phrasal_verb':
+        return adjustColor(theme.accent, 12);
+      case 'word_group':
+        return adjustColor(theme.accent, -12);
+      default:
+        return theme.accent;
+    }
+  }, [theme.accent]);
+
+  const accentTextColor = getContrastColor(theme.accent);
+
   return (
-    <div className="p-6 max-w-4xl mx-auto">
+    <div className="p-6 max-w-4xl mx-auto" style={{ color: theme.text }}>
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-gray-800 dark:text-cream-100">Your Vocabulary</h2>
+        <h2 className="text-2xl font-bold" style={{ color: theme.accent }}>
+          Your Vocabulary
+        </h2>
         <div className="flex items-center gap-2">
           <BookFilter
             books={books}
@@ -199,7 +215,11 @@ const VocabularyPage: React.FC = () => {
             ref={exportButtonRef}
             onClick={handleExportButtonClick}
             disabled={exporting || displayEntries.length === 0}
-            className="px-3 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+            className="px-3 py-2 text-sm rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+            style={{
+              backgroundColor: theme.accent,
+              color: accentTextColor,
+            }}
             title="Export vocabulary"
           >
             {exporting ? 'Exporting...' : (
@@ -228,13 +248,24 @@ const VocabularyPage: React.FC = () => {
             placeholder={`Search ${getTabTitle().toLowerCase()}...`}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-cream-100 placeholder-gray-400 dark:placeholder-gray-500"
+            className="w-full px-4 py-2 border rounded-lg focus:outline-none"
+            style={{
+              backgroundColor: theme.panel,
+              color: theme.text,
+              borderColor: theme.border,
+            }}
+            onFocus={(event) => {
+              event.currentTarget.style.boxShadow = `0 0 0 2px ${theme.accent}40`;
+            }}
+            onBlur={(event) => {
+              event.currentTarget.style.boxShadow = 'none';
+            }}
           />
         </div>
       )}
 
       {loading && activeTab !== 'session' ? (
-        <div className="text-center py-12 text-gray-500 dark:text-cream-300">
+        <div className="text-center py-12" style={{ color: theme.textSecondary }}>
           Loading vocabulary...
         </div>
       ) : displayEntries.length === 0 ? (
@@ -242,10 +273,10 @@ const VocabularyPage: React.FC = () => {
           <div className="text-6xl mb-4">
             {activeTab === 'session' ? '⏱️' : activeTab === 'phrasal_verb' ? '🔗' : activeTab === 'word_group' ? '📚' : '📝'}
           </div>
-          <h3 className="text-xl font-medium text-gray-700 dark:text-cream-200 mb-2">
+          <h3 className="text-xl font-medium mb-2" style={{ color: theme.text }}>
             No {getTabTitle().toLowerCase()} yet
           </h3>
-          <p className="text-gray-500 dark:text-cream-300">
+          <p style={{ color: theme.textSecondary }}>
             {getEmptyMessage()}
           </p>
         </div>
@@ -256,44 +287,25 @@ const VocabularyPage: React.FC = () => {
             sessionEntries.map((entry, index) => (
               <div
                 key={`session-${index}`}
-                className={`card ${
-                  entry.word_type === 'phrasal_verb'
-                    ? 'bg-purple-50 dark:bg-purple-900/20 border-l-4 border-purple-400'
-                    : entry.word_type === 'word_group'
-                    ? 'border-l-4'
-                    : 'bg-green-50 dark:bg-green-900/20 border-l-4 border-green-400'
-                }`}
-                style={
-                  entry.word_type === 'word_group'
-                    ? {
-                        backgroundColor: theme.panel,
-                        borderLeftColor: theme.accent
-                      }
-                    : undefined
-                }
+                className="rounded-xl p-6 border"
+                style={{
+                  backgroundColor: theme.panel,
+                  borderColor: theme.panelBorder,
+                  borderLeft: `4px solid ${getTypeColor(entry.word_type)}`,
+                }}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-lg font-semibold text-gray-800 dark:text-cream-100">
+                      <h3 className="text-lg font-semibold" style={{ color: theme.text }}>
                         {entry.word}
                       </h3>
                       <span
-                        className={`text-xs px-2 py-0.5 rounded-full ${
-                          entry.word_type === 'phrasal_verb'
-                            ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
-                            : entry.word_type === 'word_group'
-                            ? 'font-semibold'
-                            : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
-                        }`}
-                        style={
-                          entry.word_type === 'word_group'
-                            ? {
-                                backgroundColor: theme.panelBorder,
-                                color: theme.accent
-                              }
-                            : undefined
-                        }
+                        className="text-xs px-2 py-0.5 rounded-full font-semibold"
+                        style={{
+                          backgroundColor: addAlpha(getTypeColor(entry.word_type), 0.2),
+                          color: getTypeColor(entry.word_type),
+                        }}
                       >
                         {entry.word_type === 'phrasal_verb' ? 'Phrasal Verb' : entry.word_type === 'word_group' ? 'Word Group' : 'Word'}
                       </span>
@@ -302,25 +314,33 @@ const VocabularyPage: React.FC = () => {
                       <div
                         className="mb-2 p-2 rounded border-l-2"
                         style={{
-                          backgroundColor: theme.panel,
-                          borderLeftColor: theme.accent
+                          backgroundColor: addAlpha(getTypeColor(entry.word_type), 0.08),
+                          borderLeftColor: getTypeColor(entry.word_type),
                         }}
                       >
-                        <p className="text-base font-semibold" style={{ color: theme.accent }}>
+                        <p className="text-base font-semibold" style={{ color: getTypeColor(entry.word_type) }}>
                           {entry.short_definition}
                         </p>
                       </div>
                     )}
                     {entry.meaning && (
-                      <p className="text-gray-600 dark:text-cream-200 mb-2">{entry.meaning}</p>
+                      <p className="mb-2" style={{ color: theme.textSecondary }}>
+                        {entry.meaning}
+                      </p>
                     )}
                     {entry.sentence && (
-                      <div className="text-sm text-gray-500 dark:text-cream-300 bg-gray-50 dark:bg-gray-700 p-2 rounded">
+                      <div
+                        className="text-sm p-2 rounded"
+                        style={{
+                          color: theme.textSecondary,
+                          backgroundColor: addAlpha(theme.panelBorder, 0.4),
+                        }}
+                      >
                         <span className="font-medium">Context:</span>{' '}
                         "{entry.sentence}"
                       </div>
                     )}
-                    <div className="flex items-center gap-4 mt-3 text-xs text-gray-400 dark:text-cream-400">
+                    <div className="flex items-center gap-4 mt-3 text-xs" style={{ color: theme.textSecondary }}>
                       <span>Added {new Date(entry.timestamp).toLocaleTimeString()}</span>
                       {entry.book_title && <span>From: {entry.book_title}</span>}
                     </div>
@@ -333,30 +353,21 @@ const VocabularyPage: React.FC = () => {
             vocabulary.map((entry) => (
               <div
                 key={entry.id}
-                className={`card ${
-                  entry.word_type === 'phrasal_verb'
-                    ? 'bg-purple-50 dark:bg-purple-900/20 border-l-4 border-purple-400'
-                    : entry.word_type === 'word_group'
-                    ? 'border-l-4'
-                    : 'bg-green-50 dark:bg-green-900/20 border-l-4 border-green-400'
-                }`}
-                style={
-                  entry.word_type === 'word_group'
-                    ? {
-                        backgroundColor: theme.panel,
-                        borderLeftColor: theme.accent
-                      }
-                    : undefined
-                }
+                className="rounded-xl p-6 border"
+                style={{
+                  backgroundColor: theme.panel,
+                  borderColor: theme.panelBorder,
+                  borderLeft: `4px solid ${getTypeColor(entry.word_type)}`,
+                }}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-lg font-semibold text-gray-800 dark:text-cream-100">
+                      <h3 className="text-lg font-semibold" style={{ color: theme.text }}>
                         {entry.word}
                       </h3>
                       {entry.ipa_pronunciation && (
-                        <span className="text-gray-500 dark:text-cream-300 font-mono text-sm">
+                        <span className="font-mono text-sm" style={{ color: theme.textSecondary }}>
                           /{entry.ipa_pronunciation}/
                         </span>
                       )}
@@ -365,25 +376,33 @@ const VocabularyPage: React.FC = () => {
                       <div
                         className="mb-2 p-2 rounded border-l-2"
                         style={{
-                          backgroundColor: theme.panel,
-                          borderLeftColor: theme.accent
+                          backgroundColor: addAlpha(getTypeColor(entry.word_type), 0.08),
+                          borderLeftColor: getTypeColor(entry.word_type),
                         }}
                       >
-                        <p className="text-base font-semibold" style={{ color: theme.accent }}>
+                        <p className="text-base font-semibold" style={{ color: getTypeColor(entry.word_type) }}>
                           {entry.short_definition}
                         </p>
                       </div>
                     )}
                     {entry.meaning && (
-                      <p className="text-gray-600 dark:text-cream-200 mb-2">{entry.meaning}</p>
+                      <p className="mb-2" style={{ color: theme.textSecondary }}>
+                        {entry.meaning}
+                      </p>
                     )}
                     {entry.original_sentence && (
-                      <div className="text-sm text-gray-500 dark:text-cream-300 bg-gray-50 dark:bg-gray-700 p-2 rounded">
+                      <div
+                        className="text-sm p-2 rounded"
+                        style={{
+                          color: theme.textSecondary,
+                          backgroundColor: addAlpha(theme.panelBorder, 0.4),
+                        }}
+                      >
                         <span className="font-medium">Context:</span>{' '}
                         "{entry.original_sentence}"
                       </div>
                     )}
-                    <div className="flex items-center gap-4 mt-3 text-xs text-gray-400 dark:text-cream-400">
+                    <div className="flex items-center gap-4 mt-3 text-xs" style={{ color: theme.textSecondary }}>
                       <span>Looked up {entry.lookup_count} times</span>
                       <span>
                         Added {new Date(entry.created_at).toLocaleDateString()}
@@ -392,7 +411,14 @@ const VocabularyPage: React.FC = () => {
                   </div>
                   <button
                     onClick={() => handleDelete(entry.id)}
-                    className="text-gray-400 hover:text-red-500 dark:text-cream-400 dark:hover:text-red-400 ml-4"
+                    className="ml-4 transition-colors"
+                    style={{ color: theme.textSecondary }}
+                    onMouseEnter={(event) => {
+                      event.currentTarget.style.color = '#E85D4A';
+                    }}
+                    onMouseLeave={(event) => {
+                      event.currentTarget.style.color = theme.textSecondary;
+                    }}
                   >
                     🗑️
                   </button>

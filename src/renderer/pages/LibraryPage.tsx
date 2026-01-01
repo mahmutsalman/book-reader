@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useBooks } from '../context/BookContext';
 import type { Book, BookLanguage } from '../../shared/types';
 import { BOOK_LANGUAGES } from '../../shared/types';
+import { useReaderTheme } from '../hooks/useReaderTheme';
+import { adjustColor, getContrastColor } from '../utils/colorUtils';
 
 // Get display name for a language code
 const getLanguageName = (code: BookLanguage): string => {
@@ -13,6 +15,7 @@ const getLanguageName = (code: BookLanguage): string => {
 const LibraryPage: React.FC = () => {
   const { books, loading, error, loadBooks, importBook, deleteBook } = useBooks();
   const navigate = useNavigate();
+  const theme = useReaderTheme();
   const [importing, setImporting] = useState(false);
   const [importProgress, setImportProgress] = useState<string>('');
   const [pendingFilePath, setPendingFilePath] = useState<string | null>(null);
@@ -157,19 +160,28 @@ const LibraryPage: React.FC = () => {
   if (loading && books.length === 0) {
     return (
       <div className="h-full flex items-center justify-center">
-        <div className="text-gray-500 dark:text-cream-300">Loading books...</div>
+        <div style={{ color: theme.textSecondary }}>Loading books...</div>
       </div>
     );
   }
 
+  const accentTextColor = getContrastColor(theme.accent);
+  const cardHoverColor = theme.wordHover || adjustColor(theme.panel, 4);
+
   return (
-    <div className="p-6">
+    <div className="p-6" style={{ color: theme.text }}>
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-gray-800 dark:text-cream-100">Your Library</h2>
+        <h2 className="text-2xl font-bold" style={{ color: theme.accent }}>
+          Your Library
+        </h2>
         <button
           onClick={handleImportBook}
           disabled={importing}
-          className="btn-primary flex items-center gap-2"
+          className="px-4 py-2 rounded-lg font-medium transition-opacity flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          style={{
+            backgroundColor: theme.accent,
+            color: accentTextColor,
+          }}
         >
           {importing ? (
             <>
@@ -194,13 +206,20 @@ const LibraryPage: React.FC = () => {
       {books.length === 0 ? (
         <div className="text-center py-12">
           <div className="text-6xl mb-4">📖</div>
-          <h3 className="text-xl font-medium text-gray-700 dark:text-cream-200 mb-2">
+          <h3 className="text-xl font-medium mb-2" style={{ color: theme.text }}>
             No books yet
           </h3>
-          <p className="text-gray-500 dark:text-cream-300 mb-4">
+          <p className="mb-4" style={{ color: theme.textSecondary }}>
             Import a JSON or PDF book to start reading
           </p>
-          <button onClick={handleImportBook} className="btn-primary">
+          <button
+            onClick={handleImportBook}
+            className="px-4 py-2 rounded-lg font-medium transition-opacity"
+            style={{
+              backgroundColor: theme.accent,
+              color: accentTextColor,
+            }}
+          >
             Import Your First Book
           </button>
         </div>
@@ -209,20 +228,43 @@ const LibraryPage: React.FC = () => {
           {booksByLanguage.map(([language, languageBooks]) => {
             const isCollapsed = collapsedSections.has(language);
             return (
-              <div key={language} className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+              <div
+                key={language}
+                className="border rounded-xl overflow-hidden"
+                style={{ borderColor: theme.panelBorder }}
+              >
                 {/* Language Section Header */}
                 <button
                   onClick={() => toggleSection(language)}
-                  className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                  className="w-full flex items-center justify-between px-4 py-3 transition-colors"
+                  style={{
+                    backgroundColor: theme.panel,
+                    color: theme.text,
+                  }}
+                  onMouseEnter={(event) => {
+                    event.currentTarget.style.backgroundColor = cardHoverColor;
+                  }}
+                  onMouseLeave={(event) => {
+                    event.currentTarget.style.backgroundColor = theme.panel;
+                  }}
                 >
                   <div className="flex items-center gap-3">
-                    <span className={`text-gray-500 dark:text-cream-300 transition-transform ${isCollapsed ? '' : 'rotate-90'}`}>
+                    <span
+                      className={`transition-transform ${isCollapsed ? '' : 'rotate-90'}`}
+                      style={{ color: theme.textSecondary }}
+                    >
                       ▶
                     </span>
-                    <span className="font-medium text-gray-800 dark:text-cream-100">
+                    <span className="font-medium" style={{ color: theme.text }}>
                       {getLanguageName(language)}
                     </span>
-                    <span className="px-2 py-0.5 text-xs font-medium bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-cream-200 rounded-full">
+                    <span
+                      className="px-2 py-0.5 text-xs font-medium rounded-full"
+                      style={{
+                        backgroundColor: theme.panelBorder,
+                        color: theme.textSecondary,
+                      }}
+                    >
                       {languageBooks.length}
                     </span>
                   </div>
@@ -236,7 +278,20 @@ const LibraryPage: React.FC = () => {
                         <div
                           key={book.id}
                           onClick={() => handleOpenBook(book)}
-                          className="bg-white dark:bg-gray-800 rounded-lg p-3 cursor-pointer hover:shadow-md dark:hover:shadow-gray-700/50 transition-all hover:scale-[1.02] group border border-gray-100 dark:border-gray-700 flex flex-col"
+                          className="rounded-lg p-3 cursor-pointer transition-all hover:scale-[1.02] group border flex flex-col"
+                          style={{
+                            backgroundColor: theme.panel,
+                            borderColor: theme.panelBorder,
+                            color: theme.text,
+                          }}
+                          onMouseEnter={(event) => {
+                            event.currentTarget.style.backgroundColor = cardHoverColor;
+                            event.currentTarget.style.boxShadow = `0 8px 16px ${theme.shadow}`;
+                          }}
+                          onMouseLeave={(event) => {
+                            event.currentTarget.style.backgroundColor = theme.panel;
+                            event.currentTarget.style.boxShadow = 'none';
+                          }}
                         >
                           {/* Book Cover - shorter aspect ratio */}
                           <div className="aspect-[4/5] bg-gradient-to-br from-book-paper to-book-spine dark:from-book-cover dark:to-book-accent rounded-md mb-2 flex items-center justify-center relative overflow-hidden flex-shrink-0">
@@ -249,18 +304,19 @@ const LibraryPage: React.FC = () => {
                           </div>
                           {/* Book Title - flex-grow pushes page count to bottom */}
                           <div className="flex-grow min-h-[2.5rem]">
-                            <h3 className="text-sm font-medium text-gray-800 dark:text-cream-100 line-clamp-2">
+                            <h3 className="text-sm font-medium line-clamp-2" style={{ color: theme.text }}>
                               {book.title}
                             </h3>
                           </div>
                           {/* Page Count - fixed at bottom */}
-                          <p className="text-xs text-gray-500 dark:text-cream-300 mt-1">
+                          <p className="text-xs mt-1" style={{ color: theme.textSecondary }}>
                             {book.total_pages} pages
                           </p>
                           {/* Delete Button */}
                           <button
                             onClick={(e) => handleDeleteBook(e, book.id)}
-                            className="mt-2 text-xs text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="mt-2 text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                            style={{ color: '#E85D4A' }}
                           >
                             Delete
                           </button>
@@ -279,51 +335,109 @@ const LibraryPage: React.FC = () => {
       {showFormatDialog && (
         <>
           <div
-            className="fixed inset-0 bg-black/50 z-40"
+            className="fixed inset-0 z-40"
             onClick={() => setShowFormatDialog(false)}
+            style={{ backgroundColor: theme.shadow }}
           />
-          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-gray-800 rounded-lg shadow-xl z-50 p-6 w-full max-w-md">
-            <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-2">Import Book</h2>
-            <p className="text-gray-600 dark:text-gray-400 mb-6">Choose the format of your book:</p>
+          <div
+            className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 rounded-lg shadow-xl z-50 p-6 w-full max-w-md"
+            style={{
+              backgroundColor: theme.panel,
+              color: theme.text,
+              border: `1px solid ${theme.panelBorder}`,
+            }}
+          >
+            <h2 className="text-2xl font-bold mb-2" style={{ color: theme.accent }}>
+              Import Book
+            </h2>
+            <p className="mb-6" style={{ color: theme.textSecondary }}>
+              Choose the format of your book:
+            </p>
 
             <div className="space-y-3 mb-6">
               <button
                 onClick={() => handleFormatSelect('pdf')}
-                className="w-full p-4 border-2 border-blue-500 dark:border-blue-600 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 flex items-center gap-3 transition-colors"
+                className="w-full p-4 border-2 rounded-lg flex items-center gap-3 transition-colors"
+                style={{
+                  borderColor: theme.accent,
+                  color: theme.text,
+                  backgroundColor: theme.background,
+                }}
+                onMouseEnter={(event) => {
+                  event.currentTarget.style.backgroundColor = cardHoverColor;
+                }}
+                onMouseLeave={(event) => {
+                  event.currentTarget.style.backgroundColor = theme.background;
+                }}
               >
                 <span className="text-3xl">📄</span>
                 <div className="text-left flex-1">
-                  <div className="font-semibold text-gray-800 dark:text-white">Import PDF Document</div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">With OCR support for scanned PDFs</div>
+                  <div className="font-semibold" style={{ color: theme.text }}>
+                    Import PDF Document
+                  </div>
+                  <div className="text-sm" style={{ color: theme.textSecondary }}>
+                    With OCR support for scanned PDFs
+                  </div>
                 </div>
               </button>
 
               <button
                 onClick={() => handleFormatSelect('txt')}
-                className="w-full p-4 border-2 border-green-500 dark:border-green-600 rounded-lg hover:bg-green-50 dark:hover:bg-green-900/20 flex items-center gap-3 transition-colors"
+                className="w-full p-4 border-2 rounded-lg flex items-center gap-3 transition-colors"
+                style={{
+                  borderColor: theme.accent,
+                  color: theme.text,
+                  backgroundColor: theme.background,
+                }}
+                onMouseEnter={(event) => {
+                  event.currentTarget.style.backgroundColor = cardHoverColor;
+                }}
+                onMouseLeave={(event) => {
+                  event.currentTarget.style.backgroundColor = theme.background;
+                }}
               >
                 <span className="text-3xl">📝</span>
                 <div className="text-left flex-1">
-                  <div className="font-semibold text-gray-800 dark:text-white">Import Plain Text (TXT)</div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">For Project Gutenberg and text books</div>
+                  <div className="font-semibold" style={{ color: theme.text }}>
+                    Import Plain Text (TXT)
+                  </div>
+                  <div className="text-sm" style={{ color: theme.textSecondary }}>
+                    For Project Gutenberg and text books
+                  </div>
                 </div>
               </button>
 
               <button
                 onClick={() => handleFormatSelect('epub')}
-                className="w-full p-4 border-2 border-purple-500 dark:border-purple-600 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20 flex items-center gap-3 transition-colors"
+                className="w-full p-4 border-2 rounded-lg flex items-center gap-3 transition-colors"
+                style={{
+                  borderColor: theme.accent,
+                  color: theme.text,
+                  backgroundColor: theme.background,
+                }}
+                onMouseEnter={(event) => {
+                  event.currentTarget.style.backgroundColor = cardHoverColor;
+                }}
+                onMouseLeave={(event) => {
+                  event.currentTarget.style.backgroundColor = theme.background;
+                }}
               >
                 <span className="text-3xl">📚</span>
                 <div className="text-left flex-1">
-                  <div className="font-semibold text-gray-800 dark:text-white">Import EPUB Document</div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">For digital books and ebooks</div>
+                  <div className="font-semibold" style={{ color: theme.text }}>
+                    Import EPUB Document
+                  </div>
+                  <div className="text-sm" style={{ color: theme.textSecondary }}>
+                    For digital books and ebooks
+                  </div>
                 </div>
               </button>
             </div>
 
             <button
               onClick={() => setShowFormatDialog(false)}
-              className="w-full px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+              className="w-full px-4 py-2 transition-colors"
+              style={{ color: theme.textSecondary }}
             >
               Cancel
             </button>
@@ -335,11 +449,19 @@ const LibraryPage: React.FC = () => {
       {pendingFilePath && (
         <>
           <div
-            className="fixed inset-0 bg-black/50 z-40"
+            className="fixed inset-0 z-40"
             onClick={!importing ? handleCancelImport : undefined}
+            style={{ backgroundColor: theme.shadow }}
           />
-          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-gray-800 rounded-lg shadow-xl z-50 p-6 w-96">
-            <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">
+          <div
+            className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 rounded-lg shadow-xl z-50 p-6 w-96"
+            style={{
+              backgroundColor: theme.panel,
+              color: theme.text,
+              border: `1px solid ${theme.panelBorder}`,
+            }}
+          >
+            <h3 className="text-lg font-semibold mb-4">
               Import {isPdfFile ? 'PDF' : isTxtFile ? 'Text File' : isEpubFile ? 'EPUB' : 'Book'}
             </h3>
             {isPdfFile && (
@@ -358,14 +480,19 @@ const LibraryPage: React.FC = () => {
                 <span className="font-medium">EPUB Import:</span> Chapters and metadata will be extracted from the EPUB file.
               </div>
             )}
-            <p className="text-sm text-gray-600 dark:text-cream-200 mb-4">
+            <p className="text-sm mb-4" style={{ color: theme.textSecondary }}>
               Select the language of the book:
             </p>
             <select
               value={selectedLanguage}
               onChange={(e) => setSelectedLanguage(e.target.value as BookLanguage)}
               disabled={importing}
-              className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-white mb-4 disabled:opacity-50"
+              className="w-full p-2 border rounded-lg mb-4 disabled:opacity-50"
+              style={{
+                backgroundColor: theme.panel,
+                color: theme.text,
+                borderColor: theme.border,
+              }}
             >
               {BOOK_LANGUAGES.map((lang) => (
                 <option key={lang.code} value={lang.code}>
@@ -373,7 +500,7 @@ const LibraryPage: React.FC = () => {
                 </option>
               ))}
             </select>
-            <p className="text-xs text-gray-500 dark:text-cream-300 mb-4">
+            <p className="text-xs mb-4" style={{ color: theme.textSecondary }}>
               {selectedLanguage !== 'en' && (
                 <>English translations will be shown for definitions and sentences.</>
               )}
@@ -382,10 +509,15 @@ const LibraryPage: React.FC = () => {
               )}
             </p>
             {importing && importProgress && (
-              <div className="bg-gray-100 dark:bg-gray-700 p-3 rounded-lg mb-4">
+              <div
+                className="p-3 rounded-lg mb-4"
+                style={{ backgroundColor: theme.panelBorder }}
+              >
                 <div className="flex items-center gap-2">
                   <span className="animate-spin text-lg">⏳</span>
-                  <span className="text-sm text-gray-600 dark:text-cream-200">{importProgress}</span>
+                  <span className="text-sm" style={{ color: theme.textSecondary }}>
+                    {importProgress}
+                  </span>
                 </div>
               </div>
             )}
@@ -393,14 +525,29 @@ const LibraryPage: React.FC = () => {
               <button
                 onClick={handleCancelImport}
                 disabled={importing}
-                className="px-4 py-2 text-gray-600 dark:text-cream-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg disabled:opacity-50"
+                className="px-4 py-2 rounded-lg disabled:opacity-50"
+                style={{
+                  backgroundColor: 'transparent',
+                  color: theme.textSecondary,
+                  border: `1px solid ${theme.border}`,
+                }}
+                onMouseEnter={(event) => {
+                  event.currentTarget.style.backgroundColor = cardHoverColor;
+                }}
+                onMouseLeave={(event) => {
+                  event.currentTarget.style.backgroundColor = 'transparent';
+                }}
               >
                 Cancel
               </button>
               <button
                 onClick={handleConfirmImport}
                 disabled={importing}
-                className="btn-primary"
+                className="px-4 py-2 rounded-lg font-medium transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{
+                  backgroundColor: theme.accent,
+                  color: accentTextColor,
+                }}
               >
                 {importing ? 'Importing...' : 'Import'}
               </button>

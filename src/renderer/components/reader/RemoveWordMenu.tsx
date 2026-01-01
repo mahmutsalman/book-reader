@@ -1,4 +1,6 @@
 import React, { useEffect, useRef } from 'react';
+import { useReaderTheme } from '../../hooks/useReaderTheme';
+import { addAlpha } from '../../utils/colorUtils';
 
 interface RemoveWordMenuProps {
   x: number;
@@ -14,6 +16,7 @@ export const RemoveWordMenu: React.FC<RemoveWordMenuProps> = ({
   onClose,
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
+  const theme = useReaderTheme();
 
   // Close on click outside
   useEffect(() => {
@@ -51,16 +54,26 @@ export const RemoveWordMenu: React.FC<RemoveWordMenuProps> = ({
   return (
     <div
       ref={menuRef}
-      className="fixed z-50 bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-gray-200 dark:border-gray-700 py-2 min-w-[200px]"
+      className="fixed z-50 rounded-lg shadow-2xl border py-2 min-w-[200px]"
       style={{
         left: `${adjustedX}px`,
         top: `${adjustedY}px`,
         animation: 'fadeIn 0.15s ease-out',
+        backgroundColor: theme.panel,
+        borderColor: theme.panelBorder,
+        color: theme.text,
       }}
     >
       <button
         onClick={handleRemoveClick}
-        className="w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400"
+        className="w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors"
+        style={{ color: '#E85D4A' }}
+        onMouseEnter={(event) => {
+          event.currentTarget.style.backgroundColor = addAlpha('#E85D4A', 0.12);
+        }}
+        onMouseLeave={(event) => {
+          event.currentTarget.style.backgroundColor = 'transparent';
+        }}
       >
         {/* Trash icon */}
         <svg

@@ -1,4 +1,6 @@
 import React, { useEffect, useRef } from 'react';
+import { useReaderTheme } from '../../hooks/useReaderTheme';
+import { addAlpha } from '../../utils/colorUtils';
 
 interface ClearSelectionsMenuProps {
   x: number;
@@ -16,6 +18,7 @@ export const ClearSelectionsMenu: React.FC<ClearSelectionsMenuProps> = ({
   hasSelections,
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
+  const theme = useReaderTheme();
 
   // Close on click outside
   useEffect(() => {
@@ -55,21 +58,34 @@ export const ClearSelectionsMenu: React.FC<ClearSelectionsMenuProps> = ({
   return (
     <div
       ref={menuRef}
-      className="fixed z-50 bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-gray-200 dark:border-gray-700 py-2 min-w-[200px]"
+      className="fixed z-50 rounded-lg shadow-2xl border py-2 min-w-[200px]"
       style={{
         left: `${adjustedX}px`,
         top: `${adjustedY}px`,
         animation: 'fadeIn 0.15s ease-out',
+        backgroundColor: theme.panel,
+        borderColor: theme.panelBorder,
+        color: theme.text,
       }}
     >
       <button
         onClick={handleClearClick}
         disabled={!hasSelections}
-        className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors ${
-          hasSelections
-            ? 'hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 cursor-pointer'
-            : 'text-gray-400 dark:text-gray-600 cursor-not-allowed'
-        }`}
+        className="w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors"
+        style={{
+          color: hasSelections ? '#E85D4A' : theme.textSecondary,
+          cursor: hasSelections ? 'pointer' : 'not-allowed',
+        }}
+        onMouseEnter={(event) => {
+          if (hasSelections) {
+            event.currentTarget.style.backgroundColor = addAlpha('#E85D4A', 0.12);
+          }
+        }}
+        onMouseLeave={(event) => {
+          if (hasSelections) {
+            event.currentTarget.style.backgroundColor = 'transparent';
+          }
+        }}
       >
         {/* X icon for clear */}
         <svg
@@ -91,7 +107,7 @@ export const ClearSelectionsMenu: React.FC<ClearSelectionsMenuProps> = ({
             Remove Selections
           </span>
           {!hasSelections && (
-            <p className="text-xs mt-0.5 text-gray-400 dark:text-gray-500">
+            <p className="text-xs mt-0.5" style={{ color: theme.textSecondary }}>
               No selections on this page
             </p>
           )}

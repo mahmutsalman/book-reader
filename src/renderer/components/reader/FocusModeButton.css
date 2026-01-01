@@ -4,34 +4,39 @@
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
-  border: none;
+  border: 1px solid var(--focus-border, transparent);
   border-radius: 6px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  background: var(--focus-bg, linear-gradient(135deg, #667eea 0%, #764ba2 100%));
+  color: var(--focus-text, #ffffff);
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
-  box-shadow: 0 2px 4px rgba(102, 126, 234, 0.2);
+  box-shadow: var(--focus-shadow, 0 2px 4px rgba(102, 126, 234, 0.2));
 }
 
 .focus-mode-button:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+  background: var(--focus-bg-hover, linear-gradient(135deg, #7589f0 0%, #8459b0 100%));
+  box-shadow: var(--focus-shadow-hover, 0 4px 8px rgba(102, 126, 234, 0.3));
 }
 
 .focus-mode-button:active {
   transform: translateY(0);
-  box-shadow: 0 1px 2px rgba(102, 126, 234, 0.2);
+  background: var(--focus-bg-active, linear-gradient(135deg, #5b72dc 0%, #6a4396 100%));
+  box-shadow: var(--focus-shadow, 0 1px 2px rgba(102, 126, 234, 0.2));
 }
 
 .focus-mode-button.active {
-  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-  box-shadow: 0 2px 4px rgba(245, 87, 108, 0.2);
+  background: var(--focus-active-bg, linear-gradient(135deg, #f093fb 0%, #f5576c 100%));
+  color: var(--focus-active-text, #ffffff);
+  border-color: var(--focus-active-border, transparent);
+  box-shadow: var(--focus-active-shadow, 0 2px 4px rgba(245, 87, 108, 0.2));
 }
 
 .focus-mode-button.active:hover {
-  box-shadow: 0 4px 8px rgba(245, 87, 108, 0.3);
+  background: var(--focus-active-bg-hover, var(--focus-active-bg, linear-gradient(135deg, #f093fb 0%, #f5576c 100%)));
+  box-shadow: var(--focus-active-shadow-hover, 0 4px 8px rgba(245, 87, 108, 0.3));
 }
 
 .focus-mode-button .button-icon {

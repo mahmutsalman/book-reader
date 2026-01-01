@@ -5,6 +5,8 @@ import { ZOOM_LEVELS } from '../../../shared/constants';
 import { cleanWord } from '../../../shared/utils/text-utils';
 import type { Book, BookData, ReadingProgress } from '../../../shared/types';
 import WordPanel from '../word-panel/WordPanel';
+import { useReaderTheme } from '../../hooks/useReaderTheme';
+import { addAlpha } from '../../utils/colorUtils';
 
 interface ReaderViewProps {
   book: Book;
@@ -26,6 +28,8 @@ interface Chapter {
 const ReaderView: React.FC<ReaderViewProps> = ({ book, bookData, initialProgress }) => {
   const navigate = useNavigate();
   const { updateProgress } = useBooks();
+  const theme = useReaderTheme();
+  const hoverFill = theme.wordHover || addAlpha(theme.panel, 0.5);
   const [currentPage, setCurrentPage] = useState(initialProgress?.current_page || 1);
   const [zoom, setZoom] = useState(initialProgress?.zoom_level || ZOOM_LEVELS.DEFAULT);
   const [selectedWord, setSelectedWord] = useState<SelectedWord | null>(null);
@@ -105,7 +109,9 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, bookData, initialProgress
 
   // Render text with clickable words
   const renderText = (text: string) => {
-    if (!text) return <span className="text-gray-400 italic">Empty page</span>;
+    if (!text) {
+      return <span className="italic" style={{ color: theme.textSecondary }}>Empty page</span>;
+    }
 
     const words = text.split(/(\s+)/);
     return words.map((part, index) => {
@@ -129,17 +135,27 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, bookData, initialProgress
   const fontSize = 18 * zoom;
 
   return (
-    <div className="h-full flex flex-col bg-gray-50">
+    <div className="h-full flex flex-col" style={{ backgroundColor: theme.background, color: theme.text }}>
       {/* Top bar */}
-      <div className="bg-white border-b border-gray-200 px-4 py-2 flex items-center justify-between">
+      <div
+        className="border-b px-4 py-2 flex items-center justify-between"
+        style={{ backgroundColor: theme.panel, borderBottomColor: theme.panelBorder }}
+      >
         <div className="flex items-center gap-4">
           <button
             onClick={() => navigate('/library')}
-            className="text-gray-500 hover:text-gray-700"
+            className="transition-colors"
+            style={{ color: theme.textSecondary }}
+            onMouseEnter={(event) => {
+              event.currentTarget.style.color = theme.text;
+            }}
+            onMouseLeave={(event) => {
+              event.currentTarget.style.color = theme.textSecondary;
+            }}
           >
             ← Back
           </button>
-          <div className="text-sm text-gray-600 max-w-md truncate">
+          <div className="text-sm max-w-md truncate" style={{ color: theme.text }}>
             {book.title}
           </div>
         </div>
@@ -150,7 +166,16 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, bookData, initialProgress
             <div className="relative">
               <button
                 onClick={() => setShowChapterMenu(!showChapterMenu)}
-                className="text-sm text-gray-600 hover:text-gray-800 flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-100"
+                className="text-sm flex items-center gap-1 px-2 py-1 rounded transition-colors"
+                style={{ color: theme.textSecondary }}
+                onMouseEnter={(event) => {
+                  event.currentTarget.style.color = theme.text;
+                  event.currentTarget.style.backgroundColor = hoverFill;
+                }}
+                onMouseLeave={(event) => {
+                  event.currentTarget.style.color = theme.textSecondary;
+                  event.currentTarget.style.backgroundColor = 'transparent';
+                }}
               >
                 <span className="max-w-xs truncate">
                   {pageData?.chapter || 'Select Chapter'}
@@ -164,7 +189,10 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, bookData, initialProgress
                     className="fixed inset-0 z-10"
                     onClick={() => setShowChapterMenu(false)}
                   />
-                  <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 max-h-80 overflow-auto min-w-64">
+                  <div
+                    className="absolute right-0 top-full mt-1 border rounded-lg shadow-lg z-20 max-h-80 overflow-auto min-w-64"
+                    style={{ backgroundColor: theme.panel, borderColor: theme.panelBorder }}
+                  >
                     {chapters.map((chapter, idx) => (
                       <button
                         key={idx}
@@ -172,12 +200,28 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, bookData, initialProgress
                           goToPage(chapter.startPage);
                           setShowChapterMenu(false);
                         }}
-                        className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 ${
-                          pageData?.chapter === chapter.name ? 'bg-primary-50 text-primary-700' : 'text-gray-700'
-                        }`}
+                        className="w-full text-left px-4 py-2 text-sm transition-colors"
+                        style={{
+                          backgroundColor: pageData?.chapter === chapter.name
+                            ? addAlpha(theme.accent, 0.15)
+                            : 'transparent',
+                          color: pageData?.chapter === chapter.name ? theme.accent : theme.text,
+                        }}
+                        onMouseEnter={(event) => {
+                          if (pageData?.chapter !== chapter.name) {
+                            event.currentTarget.style.backgroundColor = hoverFill;
+                          }
+                        }}
+                        onMouseLeave={(event) => {
+                          if (pageData?.chapter !== chapter.name) {
+                            event.currentTarget.style.backgroundColor = 'transparent';
+                          }
+                        }}
                       >
                         <div className="truncate">{chapter.name}</div>
-                        <div className="text-xs text-gray-400">Page {chapter.startPage}</div>
+                        <div className="text-xs" style={{ color: theme.textSecondary }}>
+                          Page {chapter.startPage}
+                        </div>
                       </button>
                     ))}
                   </div>
@@ -188,7 +232,9 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, bookData, initialProgress
 
           {/* Zoom control */}
           <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500">Zoom:</span>
+            <span className="text-xs" style={{ color: theme.textSecondary }}>
+              Zoom:
+            </span>
             <input
               type="range"
               min={ZOOM_LEVELS.MIN}
@@ -196,9 +242,10 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, bookData, initialProgress
               step={ZOOM_LEVELS.STEP}
               value={zoom}
               onChange={(e) => setZoom(parseFloat(e.target.value))}
-              className="w-24 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+              className="w-24 h-2 rounded-lg appearance-none cursor-pointer"
+              style={{ backgroundColor: theme.panelBorder, accentColor: theme.accent }}
             />
-            <span className="text-xs text-gray-600 w-10">
+            <span className="text-xs w-10" style={{ color: theme.textSecondary }}>
               {zoom.toFixed(1)}x
             </span>
           </div>
@@ -219,16 +266,22 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, bookData, initialProgress
       </div>
 
       {/* Bottom navigation */}
-      <div className="bg-white border-t border-gray-200 px-4 py-3">
+      <div
+        className="border-t px-4 py-3"
+        style={{ backgroundColor: theme.panel, borderTopColor: theme.panelBorder }}
+      >
         {/* Progress bar */}
         <div className="max-w-3xl mx-auto mb-3">
-          <div className="h-1 bg-gray-200 rounded-full overflow-hidden">
+          <div className="h-1 rounded-full overflow-hidden" style={{ backgroundColor: theme.border }}>
             <div
-              className="h-full bg-primary-600 transition-all duration-300"
-              style={{ width: `${(currentPage / bookData.total_pages) * 100}%` }}
+              className="h-full transition-all duration-300"
+              style={{
+                width: `${(currentPage / bookData.total_pages) * 100}%`,
+                backgroundColor: theme.accent,
+              }}
             />
           </div>
-          <div className="text-xs text-gray-400 text-center mt-1">
+          <div className="text-xs text-center mt-1" style={{ color: theme.textSecondary }}>
             {Math.round((currentPage / bookData.total_pages) * 100)}% complete
           </div>
         </div>
@@ -237,7 +290,12 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, bookData, initialProgress
           <button
             onClick={goPrev}
             disabled={currentPage <= 1}
-            className="btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{
+              backgroundColor: 'transparent',
+              color: theme.textSecondary,
+              border: `1px solid ${theme.border}`,
+            }}
           >
             ← Previous
           </button>
@@ -249,15 +307,25 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, bookData, initialProgress
               max={bookData.total_pages}
               value={currentPage}
               onChange={(e) => goToPage(parseInt(e.target.value, 10) || 1)}
-              className="w-16 px-2 py-1 text-center border border-gray-300 rounded"
+              className="w-16 px-2 py-1 text-center border rounded"
+              style={{
+                backgroundColor: theme.panel,
+                color: theme.text,
+                borderColor: theme.border,
+              }}
             />
-            <span className="text-gray-500">of {bookData.total_pages}</span>
+            <span style={{ color: theme.textSecondary }}>of {bookData.total_pages}</span>
           </div>
 
           <button
             onClick={goNext}
             disabled={currentPage >= bookData.total_pages}
-            className="btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{
+              backgroundColor: 'transparent',
+              color: theme.textSecondary,
+              border: `1px solid ${theme.border}`,
+            }}
           >
             Next →
           </button>

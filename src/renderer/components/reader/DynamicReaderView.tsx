@@ -22,6 +22,7 @@ import { ClearSelectionsMenu } from './ClearSelectionsMenu';
 import { RemoveWordMenu } from './RemoveWordMenu';
 import { readerThemes } from '../../config/readerThemes';
 import { useReaderTheme } from '../../hooks/useReaderTheme';
+import { addAlpha, getContrastColor } from '../../utils/colorUtils';
 
 const MAX_PHRASE_WORDS = 10;
 
@@ -58,6 +59,8 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
   const { settings, updateSetting } = useSettings();
   const { isFocusMode, setIsFocusMode } = useFocusMode();
   const theme = useReaderTheme();
+  const accentTextColor = getContrastColor(theme.accent);
+  const hoverFill = theme.wordHover || addAlpha(theme.panel, 0.5);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Determine if system is in dark mode
@@ -1264,7 +1267,9 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
 
   // Render text with clickable words and ready indicators
   const renderText = (text: string) => {
-    if (!text) return <span className="text-gray-400 dark:text-cream-400 italic">Empty page</span>;
+    if (!text) {
+      return <span className="italic" style={{ color: theme.textSecondary }}>Empty page</span>;
+    }
 
     // Debug: Log phrase ranges on each render
     if (phraseRanges.size > 0) {
@@ -1389,18 +1394,28 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
     : 0;
 
   return (
-    <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-900">
+    <div className="h-full flex flex-col" style={{ backgroundColor: theme.background, color: theme.text }}>
       {/* Top bar - Hidden in Focus Mode */}
       {!isFocusMode && (
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-2 flex items-center justify-between">
+      <div
+        className="border-b px-4 py-2 flex items-center justify-between"
+        style={{ backgroundColor: theme.panel, borderBottomColor: theme.panelBorder }}
+      >
         <div className="flex items-center gap-4">
           <button
             onClick={() => navigate('/library')}
-            className="text-gray-500 dark:text-cream-300 hover:text-gray-700 dark:hover:text-cream-100"
+            className="transition-colors"
+            style={{ color: theme.textSecondary }}
+            onMouseEnter={(event) => {
+              event.currentTarget.style.color = theme.text;
+            }}
+            onMouseLeave={(event) => {
+              event.currentTarget.style.color = theme.textSecondary;
+            }}
           >
             ← Back
           </button>
-          <div className="text-sm text-gray-600 dark:text-cream-200 max-w-md truncate">
+          <div className="text-sm max-w-md truncate" style={{ color: theme.text }}>
             {book.title}
           </div>
         </div>
@@ -1411,7 +1426,16 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
             <div className="relative">
               <button
                 onClick={() => setShowChapterMenu(!showChapterMenu)}
-                className="text-sm text-gray-600 dark:text-cream-200 hover:text-gray-800 dark:hover:text-cream-100 flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+                className="text-sm flex items-center gap-1 px-2 py-1 rounded transition-colors"
+                style={{ color: theme.textSecondary }}
+                onMouseEnter={(event) => {
+                  event.currentTarget.style.color = theme.text;
+                  event.currentTarget.style.backgroundColor = hoverFill;
+                }}
+                onMouseLeave={(event) => {
+                  event.currentTarget.style.color = theme.textSecondary;
+                  event.currentTarget.style.backgroundColor = 'transparent';
+                }}
               >
                 <span className="max-w-xs truncate">
                   {reflowState.chapterName || 'Select Chapter'}
@@ -1425,7 +1449,10 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
                     className="fixed inset-0 z-10"
                     onClick={() => setShowChapterMenu(false)}
                   />
-                  <div className="absolute right-0 top-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-20 max-h-80 overflow-auto min-w-64">
+                  <div
+                    className="absolute right-0 top-full mt-1 border rounded-lg shadow-lg z-20 max-h-80 overflow-auto min-w-64"
+                    style={{ backgroundColor: theme.panel, borderColor: theme.panelBorder }}
+                  >
                     {chapters.map((chapter, idx) => (
                       <button
                         key={idx}
@@ -1433,12 +1460,28 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
                           goToOriginalPage(chapter.startPage);
                           setShowChapterMenu(false);
                         }}
-                        className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 ${
-                          reflowState.chapterName === chapter.name ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400' : 'text-gray-700 dark:text-cream-200'
-                        }`}
+                        className="w-full text-left px-4 py-2 text-sm transition-colors"
+                        style={{
+                          backgroundColor: reflowState.chapterName === chapter.name
+                            ? addAlpha(theme.accent, 0.15)
+                            : 'transparent',
+                          color: reflowState.chapterName === chapter.name ? theme.accent : theme.text,
+                        }}
+                        onMouseEnter={(event) => {
+                          if (reflowState.chapterName !== chapter.name) {
+                            event.currentTarget.style.backgroundColor = hoverFill;
+                          }
+                        }}
+                        onMouseLeave={(event) => {
+                          if (reflowState.chapterName !== chapter.name) {
+                            event.currentTarget.style.backgroundColor = 'transparent';
+                          }
+                        }}
                       >
                         <div className="truncate">{chapter.name}</div>
-                        <div className="text-xs text-gray-400 dark:text-cream-400">Page {chapter.startPage}</div>
+                        <div className="text-xs" style={{ color: theme.textSecondary }}>
+                          Page {chapter.startPage}
+                        </div>
                       </button>
                     ))}
                   </div>
@@ -1448,7 +1491,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
           )}
 
           {/* Original page indicator */}
-          <span className="text-xs text-gray-400 dark:text-cream-400">
+          <span className="text-xs" style={{ color: theme.textSecondary }}>
             Book page: {reflowState.originalPage}
           </span>
 
@@ -1462,11 +1505,23 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
                 updateSetting('is_meaning_mode', false);
               }
             }}
-            className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200 ${
-              isGrammarMode
-                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30 ring-2 ring-indigo-400'
-                : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-cream-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/30'
-            }`}
+            className="w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200"
+            style={{
+              backgroundColor: isGrammarMode ? theme.accent : theme.panelBorder,
+              color: isGrammarMode ? accentTextColor : theme.textSecondary,
+              boxShadow: isGrammarMode ? `0 8px 16px ${addAlpha(theme.accent, 0.25)}` : 'none',
+              border: isGrammarMode ? `1px solid ${addAlpha(theme.accent, 0.6)}` : `1px solid ${theme.border}`,
+            }}
+            onMouseEnter={(event) => {
+              if (!isGrammarMode) {
+                event.currentTarget.style.backgroundColor = hoverFill;
+              }
+            }}
+            onMouseLeave={(event) => {
+              if (!isGrammarMode) {
+                event.currentTarget.style.backgroundColor = theme.panelBorder;
+              }
+            }}
             title={isGrammarMode ? 'Grammar Mode ON - Click to disable' : 'Enable Grammar Mode'}
           >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
@@ -1484,11 +1539,23 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
                 updateSetting('is_grammar_mode', false);
               }
             }}
-            className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200 ${
-              isMeaningMode
-                ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/30 ring-2 ring-purple-400'
-                : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-cream-300 hover:bg-purple-100 dark:hover:bg-purple-900/30'
-            }`}
+            className="w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200"
+            style={{
+              backgroundColor: isMeaningMode ? theme.accent : theme.panelBorder,
+              color: isMeaningMode ? accentTextColor : theme.textSecondary,
+              boxShadow: isMeaningMode ? `0 8px 16px ${addAlpha(theme.accent, 0.25)}` : 'none',
+              border: isMeaningMode ? `1px solid ${addAlpha(theme.accent, 0.6)}` : `1px solid ${theme.border}`,
+            }}
+            onMouseEnter={(event) => {
+              if (!isMeaningMode) {
+                event.currentTarget.style.backgroundColor = hoverFill;
+              }
+            }}
+            onMouseLeave={(event) => {
+              if (!isMeaningMode) {
+                event.currentTarget.style.backgroundColor = theme.panelBorder;
+              }
+            }}
             title={isMeaningMode ? 'Meaning Mode ON - Click to disable' : 'Enable Meaning Mode'}
           >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
@@ -1498,13 +1565,19 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
           </button>
 
           {/* Queue indicator - always reserve space to prevent layout shift */}
-          <span className={`text-xs flex items-center gap-1 px-2 py-1 rounded min-w-[90px] ${
-            (fetchingCount + pendingCount) > 0
-              ? 'text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/30'
-              : 'invisible'
-          }`}>
+          <span
+            className="text-xs flex items-center gap-1 px-2 py-1 rounded min-w-[90px]"
+            style={{
+              color: (fetchingCount + pendingCount) > 0 ? theme.accent : 'transparent',
+              backgroundColor: (fetchingCount + pendingCount) > 0 ? addAlpha(theme.accent, 0.15) : 'transparent',
+              visibility: (fetchingCount + pendingCount) > 0 ? 'visible' : 'hidden',
+            }}
+          >
             <span className="relative inline-flex">
-              <span className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" />
+              <span
+                className="w-2 h-2 rounded-full animate-pulse"
+                style={{ backgroundColor: theme.accent }}
+              />
             </span>
             {fetchingCount + pendingCount} in queue
           </span>
@@ -1525,7 +1598,9 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
 
           {/* Zoom control */}
           <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500 dark:text-cream-300">Zoom:</span>
+            <span className="text-xs" style={{ color: theme.textSecondary }}>
+              Zoom:
+            </span>
             <input
               type="range"
               min={ZOOM_LEVELS.MIN}
@@ -1533,9 +1608,10 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
               step={ZOOM_LEVELS.STEP}
               value={zoom}
               onChange={(e) => setZoom(parseFloat(e.target.value))}
-              className="w-24 h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer accent-primary-600"
+              className="w-24 h-2 rounded-lg appearance-none cursor-pointer"
+              style={{ backgroundColor: theme.panelBorder, accentColor: theme.accent }}
             />
-            <span className="text-xs text-gray-600 dark:text-cream-300 w-10">
+            <span className="text-xs w-10" style={{ color: theme.textSecondary }}>
               {zoom.toFixed(1)}x
             </span>
           </div>
@@ -1639,16 +1715,22 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
 
       {/* Bottom navigation - Hidden in Focus Mode */}
       {!isFocusMode && (
-      <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 px-4 py-3">
+      <div
+        className="border-t px-4 py-3"
+        style={{ backgroundColor: theme.panel, borderTopColor: theme.panelBorder }}
+      >
         {/* Progress bar */}
         <div className="max-w-3xl mx-auto mb-3">
-          <div className="h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+          <div
+            className="h-1 rounded-full overflow-hidden"
+            style={{ backgroundColor: theme.border }}
+          >
             <div
-              className="h-full bg-primary-600 transition-all duration-300"
-              style={{ width: `${progressPercent}%` }}
+              className="h-full transition-all duration-300"
+              style={{ width: `${progressPercent}%`, backgroundColor: theme.accent }}
             />
           </div>
-          <div className="text-xs text-gray-400 dark:text-cream-400 text-center mt-1">
+          <div className="text-xs text-center mt-1" style={{ color: theme.textSecondary }}>
             View {reflowState.currentPageIndex + 1} of {reflowState.totalPages} • {Math.round(progressPercent)}% complete
           </div>
         </div>
@@ -1657,12 +1739,17 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
           <button
             onClick={goToPrevPage}
             disabled={reflowState.currentPageIndex <= 0}
-            className="btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{
+              backgroundColor: 'transparent',
+              color: theme.textSecondary,
+              border: `1px solid ${theme.border}`,
+            }}
           >
             ← Previous
           </button>
 
-          <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-cream-300">
+          <div className="flex items-center gap-2 text-sm" style={{ color: theme.textSecondary }}>
             <span>View</span>
             <span className="font-medium">{reflowState.currentPageIndex + 1}</span>
             <span>of</span>
@@ -1672,7 +1759,12 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
           <button
             onClick={goToNextPage}
             disabled={reflowState.currentPageIndex >= reflowState.totalPages - 1}
-            className="btn-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{
+              backgroundColor: 'transparent',
+              color: theme.textSecondary,
+              border: `1px solid ${theme.border}`,
+            }}
           >
             Next →
           </button>

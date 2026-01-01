@@ -1,4 +1,6 @@
 import React from 'react';
+import { useReaderTheme } from '../../hooks/useReaderTheme';
+import { addAlpha, getContrastColor } from '../../utils/colorUtils';
 
 interface FocusModeHeaderProps {
   isGrammarMode: boolean;
@@ -13,20 +15,36 @@ const FocusModeHeader: React.FC<FocusModeHeaderProps> = ({
   onToggleGrammar,
   onToggleMeaning,
 }) => {
+  const theme = useReaderTheme();
+  const accentTextColor = getContrastColor(theme.accent);
+  const hoverFill = theme.wordHover || addAlpha(theme.panel, 0.5);
+
   return (
-    <div className="fixed top-0 left-0 right-0 z-[9999] flex items-center justify-center py-2 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm pointer-events-auto app-no-drag">
+    <div
+      className="fixed top-0 left-0 right-0 z-[9999] flex items-center justify-center py-2 backdrop-blur-sm pointer-events-auto app-no-drag"
+      style={{ backgroundColor: addAlpha(theme.panel, 0.85), color: theme.text }}
+    >
       <div className="flex items-center gap-2 pointer-events-auto">
         {/* Grammar Mode Button */}
         <button
           onClick={onToggleGrammar}
-          className={`
-            px-3 py-1.5 rounded-md text-sm font-medium transition-all cursor-pointer
-            ${
-              isGrammarMode
-                ? 'bg-gray-500 dark:bg-gray-500 text-white border-2 border-gray-700 dark:border-gray-300 shadow-md'
-                : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-600 hover:bg-gray-300 dark:hover:bg-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
+          className="px-3 py-1.5 rounded-md text-sm font-medium transition-all cursor-pointer"
+          style={{
+            backgroundColor: isGrammarMode ? theme.accent : theme.panelBorder,
+            color: isGrammarMode ? accentTextColor : theme.textSecondary,
+            border: `1px solid ${isGrammarMode ? theme.accent : theme.border}`,
+            boxShadow: isGrammarMode ? `0 6px 14px ${addAlpha(theme.accent, 0.25)}` : 'none',
+          }}
+          onMouseEnter={(event) => {
+            if (!isGrammarMode) {
+              event.currentTarget.style.backgroundColor = hoverFill;
             }
-          `}
+          }}
+          onMouseLeave={(event) => {
+            if (!isGrammarMode) {
+              event.currentTarget.style.backgroundColor = theme.panelBorder;
+            }
+          }}
           title={isGrammarMode ? 'Grammar Mode ON - Click to disable' : 'Grammar Mode OFF - Click to enable'}
         >
           <div className="flex items-center gap-1.5">
@@ -42,14 +60,23 @@ const FocusModeHeader: React.FC<FocusModeHeaderProps> = ({
         {/* Meaning Mode Button */}
         <button
           onClick={onToggleMeaning}
-          className={`
-            px-3 py-1.5 rounded-md text-sm font-medium transition-all cursor-pointer
-            ${
-              isMeaningMode
-                ? 'bg-gray-500 dark:bg-gray-500 text-white border-2 border-gray-700 dark:border-gray-300 shadow-md'
-                : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 border border-gray-300 dark:border-gray-600 hover:bg-gray-300 dark:hover:bg-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
+          className="px-3 py-1.5 rounded-md text-sm font-medium transition-all cursor-pointer"
+          style={{
+            backgroundColor: isMeaningMode ? theme.accent : theme.panelBorder,
+            color: isMeaningMode ? accentTextColor : theme.textSecondary,
+            border: `1px solid ${isMeaningMode ? theme.accent : theme.border}`,
+            boxShadow: isMeaningMode ? `0 6px 14px ${addAlpha(theme.accent, 0.25)}` : 'none',
+          }}
+          onMouseEnter={(event) => {
+            if (!isMeaningMode) {
+              event.currentTarget.style.backgroundColor = hoverFill;
             }
-          `}
+          }}
+          onMouseLeave={(event) => {
+            if (!isMeaningMode) {
+              event.currentTarget.style.backgroundColor = theme.panelBorder;
+            }
+          }}
           title={isMeaningMode ? 'Meaning Mode ON - Click to disable' : 'Meaning Mode OFF - Click to enable'}
         >
           <div className="flex items-center gap-1.5">

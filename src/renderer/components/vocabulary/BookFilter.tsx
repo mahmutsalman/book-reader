@@ -1,5 +1,6 @@
 import React from 'react';
 import type { Book } from '../../../shared/types';
+import { useReaderTheme } from '../../hooks/useReaderTheme';
 
 interface BookFilterProps {
   books: Book[];
@@ -8,14 +9,24 @@ interface BookFilterProps {
 }
 
 const BookFilter: React.FC<BookFilterProps> = ({ books, selectedBookId, onBookChange }) => {
+  const theme = useReaderTheme();
+
   return (
     <select
       value={selectedBookId ?? ''}
       onChange={(e) => onBookChange(e.target.value ? Number(e.target.value) : null)}
-      className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
-                 bg-white dark:bg-gray-700 text-gray-900 dark:text-cream-100
-                 focus:outline-none focus:ring-2 focus:ring-primary-500
-                 text-sm max-w-[180px] truncate"
+      className="px-3 py-2 border rounded-lg focus:outline-none text-sm max-w-[180px] truncate"
+      style={{
+        backgroundColor: theme.panel,
+        color: theme.text,
+        borderColor: theme.border,
+      }}
+      onFocus={(event) => {
+        event.currentTarget.style.boxShadow = `0 0 0 2px ${theme.accent}40`;
+      }}
+      onBlur={(event) => {
+        event.currentTarget.style.boxShadow = 'none';
+      }}
     >
       <option value="">All Books</option>
       {books.map(book => (

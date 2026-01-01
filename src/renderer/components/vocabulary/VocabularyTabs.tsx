@@ -1,5 +1,7 @@
 import React from 'react';
 import type { WordType } from '../../../shared/types';
+import { useReaderTheme } from '../../hooks/useReaderTheme';
+import { addAlpha } from '../../utils/colorUtils';
 
 export type VocabularyTab = WordType | 'session';
 
@@ -15,6 +17,7 @@ interface VocabularyTabsProps {
 }
 
 const VocabularyTabs: React.FC<VocabularyTabsProps> = ({ activeTab, onTabChange, counts }) => {
+  const theme = useReaderTheme();
   const tabs: { key: VocabularyTab; label: string; count: number }[] = [
     { key: 'word', label: 'Words', count: counts.word },
     { key: 'phrasal_verb', label: 'Phrasal Verbs', count: counts.phrasal_verb },
@@ -23,23 +26,28 @@ const VocabularyTabs: React.FC<VocabularyTabsProps> = ({ activeTab, onTabChange,
   ];
 
   return (
-    <div className="flex border-b border-gray-200 dark:border-gray-700 mb-4 overflow-x-auto">
+    <div
+      className="flex border-b mb-4 overflow-x-auto"
+      style={{ borderBottomColor: theme.border }}
+    >
       {tabs.map(tab => (
         <button
           key={tab.key}
           onClick={() => onTabChange(tab.key)}
-          className={`px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap ${
-            activeTab === tab.key
-              ? 'text-primary-600 border-b-2 border-primary-600 dark:text-primary-400 dark:border-primary-400'
-              : 'text-gray-500 hover:text-gray-700 dark:text-cream-300 dark:hover:text-cream-100'
-          }`}
+          className="px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap border-b-2"
+          style={{
+            color: activeTab === tab.key ? theme.accent : theme.textSecondary,
+            borderBottomColor: activeTab === tab.key ? theme.accent : 'transparent',
+          }}
         >
           {tab.label}
-          <span className={`ml-2 px-2 py-0.5 text-xs rounded-full ${
-            activeTab === tab.key
-              ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300'
-              : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-cream-300'
-          }`}>
+          <span
+            className="ml-2 px-2 py-0.5 text-xs rounded-full"
+            style={{
+              backgroundColor: activeTab === tab.key ? addAlpha(theme.accent, 0.2) : theme.panel,
+              color: activeTab === tab.key ? theme.accent : theme.textSecondary,
+            }}
+          >
             {tab.count}
           </span>
         </button>

@@ -3,10 +3,10 @@
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
-  border: 1px solid #4a90d9;
+  border: 1px solid var(--prestudy-border, #4a90d9);
   border-radius: 6px;
-  background: linear-gradient(135deg, #4a90d9 0%, #357abd 100%);
-  color: white;
+  background: var(--prestudy-bg, linear-gradient(135deg, #4a90d9 0%, #357abd 100%));
+  color: var(--prestudy-text, #ffffff);
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
@@ -16,26 +16,30 @@
 }
 
 .pre-study-button:hover:not(.disabled):not(.generating) {
-  background: linear-gradient(135deg, #5a9ee9 0%, #4588cd 100%);
-  box-shadow: 0 2px 8px rgba(74, 144, 217, 0.3);
+  background: var(--prestudy-bg-hover, linear-gradient(135deg, #5a9ee9 0%, #4588cd 100%));
+  box-shadow: var(--prestudy-shadow-hover, 0 2px 8px rgba(74, 144, 217, 0.3));
   transform: translateY(-1px);
 }
 
 .pre-study-button:active:not(.disabled):not(.generating) {
   transform: translateY(0);
-  box-shadow: 0 1px 4px rgba(74, 144, 217, 0.2);
+  background: var(--prestudy-bg-active, linear-gradient(135deg, #4a90d9 0%, #357abd 100%));
+  box-shadow: var(--prestudy-shadow, 0 1px 4px rgba(74, 144, 217, 0.2));
 }
 
 .pre-study-button.disabled {
   opacity: 0.5;
   cursor: not-allowed;
-  background: linear-gradient(135deg, #888 0%, #666 100%);
-  border-color: #666;
+  background: var(--prestudy-disabled-bg, linear-gradient(135deg, #888 0%, #666 100%));
+  border-color: var(--prestudy-disabled-border, #666);
+  color: var(--prestudy-disabled-text, #ffffff);
+  box-shadow: none;
 }
 
 .pre-study-button.generating {
   cursor: wait;
-  background: linear-gradient(135deg, #5a9ee9 0%, #4588cd 100%);
+  background: var(--prestudy-bg-hover, linear-gradient(135deg, #5a9ee9 0%, #4588cd 100%));
+  box-shadow: var(--prestudy-shadow, 0 2px 8px rgba(74, 144, 217, 0.3));
 }
 
 .button-icon {
@@ -72,26 +76,14 @@
   left: 0;
   right: 0;
   height: 3px;
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--prestudy-progress-track, rgba(255, 255, 255, 0.2));
   overflow: hidden;
 }
 
 .progress-fill {
   height: 100%;
-  background: rgba(255, 255, 255, 0.8);
+  background: var(--prestudy-progress-fill, rgba(255, 255, 255, 0.8));
   transition: width 0.3s ease;
-}
-
-/* Dark mode support */
-@media (prefers-color-scheme: dark) {
-  .pre-study-button {
-    background: linear-gradient(135deg, #5a9ee9 0%, #4588cd 100%);
-    border-color: #5a9ee9;
-  }
-
-  .pre-study-button:hover:not(.disabled):not(.generating) {
-    background: linear-gradient(135deg, #6aaeF9 0%, #5598dd 100%);
-  }
 }
 
 /* Responsive adjustments */

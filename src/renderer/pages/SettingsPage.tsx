@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useSettings } from '../context/SettingsContext';
 import type { AppSettings } from '../../shared/types';
 import type { IPALanguageInfo, VoiceModelInfo } from '../../shared/types/pronunciation.types';
+import { useReaderTheme } from '../hooks/useReaderTheme';
+import { addAlpha, getContrastColor } from '../utils/colorUtils';
 
 type ThemeOption = AppSettings['theme'];
 
@@ -35,6 +37,7 @@ const GOOGLE_MODELS = [
 
 const SettingsPage: React.FC = () => {
   const { settings, updateSetting, loading } = useSettings();
+  const theme = useReaderTheme();
   const [testingConnection, setTestingConnection] = useState(false);
   const [connectionResult, setConnectionResult] = useState<{ success: boolean; message: string } | null>(null);
   const [availableModels, setAvailableModels] = useState<string[]>([]);
@@ -61,6 +64,26 @@ const SettingsPage: React.FC = () => {
   const [mistralConnectionResult, setMistralConnectionResult] = useState<{ success: boolean; message: string } | null>(null);
   const [testingGoogleConnection, setTestingGoogleConnection] = useState(false);
   const [googleConnectionResult, setGoogleConnectionResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  const accentTextColor = getContrastColor(theme.accent);
+  const hoverFill = theme.wordHover || addAlpha(theme.panel, 0.5);
+  const inputStyle = {
+    backgroundColor: theme.panel,
+    color: theme.text,
+    borderColor: theme.border,
+  };
+  const cardStyle = {
+    backgroundColor: theme.panel,
+    borderColor: theme.panelBorder,
+    color: theme.text,
+  };
+  const focusRing = `0 0 0 2px ${theme.accent}40`;
+  const handleInputFocus = (event: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) => {
+    event.currentTarget.style.boxShadow = focusRing;
+  };
+  const handleInputBlur = (event: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) => {
+    event.currentTarget.style.boxShadow = 'none';
+  };
 
   const handleTestConnection = async () => {
     if (!window.electronAPI) return;
@@ -358,7 +381,9 @@ const SettingsPage: React.FC = () => {
   if (loading) {
     return (
       <div className="p-6 max-w-2xl mx-auto">
-        <div className="text-center py-12 text-gray-500 dark:text-cream-300">Loading settings...</div>
+        <div className="text-center py-12" style={{ color: theme.textSecondary }}>
+          Loading settings...
+        </div>
       </div>
     );
   }
@@ -370,37 +395,52 @@ const SettingsPage: React.FC = () => {
   ];
 
   return (
-    <div className="p-6 max-w-2xl mx-auto">
-      <h2 className="text-2xl font-bold text-gray-800 dark:text-cream-100 mb-6">Settings</h2>
+    <div className="p-6 max-w-2xl mx-auto" style={{ color: theme.text }}>
+      <h2 className="text-2xl font-bold mb-6" style={{ color: theme.accent }}>
+        Settings
+      </h2>
 
       {/* Appearance Settings */}
-      <div className="card mb-6">
-        <h3 className="text-lg font-semibold text-gray-800 dark:text-cream-100 mb-4">
+      <div className="card mb-6" style={cardStyle}>
+        <h3 className="text-lg font-semibold mb-4">
           🎨 Appearance
         </h3>
 
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-cream-200 mb-2">
+            <label className="block text-sm font-medium mb-2" style={{ color: theme.textSecondary }}>
               Theme
             </label>
-            <div className="inline-flex rounded-lg border border-gray-300 dark:border-gray-600 p-1 bg-gray-100 dark:bg-gray-700">
+            <div
+              className="inline-flex rounded-lg border p-1"
+              style={{ borderColor: theme.border, backgroundColor: theme.background }}
+            >
               {themeOptions.map((option) => (
                 <button
                   key={option.value}
                   onClick={() => updateSetting('theme', option.value)}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center gap-2 ${
-                    settings.theme === option.value
-                      ? 'bg-primary-600 text-white shadow-sm'
-                      : 'text-gray-700 dark:text-cream-200 hover:bg-gray-200 dark:hover:bg-gray-600'
-                  }`}
+                  className="px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center gap-2"
+                  style={{
+                    backgroundColor: settings.theme === option.value ? theme.accent : 'transparent',
+                    color: settings.theme === option.value ? accentTextColor : theme.textSecondary,
+                  }}
+                  onMouseEnter={(event) => {
+                    if (settings.theme !== option.value) {
+                      event.currentTarget.style.backgroundColor = hoverFill;
+                    }
+                  }}
+                  onMouseLeave={(event) => {
+                    if (settings.theme !== option.value) {
+                      event.currentTarget.style.backgroundColor = 'transparent';
+                    }
+                  }}
                 >
                   <span>{option.icon}</span>
                   <span>{option.label}</span>
                 </button>
               ))}
             </div>
-            <p className="text-xs text-gray-500 dark:text-cream-300 mt-2">
+            <p className="text-xs mt-2" style={{ color: theme.textSecondary }}>
               Choose your preferred color scheme
             </p>
           </div>
@@ -408,75 +448,128 @@ const SettingsPage: React.FC = () => {
       </div>
 
       {/* AI Provider Settings */}
-      <div className="card mb-6">
-        <h3 className="text-lg font-semibold text-gray-800 dark:text-cream-100 mb-4">
+      <div className="card mb-6" style={cardStyle}>
+        <h3 className="text-lg font-semibold mb-4">
           🤖 AI Provider
         </h3>
 
         <div className="space-y-4">
           {/* Provider Toggle */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-cream-200 mb-2">
+            <label className="block text-sm font-medium mb-2" style={{ color: theme.textSecondary }}>
               Select AI Provider
             </label>
-            <div className="inline-flex rounded-lg border border-gray-300 dark:border-gray-600 p-1 bg-gray-100 dark:bg-gray-700 flex-wrap">
+            <div
+              className="inline-flex rounded-lg border p-1 flex-wrap"
+              style={{ borderColor: theme.border, backgroundColor: theme.background }}
+            >
               <button
                 onClick={() => updateSetting('ai_provider', 'local')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center gap-2 ${
-                  settings.ai_provider === 'local'
-                    ? 'bg-primary-600 text-white shadow-sm'
-                    : 'text-gray-700 dark:text-cream-200 hover:bg-gray-200 dark:hover:bg-gray-600'
-                }`}
+                className="px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center gap-2"
+                style={{
+                  backgroundColor: settings.ai_provider === 'local' ? theme.accent : 'transparent',
+                  color: settings.ai_provider === 'local' ? accentTextColor : theme.textSecondary,
+                }}
+                onMouseEnter={(event) => {
+                  if (settings.ai_provider !== 'local') {
+                    event.currentTarget.style.backgroundColor = hoverFill;
+                  }
+                }}
+                onMouseLeave={(event) => {
+                  if (settings.ai_provider !== 'local') {
+                    event.currentTarget.style.backgroundColor = 'transparent';
+                  }
+                }}
               >
                 <span>💻</span>
                 <span>Local AI</span>
               </button>
               <button
                 onClick={() => updateSetting('ai_provider', 'groq')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center gap-2 ${
-                  settings.ai_provider === 'groq'
-                    ? 'bg-primary-600 text-white shadow-sm'
-                    : 'text-gray-700 dark:text-cream-200 hover:bg-gray-200 dark:hover:bg-gray-600'
-                }`}
+                className="px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center gap-2"
+                style={{
+                  backgroundColor: settings.ai_provider === 'groq' ? theme.accent : 'transparent',
+                  color: settings.ai_provider === 'groq' ? accentTextColor : theme.textSecondary,
+                }}
+                onMouseEnter={(event) => {
+                  if (settings.ai_provider !== 'groq') {
+                    event.currentTarget.style.backgroundColor = hoverFill;
+                  }
+                }}
+                onMouseLeave={(event) => {
+                  if (settings.ai_provider !== 'groq') {
+                    event.currentTarget.style.backgroundColor = 'transparent';
+                  }
+                }}
               >
                 <span>☁️</span>
                 <span>Groq</span>
               </button>
               <button
                 onClick={() => updateSetting('ai_provider', 'openrouter')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center gap-2 ${
-                  settings.ai_provider === 'openrouter'
-                    ? 'bg-primary-600 text-white shadow-sm'
-                    : 'text-gray-700 dark:text-cream-200 hover:bg-gray-200 dark:hover:bg-gray-600'
-                }`}
+                className="px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center gap-2"
+                style={{
+                  backgroundColor: settings.ai_provider === 'openrouter' ? theme.accent : 'transparent',
+                  color: settings.ai_provider === 'openrouter' ? accentTextColor : theme.textSecondary,
+                }}
+                onMouseEnter={(event) => {
+                  if (settings.ai_provider !== 'openrouter') {
+                    event.currentTarget.style.backgroundColor = hoverFill;
+                  }
+                }}
+                onMouseLeave={(event) => {
+                  if (settings.ai_provider !== 'openrouter') {
+                    event.currentTarget.style.backgroundColor = 'transparent';
+                  }
+                }}
               >
                 <span>🌐</span>
                 <span>OpenRouter</span>
               </button>
               <button
                 onClick={() => updateSetting('ai_provider', 'mistral')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center gap-2 ${
-                  settings.ai_provider === 'mistral'
-                    ? 'bg-primary-600 text-white shadow-sm'
-                    : 'text-gray-700 dark:text-cream-200 hover:bg-gray-200 dark:hover:bg-gray-600'
-                }`}
+                className="px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center gap-2"
+                style={{
+                  backgroundColor: settings.ai_provider === 'mistral' ? theme.accent : 'transparent',
+                  color: settings.ai_provider === 'mistral' ? accentTextColor : theme.textSecondary,
+                }}
+                onMouseEnter={(event) => {
+                  if (settings.ai_provider !== 'mistral') {
+                    event.currentTarget.style.backgroundColor = hoverFill;
+                  }
+                }}
+                onMouseLeave={(event) => {
+                  if (settings.ai_provider !== 'mistral') {
+                    event.currentTarget.style.backgroundColor = 'transparent';
+                  }
+                }}
               >
                 <span>🔮</span>
                 <span>Mistral AI</span>
               </button>
               <button
                 onClick={() => updateSetting('ai_provider', 'google-ai')}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center gap-2 ${
-                  settings.ai_provider === 'google-ai'
-                    ? 'bg-primary-600 text-white shadow-sm'
-                    : 'text-gray-700 dark:text-cream-200 hover:bg-gray-200 dark:hover:bg-gray-600'
-                }`}
+                className="px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center gap-2"
+                style={{
+                  backgroundColor: settings.ai_provider === 'google-ai' ? theme.accent : 'transparent',
+                  color: settings.ai_provider === 'google-ai' ? accentTextColor : theme.textSecondary,
+                }}
+                onMouseEnter={(event) => {
+                  if (settings.ai_provider !== 'google-ai') {
+                    event.currentTarget.style.backgroundColor = hoverFill;
+                  }
+                }}
+                onMouseLeave={(event) => {
+                  if (settings.ai_provider !== 'google-ai') {
+                    event.currentTarget.style.backgroundColor = 'transparent';
+                  }
+                }}
               >
                 <span>✨</span>
                 <span>Google AI</span>
               </button>
             </div>
-            <p className="text-xs text-gray-500 dark:text-cream-300 mt-2">
+            <p className="text-xs mt-2" style={{ color: theme.textSecondary }}>
               {settings.ai_provider === 'local'
                 ? 'Uses LM Studio running locally on your computer'
                 : settings.ai_provider === 'groq'
@@ -491,14 +584,14 @@ const SettingsPage: React.FC = () => {
 
           {/* Local AI Settings */}
           {settings.ai_provider === 'local' && (
-            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
-              <h4 className="text-sm font-medium text-gray-700 dark:text-cream-200 mb-3">
+            <div className="mt-4 pt-4 border-t" style={{ borderTopColor: theme.border }}>
+              <h4 className="text-sm font-medium mb-3" style={{ color: theme.textSecondary }}>
                 LM Studio Settings
               </h4>
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-cream-200 mb-1">
+                  <label className="block text-sm font-medium mb-1" style={{ color: theme.textSecondary }}>
                     LM Studio URL
                   </label>
                   <input
@@ -506,9 +599,12 @@ const SettingsPage: React.FC = () => {
                     value={settings.lm_studio_url}
                     onChange={(e) => updateSetting('lm_studio_url', e.target.value)}
                     placeholder="http://localhost:1234"
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-cream-100"
+                    className="w-full px-4 py-2 border rounded-lg focus:outline-none"
+                    style={inputStyle}
+                    onFocus={handleInputFocus}
+                    onBlur={handleInputBlur}
                   />
-                  <p className="text-xs text-gray-500 dark:text-cream-300 mt-1">
+                  <p className="text-xs mt-1" style={{ color: theme.textSecondary }}>
                     Default: http://localhost:1234
                   </p>
                 </div>
@@ -517,7 +613,18 @@ const SettingsPage: React.FC = () => {
                   <button
                     onClick={handleTestConnection}
                     disabled={testingConnection}
-                    className="btn-secondary"
+                    className="px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{
+                      backgroundColor: 'transparent',
+                      color: theme.textSecondary,
+                      border: `1px solid ${theme.border}`,
+                    }}
+                    onMouseEnter={(event) => {
+                      event.currentTarget.style.backgroundColor = hoverFill;
+                    }}
+                    onMouseLeave={(event) => {
+                      event.currentTarget.style.backgroundColor = 'transparent';
+                    }}
                   >
                     {testingConnection ? 'Testing...' : 'Test Connection'}
                   </button>
@@ -535,13 +642,16 @@ const SettingsPage: React.FC = () => {
                 {/* Model Selection */}
                 {availableModels.length > 0 && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-cream-200 mb-1">
+                    <label className="block text-sm font-medium mb-1" style={{ color: theme.textSecondary }}>
                       AI Model
                     </label>
                     <select
                       value={settings.lm_studio_model}
                       onChange={(e) => updateSetting('lm_studio_model', e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-cream-100"
+                      className="w-full px-4 py-2 border rounded-lg focus:outline-none"
+                      style={inputStyle}
+                      onFocus={handleInputFocus}
+                      onBlur={handleInputBlur}
                     >
                       {availableModels.map((model) => (
                         <option key={model} value={model}>
@@ -549,14 +659,14 @@ const SettingsPage: React.FC = () => {
                         </option>
                       ))}
                     </select>
-                    <p className="text-xs text-gray-500 dark:text-cream-300 mt-1">
+                    <p className="text-xs mt-1" style={{ color: theme.textSecondary }}>
                       Select the model to use for word definitions and sentence simplification
                     </p>
                   </div>
                 )}
 
                 {settings.lm_studio_model !== 'default' && availableModels.length === 0 && (
-                  <div className="text-sm text-gray-500 dark:text-cream-300">
+                  <div className="text-sm" style={{ color: theme.textSecondary }}>
                     Current model: <span className="font-medium">{settings.lm_studio_model}</span>
                     <br />
                     <span className="text-xs">Test connection to see available models</span>
@@ -568,26 +678,27 @@ const SettingsPage: React.FC = () => {
 
           {/* Groq Cloud AI Settings */}
           {settings.ai_provider === 'groq' && (
-            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
-              <h4 className="text-sm font-medium text-gray-700 dark:text-cream-200 mb-3">
+            <div className="mt-4 pt-4 border-t" style={{ borderTopColor: theme.border }}>
+              <h4 className="text-sm font-medium mb-3" style={{ color: theme.textSecondary }}>
                 Groq Cloud AI Settings
               </h4>
 
               <div className="space-y-4">
                 {/* Setup Instructions */}
                 {!settings.groq_api_key && (
-                  <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                    <p className="text-sm text-blue-700 dark:text-blue-300 mb-2">
+                  <div className="p-3 rounded-lg border" style={{ borderColor: theme.panelBorder, backgroundColor: theme.background }}>
+                    <p className="text-sm mb-2" style={{ color: theme.textSecondary }}>
                       To use Groq's free AI, you need an API key:
                     </p>
-                    <ol className="text-xs text-blue-600 dark:text-blue-400 list-decimal list-inside space-y-1 mb-3">
+                    <ol className="text-xs list-decimal list-inside space-y-1 mb-3" style={{ color: theme.textSecondary }}>
                       <li>Click "Setup Groq" to create a free account</li>
                       <li>Go to API Keys and create a new key</li>
                       <li>Paste your API key below</li>
                     </ol>
                     <button
                       onClick={handleOpenGroqSetup}
-                      className="btn-primary text-sm"
+                      className="px-4 py-2 rounded-lg font-medium transition-opacity text-sm"
+                      style={{ backgroundColor: theme.accent, color: accentTextColor }}
                     >
                       Setup Groq (Free)
                     </button>
@@ -595,7 +706,7 @@ const SettingsPage: React.FC = () => {
                 )}
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-cream-200 mb-1">
+                  <label className="block text-sm font-medium mb-1" style={{ color: theme.textSecondary }}>
                     API Key
                   </label>
                   <input
@@ -603,21 +714,27 @@ const SettingsPage: React.FC = () => {
                     value={settings.groq_api_key}
                     onChange={(e) => updateSetting('groq_api_key', e.target.value)}
                     placeholder="gsk_..."
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-cream-100"
+                    className="w-full px-4 py-2 border rounded-lg focus:outline-none"
+                    style={inputStyle}
+                    onFocus={handleInputFocus}
+                    onBlur={handleInputBlur}
                   />
-                  <p className="text-xs text-gray-500 dark:text-cream-300 mt-1">
+                  <p className="text-xs mt-1" style={{ color: theme.textSecondary }}>
                     Your API key is stored securely using OS encryption
                   </p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-cream-200 mb-1">
+                  <label className="block text-sm font-medium mb-1" style={{ color: theme.textSecondary }}>
                     Model
                   </label>
                   <select
                     value={settings.groq_model}
                     onChange={(e) => updateSetting('groq_model', e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-cream-100"
+                    className="w-full px-4 py-2 border rounded-lg focus:outline-none"
+                    style={inputStyle}
+                    onFocus={handleInputFocus}
+                    onBlur={handleInputBlur}
                   >
                     {GROQ_MODELS.map((model) => (
                       <option key={model.value} value={model.value}>
@@ -625,7 +742,7 @@ const SettingsPage: React.FC = () => {
                       </option>
                     ))}
                   </select>
-                  <p className="text-xs text-gray-500 dark:text-cream-300 mt-1">
+                  <p className="text-xs mt-1" style={{ color: theme.textSecondary }}>
                     Llama 3.3 70B provides the best results for language learning
                   </p>
                 </div>
@@ -634,7 +751,18 @@ const SettingsPage: React.FC = () => {
                   <button
                     onClick={handleTestGroqConnection}
                     disabled={testingGroqConnection || !settings.groq_api_key}
-                    className="btn-secondary"
+                    className="px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{
+                      backgroundColor: 'transparent',
+                      color: theme.textSecondary,
+                      border: `1px solid ${theme.border}`,
+                    }}
+                    onMouseEnter={(event) => {
+                      event.currentTarget.style.backgroundColor = hoverFill;
+                    }}
+                    onMouseLeave={(event) => {
+                      event.currentTarget.style.backgroundColor = 'transparent';
+                    }}
                   >
                     {testingGroqConnection ? 'Testing...' : 'Test Connection'}
                   </button>
@@ -650,11 +778,11 @@ const SettingsPage: React.FC = () => {
                 </div>
 
                 {/* Enhanced Features Info */}
-                <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-                  <p className="text-sm font-medium text-green-700 dark:text-green-300 mb-1">
+                <div className="p-3 rounded-lg border" style={{ borderColor: theme.panelBorder, backgroundColor: addAlpha(theme.accent, 0.1) }}>
+                  <p className="text-sm font-medium mb-1" style={{ color: theme.accent }}>
                     Enhanced Features with Cloud AI
                   </p>
-                  <ul className="text-xs text-green-600 dark:text-green-400 list-disc list-inside space-y-1">
+                  <ul className="text-xs list-disc list-inside space-y-1" style={{ color: theme.textSecondary }}>
                     <li>Example sentences for each word showing different grammar contexts</li>
                     <li>Grammar explanations to help understand sentence structures</li>
                     <li>Works for all AI features: definitions, IPA, simplification, pre-study notes</li>
@@ -666,19 +794,19 @@ const SettingsPage: React.FC = () => {
 
           {/* OpenRouter Settings */}
           {settings.ai_provider === 'openrouter' && (
-            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
-              <h4 className="text-sm font-medium text-gray-700 dark:text-cream-200 mb-3">
+            <div className="mt-4 pt-4 border-t" style={{ borderTopColor: theme.border }}>
+              <h4 className="text-sm font-medium mb-3" style={{ color: theme.textSecondary }}>
                 OpenRouter Settings
               </h4>
 
               <div className="space-y-4">
                 {/* Setup Instructions */}
                 {!settings.openrouter_api_key && (
-                  <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                    <p className="text-sm text-blue-700 dark:text-blue-300 mb-2">
+                  <div className="p-3 rounded-lg border" style={{ borderColor: theme.panelBorder, backgroundColor: theme.background }}>
+                    <p className="text-sm mb-2" style={{ color: theme.textSecondary }}>
                       Get free access to 30+ AI models with OpenRouter:
                     </p>
-                    <ol className="text-xs text-blue-600 dark:text-blue-400 list-decimal list-inside space-y-1 mb-3">
+                    <ol className="text-xs list-decimal list-inside space-y-1 mb-3" style={{ color: theme.textSecondary }}>
                       <li>Visit <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer" className="underline">openrouter.ai/keys</a></li>
                       <li>Sign up with Google or email (free)</li>
                       <li>Create a new API key</li>
@@ -688,7 +816,7 @@ const SettingsPage: React.FC = () => {
                 )}
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-cream-200 mb-1">
+                  <label className="block text-sm font-medium mb-1" style={{ color: theme.textSecondary }}>
                     API Key
                   </label>
                   <input
@@ -696,21 +824,27 @@ const SettingsPage: React.FC = () => {
                     value={settings.openrouter_api_key}
                     onChange={(e) => updateSetting('openrouter_api_key', e.target.value)}
                     placeholder="sk-or-..."
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-cream-100"
+                    className="w-full px-4 py-2 border rounded-lg focus:outline-none"
+                    style={inputStyle}
+                    onFocus={handleInputFocus}
+                    onBlur={handleInputBlur}
                   />
-                  <p className="text-xs text-gray-500 dark:text-cream-300 mt-1">
+                  <p className="text-xs mt-1" style={{ color: theme.textSecondary }}>
                     Your API key is stored securely using OS encryption
                   </p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-cream-200 mb-1">
+                  <label className="block text-sm font-medium mb-1" style={{ color: theme.textSecondary }}>
                     Model
                   </label>
                   <select
                     value={settings.openrouter_model}
                     onChange={(e) => updateSetting('openrouter_model', e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-cream-100"
+                    className="w-full px-4 py-2 border rounded-lg focus:outline-none"
+                    style={inputStyle}
+                    onFocus={handleInputFocus}
+                    onBlur={handleInputBlur}
                   >
                     {OPENROUTER_MODELS.map((model) => (
                       <option key={model.value} value={model.value}>
@@ -718,7 +852,7 @@ const SettingsPage: React.FC = () => {
                       </option>
                     ))}
                   </select>
-                  <p className="text-xs text-gray-500 dark:text-cream-300 mt-1">
+                  <p className="text-xs mt-1" style={{ color: theme.textSecondary }}>
                     Gemma 3 27B recommended - fast responses, 140+ languages, automatic fallback
                   </p>
                 </div>
@@ -727,7 +861,18 @@ const SettingsPage: React.FC = () => {
                   <button
                     onClick={handleTestOpenRouterConnection}
                     disabled={testingOpenRouterConnection || !settings.openrouter_api_key}
-                    className="btn-secondary"
+                    className="px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{
+                      backgroundColor: 'transparent',
+                      color: theme.textSecondary,
+                      border: `1px solid ${theme.border}`,
+                    }}
+                    onMouseEnter={(event) => {
+                      event.currentTarget.style.backgroundColor = hoverFill;
+                    }}
+                    onMouseLeave={(event) => {
+                      event.currentTarget.style.backgroundColor = 'transparent';
+                    }}
                   >
                     {testingOpenRouterConnection ? 'Testing...' : 'Test Connection'}
                   </button>
@@ -743,11 +888,11 @@ const SettingsPage: React.FC = () => {
                 </div>
 
                 {/* Features Info */}
-                <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-                  <p className="text-sm font-medium text-green-700 dark:text-green-300 mb-1">
+                <div className="p-3 rounded-lg border" style={{ borderColor: theme.panelBorder, backgroundColor: addAlpha(theme.accent, 0.1) }}>
+                  <p className="text-sm font-medium mb-1" style={{ color: theme.accent }}>
                     OpenRouter - ONLY Gemma 3 Models Work
                   </p>
-                  <ul className="text-xs text-green-600 dark:text-green-400 list-disc list-inside space-y-1">
+                  <ul className="text-xs list-disc list-inside space-y-1" style={{ color: theme.textSecondary }}>
                     <li>✓✓✓ Gemma 3 family (27B, 12B, 4B) - 100% verified working</li>
                     <li>⚡ Ultra-fast responses perfect for language learning</li>
                     <li>🌍 Supports 140+ languages including Russian, German, Spanish, Arabic</li>
@@ -761,19 +906,19 @@ const SettingsPage: React.FC = () => {
 
           {/* Mistral AI Settings */}
           {settings.ai_provider === 'mistral' && (
-            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
-              <h4 className="text-sm font-medium text-gray-700 dark:text-cream-200 mb-3">
+            <div className="mt-4 pt-4 border-t" style={{ borderTopColor: theme.border }}>
+              <h4 className="text-sm font-medium mb-3" style={{ color: theme.textSecondary }}>
                 Mistral AI Settings
               </h4>
 
               <div className="space-y-4">
                 {/* Setup Instructions */}
                 {!settings.mistral_api_key && (
-                  <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                    <p className="text-sm text-blue-700 dark:text-blue-300 mb-2">
+                  <div className="p-3 rounded-lg border" style={{ borderColor: theme.panelBorder, backgroundColor: theme.background }}>
+                    <p className="text-sm mb-2" style={{ color: theme.textSecondary }}>
                       Get 1 billion free tokens per month with Mistral AI:
                     </p>
-                    <ol className="text-xs text-blue-600 dark:text-blue-400 list-decimal list-inside space-y-1 mb-3">
+                    <ol className="text-xs list-decimal list-inside space-y-1 mb-3" style={{ color: theme.textSecondary }}>
                       <li>Visit <a href="https://console.mistral.ai/api-keys/" target="_blank" rel="noopener noreferrer" className="underline">console.mistral.ai</a></li>
                       <li>Sign up with Google or email (free)</li>
                       <li>Create a new API key</li>
@@ -783,7 +928,7 @@ const SettingsPage: React.FC = () => {
                 )}
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-cream-200 mb-1">
+                  <label className="block text-sm font-medium mb-1" style={{ color: theme.textSecondary }}>
                     API Key
                   </label>
                   <input
@@ -791,21 +936,27 @@ const SettingsPage: React.FC = () => {
                     value={settings.mistral_api_key}
                     onChange={(e) => updateSetting('mistral_api_key', e.target.value)}
                     placeholder="..."
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-cream-100"
+                    className="w-full px-4 py-2 border rounded-lg focus:outline-none"
+                    style={inputStyle}
+                    onFocus={handleInputFocus}
+                    onBlur={handleInputBlur}
                   />
-                  <p className="text-xs text-gray-500 dark:text-cream-300 mt-1">
+                  <p className="text-xs mt-1" style={{ color: theme.textSecondary }}>
                     Your API key is stored securely using OS encryption
                   </p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-cream-200 mb-1">
+                  <label className="block text-sm font-medium mb-1" style={{ color: theme.textSecondary }}>
                     Model
                   </label>
                   <select
                     value={settings.mistral_model}
                     onChange={(e) => updateSetting('mistral_model', e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-cream-100"
+                    className="w-full px-4 py-2 border rounded-lg focus:outline-none"
+                    style={inputStyle}
+                    onFocus={handleInputFocus}
+                    onBlur={handleInputBlur}
                   >
                     {MISTRAL_MODELS.map((model) => (
                       <option key={model.value} value={model.value}>
@@ -813,7 +964,7 @@ const SettingsPage: React.FC = () => {
                       </option>
                     ))}
                   </select>
-                  <p className="text-xs text-gray-500 dark:text-cream-300 mt-1">
+                  <p className="text-xs mt-1" style={{ color: theme.textSecondary }}>
                     Mistral Small provides the best balance of quality and speed
                   </p>
                 </div>
@@ -822,7 +973,18 @@ const SettingsPage: React.FC = () => {
                   <button
                     onClick={handleTestMistralConnection}
                     disabled={testingMistralConnection || !settings.mistral_api_key}
-                    className="btn-secondary"
+                    className="px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{
+                      backgroundColor: 'transparent',
+                      color: theme.textSecondary,
+                      border: `1px solid ${theme.border}`,
+                    }}
+                    onMouseEnter={(event) => {
+                      event.currentTarget.style.backgroundColor = hoverFill;
+                    }}
+                    onMouseLeave={(event) => {
+                      event.currentTarget.style.backgroundColor = 'transparent';
+                    }}
                   >
                     {testingMistralConnection ? 'Testing...' : 'Test Connection'}
                   </button>
@@ -838,11 +1000,11 @@ const SettingsPage: React.FC = () => {
                 </div>
 
                 {/* Features Info */}
-                <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-                  <p className="text-sm font-medium text-green-700 dark:text-green-300 mb-1">
+                <div className="p-3 rounded-lg border" style={{ borderColor: theme.panelBorder, backgroundColor: addAlpha(theme.accent, 0.1) }}>
+                  <p className="text-sm font-medium mb-1" style={{ color: theme.accent }}>
                     Mistral AI Features
                   </p>
-                  <ul className="text-xs text-green-600 dark:text-green-400 list-disc list-inside space-y-1">
+                  <ul className="text-xs list-disc list-inside space-y-1" style={{ color: theme.textSecondary }}>
                     <li>1 billion tokens per month free tier (enough for extensive language learning)</li>
                     <li>High-quality models with automatic fallback</li>
                     <li>Works for all AI features: definitions, IPA, simplification, pre-study notes</li>
@@ -854,26 +1016,27 @@ const SettingsPage: React.FC = () => {
 
           {/* Google AI Settings */}
           {settings.ai_provider === 'google-ai' && (
-            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
-              <h4 className="text-sm font-medium text-gray-700 dark:text-cream-200 mb-3">
+            <div className="mt-4 pt-4 border-t" style={{ borderTopColor: theme.border }}>
+              <h4 className="text-sm font-medium mb-3" style={{ color: theme.textSecondary }}>
                 Google AI Settings
               </h4>
 
               <div className="space-y-4">
                 {/* Setup Instructions */}
                 {!settings.google_api_key && (
-                  <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                    <p className="text-sm text-blue-700 dark:text-blue-300 mb-2">
+                  <div className="p-3 rounded-lg border" style={{ borderColor: theme.panelBorder, backgroundColor: theme.background }}>
+                    <p className="text-sm mb-2" style={{ color: theme.textSecondary }}>
                       Get 1 million tokens per minute free with Google AI Studio:
                     </p>
-                    <ol className="text-xs text-blue-600 dark:text-blue-400 list-decimal list-inside space-y-1 mb-3">
+                    <ol className="text-xs list-decimal list-inside space-y-1 mb-3" style={{ color: theme.textSecondary }}>
                       <li>
                         Visit{' '}
                         <a
                           href="https://aistudio.google.com/apikey"
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="underline hover:text-blue-800 dark:hover:text-blue-200"
+                          className="underline"
+                          style={{ color: theme.accent }}
                         >
                           aistudio.google.com/apikey
                         </a>
@@ -887,7 +1050,7 @@ const SettingsPage: React.FC = () => {
 
                 {/* API Key Input */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-cream-200 mb-1">
+                  <label className="block text-sm font-medium mb-1" style={{ color: theme.textSecondary }}>
                     API Key
                   </label>
                   <input
@@ -895,21 +1058,27 @@ const SettingsPage: React.FC = () => {
                     value={settings.google_api_key || ''}
                     onChange={(e) => updateSetting('google_api_key', e.target.value)}
                     placeholder="AIza..."
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-cream-100"
+                    className="w-full px-4 py-2 border rounded-lg focus:outline-none"
+                    style={inputStyle}
+                    onFocus={handleInputFocus}
+                    onBlur={handleInputBlur}
                   />
-                  <p className="text-xs text-gray-500 dark:text-cream-300 mt-1">
+                  <p className="text-xs mt-1" style={{ color: theme.textSecondary }}>
                     Your API key is stored securely using OS encryption
                   </p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-cream-200 mb-1">
+                  <label className="block text-sm font-medium mb-1" style={{ color: theme.textSecondary }}>
                     Model
                   </label>
                   <select
                     value={settings.google_model}
                     onChange={(e) => updateSetting('google_model', e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-cream-100"
+                    className="w-full px-4 py-2 border rounded-lg focus:outline-none"
+                    style={inputStyle}
+                    onFocus={handleInputFocus}
+                    onBlur={handleInputBlur}
                   >
                     {GOOGLE_MODELS.map((model) => (
                       <option key={model.value} value={model.value}>
@@ -917,7 +1086,7 @@ const SettingsPage: React.FC = () => {
                       </option>
                     ))}
                   </select>
-                  <p className="text-xs text-gray-500 dark:text-cream-300 mt-1">
+                  <p className="text-xs mt-1" style={{ color: theme.textSecondary }}>
                     Gemini 2.5 Flash Lite has the highest free tier limits (15 RPM, 1000/day)
                   </p>
                 </div>
@@ -926,7 +1095,18 @@ const SettingsPage: React.FC = () => {
                   <button
                     onClick={handleTestGoogleConnection}
                     disabled={testingGoogleConnection || !settings.google_api_key}
-                    className="btn-secondary"
+                    className="px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{
+                      backgroundColor: 'transparent',
+                      color: theme.textSecondary,
+                      border: `1px solid ${theme.border}`,
+                    }}
+                    onMouseEnter={(event) => {
+                      event.currentTarget.style.backgroundColor = hoverFill;
+                    }}
+                    onMouseLeave={(event) => {
+                      event.currentTarget.style.backgroundColor = 'transparent';
+                    }}
                   >
                     {testingGoogleConnection ? 'Testing...' : 'Test Connection'}
                   </button>
@@ -942,11 +1122,11 @@ const SettingsPage: React.FC = () => {
                 </div>
 
                 {/* Features Info */}
-                <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-                  <p className="text-sm font-medium text-green-700 dark:text-green-300 mb-1">
+                <div className="p-3 rounded-lg border" style={{ borderColor: theme.panelBorder, backgroundColor: addAlpha(theme.accent, 0.1) }}>
+                  <p className="text-sm font-medium mb-1" style={{ color: theme.accent }}>
                     Google AI Features
                   </p>
-                  <ul className="text-xs text-green-600 dark:text-green-400 list-disc list-inside space-y-1">
+                  <ul className="text-xs list-disc list-inside space-y-1" style={{ color: theme.textSecondary }}>
                     <li>Gemini 2.5 Flash Lite: 15 RPM, 1000 requests/day (best free tier)</li>
                     <li>Automatic fallback to other models if rate-limited</li>
                     <li>Works for all AI features: definitions, IPA, simplification, pre-study notes</li>
@@ -959,14 +1139,14 @@ const SettingsPage: React.FC = () => {
       </div>
 
       {/* Python Server Settings */}
-      <div className="card mb-6">
-        <h3 className="text-lg font-semibold text-gray-800 dark:text-cream-100 mb-4">
+      <div className="card mb-6" style={cardStyle}>
+        <h3 className="text-lg font-semibold mb-4">
           🔊 Pronunciation Server
         </h3>
 
         <div className="space-y-4">
           <div>
-            <p className="text-sm text-gray-500 dark:text-cream-300 mb-3">
+            <p className="text-sm mb-3" style={{ color: theme.textSecondary }}>
               Python server for text-to-speech and IPA transcription
             </p>
           </div>
@@ -975,7 +1155,18 @@ const SettingsPage: React.FC = () => {
             <button
               onClick={handleTestPythonServer}
               disabled={testingPython || restartingPython}
-              className="btn-secondary"
+              className="px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{
+                backgroundColor: 'transparent',
+                color: theme.textSecondary,
+                border: `1px solid ${theme.border}`,
+              }}
+              onMouseEnter={(event) => {
+                event.currentTarget.style.backgroundColor = hoverFill;
+              }}
+              onMouseLeave={(event) => {
+                event.currentTarget.style.backgroundColor = 'transparent';
+              }}
             >
               {testingPython ? 'Checking...' : 'Check Status'}
             </button>
@@ -983,7 +1174,18 @@ const SettingsPage: React.FC = () => {
             <button
               onClick={handleRestartPythonServer}
               disabled={testingPython || restartingPython}
-              className="btn-secondary"
+              className="px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{
+                backgroundColor: 'transparent',
+                color: theme.textSecondary,
+                border: `1px solid ${theme.border}`,
+              }}
+              onMouseEnter={(event) => {
+                event.currentTarget.style.backgroundColor = hoverFill;
+              }}
+              onMouseLeave={(event) => {
+                event.currentTarget.style.backgroundColor = 'transparent';
+              }}
               title="Force restart the pronunciation server (kills all related processes)"
             >
               {restartingPython ? 'Restarting...' : '🔄 Restart Server'}
@@ -1001,7 +1203,7 @@ const SettingsPage: React.FC = () => {
           </div>
 
           {pythonStatus && (
-            <div className="text-sm text-gray-500 dark:text-cream-300">
+            <div className="text-sm" style={{ color: theme.textSecondary }}>
               <div>Status: {pythonStatus.running ? 'Running' : 'Stopped'}</div>
               <div>URL: {pythonStatus.url}</div>
             </div>
@@ -1009,46 +1211,52 @@ const SettingsPage: React.FC = () => {
 
           {/* IPA Language Packages */}
           {pythonStatus?.ready && (
-            <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-600">
-              <h4 className="text-sm font-medium text-gray-700 dark:text-cream-200 mb-3">
+            <div className="mt-6 pt-4 border-t" style={{ borderTopColor: theme.border }}>
+              <h4 className="text-sm font-medium mb-3" style={{ color: theme.textSecondary }}>
                 IPA Pronunciation Packages
               </h4>
-              <p className="text-xs text-gray-500 dark:text-cream-300 mb-3">
+              <p className="text-xs mb-3" style={{ color: theme.textSecondary }}>
                 Install language packages for accurate IPA transcription. Without a package, AI will be used as fallback.
               </p>
 
               {loadingIpaLanguages ? (
-                <div className="text-sm text-gray-500 dark:text-cream-300">Loading languages...</div>
+                <div className="text-sm" style={{ color: theme.textSecondary }}>
+                  Loading languages...
+                </div>
               ) : (
                 <div className="grid grid-cols-2 gap-2">
                   {ipaLanguages.map((lang) => (
                     <div
                       key={lang.code}
-                      className={`flex items-center justify-between p-2 rounded-lg border ${
-                        lang.installed
-                          ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20'
-                          : 'border-gray-200 dark:border-gray-600'
-                      }`}
+                      className="flex items-center justify-between p-2 rounded-lg border"
+                      style={{
+                        borderColor: lang.installed ? theme.accent : theme.border,
+                        backgroundColor: lang.installed ? addAlpha(theme.accent, 0.12) : theme.panel,
+                      }}
                     >
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-gray-700 dark:text-cream-200">
+                        <span className="text-sm font-medium" style={{ color: theme.text }}>
                           {lang.name}
                         </span>
-                        <span className="text-xs text-gray-400">({lang.code})</span>
+                        <span className="text-xs" style={{ color: theme.textSecondary }}>
+                          ({lang.code})
+                        </span>
                       </div>
                       {lang.installed ? (
-                        <span className="text-xs text-green-600 dark:text-green-400 font-medium">
+                        <span className="text-xs font-medium" style={{ color: theme.accent }}>
                           ✓ Installed
                         </span>
                       ) : (
                         <button
                           onClick={() => handleInstallLanguage(lang.code)}
                           disabled={installingLanguage !== null}
-                          className={`text-xs px-2 py-1 rounded ${
-                            installingLanguage === lang.code
-                              ? 'bg-gray-200 dark:bg-gray-600 text-gray-500'
-                              : 'bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 hover:bg-primary-200 dark:hover:bg-primary-900/50'
-                          }`}
+                          className="text-xs px-2 py-1 rounded"
+                          style={{
+                            backgroundColor: installingLanguage === lang.code
+                              ? theme.panelBorder
+                              : addAlpha(theme.accent, 0.2),
+                            color: installingLanguage === lang.code ? theme.textSecondary : theme.accent,
+                          }}
                         >
                           {installingLanguage === lang.code ? 'Installing...' : 'Install'}
                         </button>
@@ -1060,11 +1268,13 @@ const SettingsPage: React.FC = () => {
 
               {installResult && (
                 <div
-                  className={`mt-3 p-2 rounded text-sm ${
-                    installResult.success
-                      ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
-                      : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
-                  }`}
+                  className="mt-3 p-2 rounded text-sm"
+                  style={{
+                    backgroundColor: installResult.success
+                      ? addAlpha(theme.accent, 0.12)
+                      : addAlpha('#E85D4A', 0.2),
+                    color: installResult.success ? theme.accent : '#E85D4A',
+                  }}
                 >
                   {installResult.message}
                 </div>
@@ -1074,36 +1284,40 @@ const SettingsPage: React.FC = () => {
 
           {/* Voice Models */}
           {pythonStatus?.ready && (
-            <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-600">
-              <h4 className="text-sm font-medium text-gray-700 dark:text-cream-200 mb-3">
+            <div className="mt-6 pt-4 border-t" style={{ borderTopColor: theme.border }}>
+              <h4 className="text-sm font-medium mb-3" style={{ color: theme.textSecondary }}>
                 Voice Models for Text-to-Speech
               </h4>
-              <p className="text-xs text-gray-500 dark:text-cream-300 mb-3">
+              <p className="text-xs mb-3" style={{ color: theme.textSecondary }}>
                 Download neural voice models for offline pronunciation (~63 MB each). Models are stored on your device and work without internet.
               </p>
 
               {loadingVoiceModels ? (
-                <div className="text-sm text-gray-500 dark:text-cream-300">Loading models...</div>
+                <div className="text-sm" style={{ color: theme.textSecondary }}>
+                  Loading models...
+                </div>
               ) : (
                 <div className="space-y-2">
                   {voiceModels.map((model) => (
                     <div
                       key={model.language}
-                      className={`flex items-center justify-between p-3 rounded-lg border ${
-                        model.downloaded
-                          ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-900/20'
-                          : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700'
-                      }`}
+                      className="flex items-center justify-between p-3 rounded-lg border"
+                      style={{
+                        borderColor: model.downloaded ? theme.accent : theme.border,
+                        backgroundColor: model.downloaded ? addAlpha(theme.accent, 0.12) : theme.panel,
+                      }}
                     >
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium text-gray-700 dark:text-cream-200">
+                          <span className="text-sm font-medium" style={{ color: theme.text }}>
                             {model.name}
                           </span>
-                          <span className="text-xs text-gray-400">({model.language.toUpperCase()})</span>
+                          <span className="text-xs" style={{ color: theme.textSecondary }}>
+                            ({model.language.toUpperCase()})
+                          </span>
                         </div>
                         {model.downloaded && model.size && (
-                          <div className="text-xs text-gray-500 dark:text-cream-300 mt-1">
+                          <div className="text-xs mt-1" style={{ color: theme.textSecondary }}>
                             Size: {(model.size / (1024 * 1024)).toFixed(1)} MB
                           </div>
                         )}
@@ -1111,12 +1325,16 @@ const SettingsPage: React.FC = () => {
                       <div className="flex items-center gap-2">
                         {model.downloaded ? (
                           <>
-                            <span className="text-xs text-green-600 dark:text-green-400 font-medium">
+                            <span className="text-xs font-medium" style={{ color: theme.accent }}>
                               ✓ Downloaded
                             </span>
                             <button
                               onClick={() => handleDeleteModel(model.language)}
-                              className="text-xs px-2 py-1 rounded bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50"
+                              className="text-xs px-2 py-1 rounded"
+                              style={{
+                                backgroundColor: addAlpha('#E85D4A', 0.2),
+                                color: '#E85D4A',
+                              }}
                             >
                               Delete
                             </button>
@@ -1125,11 +1343,13 @@ const SettingsPage: React.FC = () => {
                           <button
                             onClick={() => handleDownloadModel(model.language)}
                             disabled={downloadingModel !== null}
-                            className={`text-xs px-3 py-1 rounded ${
-                              downloadingModel === model.language
-                                ? 'bg-gray-200 dark:bg-gray-600 text-gray-500'
-                                : 'bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 hover:bg-primary-200 dark:hover:bg-primary-900/50'
-                            }`}
+                            className="text-xs px-3 py-1 rounded"
+                            style={{
+                              backgroundColor: downloadingModel === model.language
+                                ? theme.panelBorder
+                                : addAlpha(theme.accent, 0.2),
+                              color: downloadingModel === model.language ? theme.textSecondary : theme.accent,
+                            }}
                           >
                             {downloadingModel === model.language ? 'Downloading...' : 'Download'}
                           </button>
@@ -1142,26 +1362,28 @@ const SettingsPage: React.FC = () => {
 
               {downloadResult && (
                 <div
-                  className={`mt-3 p-2 rounded text-sm ${
-                    downloadResult.success
-                      ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
-                      : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
-                  }`}
+                  className="mt-3 p-2 rounded text-sm"
+                  style={{
+                    backgroundColor: downloadResult.success
+                      ? addAlpha(theme.accent, 0.12)
+                      : addAlpha('#E85D4A', 0.2),
+                    color: downloadResult.success ? theme.accent : '#E85D4A',
+                  }}
                 >
                   {downloadResult.message}
                 </div>
               )}
 
-              <div className="mt-3 text-xs text-gray-500 dark:text-cream-300">
+              <div className="mt-3 text-xs" style={{ color: theme.textSecondary }}>
                 💡 Tip: Without voice models, pronunciation features will show placeholders. Download models to enable offline text-to-speech.
               </div>
             </div>
           )}
 
           {/* Slow Playback Speed */}
-          <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-600">
+          <div className="mt-6 pt-4 border-t" style={{ borderTopColor: theme.border }}>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-cream-200 mb-1">
+              <label className="block text-sm font-medium mb-1" style={{ color: theme.textSecondary }}>
                 Slow Playback Speed: {settings.slow_playback_speed.toFixed(2)}x
               </label>
               <input
@@ -1171,13 +1393,14 @@ const SettingsPage: React.FC = () => {
                 step="0.05"
                 value={settings.slow_playback_speed}
                 onChange={(e) => updateSetting('slow_playback_speed', parseFloat(e.target.value))}
-                className="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer accent-primary-600"
+                className="w-full h-2 rounded-lg appearance-none cursor-pointer"
+                style={{ backgroundColor: theme.panelBorder, accentColor: theme.accent }}
               />
-              <div className="flex justify-between text-xs text-gray-400 mt-1">
+              <div className="flex justify-between text-xs mt-1" style={{ color: theme.textSecondary }}>
                 <span>0.25x</span>
                 <span>2.0x</span>
               </div>
-              <p className="text-xs text-gray-500 dark:text-cream-300 mt-1">
+              <p className="text-xs mt-1" style={{ color: theme.textSecondary }}>
                 Speed for slow audio playback in word panel and pre-study notes
               </p>
             </div>
@@ -1186,16 +1409,18 @@ const SettingsPage: React.FC = () => {
       </div>
 
       {/* Tatoeba Settings */}
-      <div className="card mb-6">
-        <h3 className="text-lg font-semibold text-gray-800 dark:text-cream-100 mb-4">
+      <div className="card mb-6" style={cardStyle}>
+        <h3 className="text-lg font-semibold mb-4">
           🌐 Tatoeba (Example Sentences)
         </h3>
 
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <div className="font-medium text-gray-700 dark:text-cream-200">Enable Tatoeba</div>
-              <div className="text-sm text-gray-500 dark:text-cream-300">
+              <div className="font-medium" style={{ color: theme.textSecondary }}>
+                Enable Tatoeba
+              </div>
+              <div className="text-sm" style={{ color: theme.textSecondary }}>
                 Show example sentences from Tatoeba database
               </div>
             </div>
@@ -1206,19 +1431,28 @@ const SettingsPage: React.FC = () => {
                 onChange={(e) => updateSetting('tatoeba_enabled', e.target.checked)}
                 className="sr-only peer"
               />
-              <div className="w-11 h-6 bg-gray-200 dark:bg-gray-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 dark:peer-focus:ring-primary-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 dark:after:border-gray-500 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
+              <div
+                className="w-11 h-6 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all"
+                style={{
+                  backgroundColor: settings.tatoeba_enabled ? theme.accent : theme.panelBorder,
+                  borderColor: theme.border,
+                }}
+              ></div>
             </label>
           </div>
 
           {settings.tatoeba_enabled && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-cream-200 mb-1">
+              <label className="block text-sm font-medium mb-1" style={{ color: theme.textSecondary }}>
                 Language
               </label>
               <select
                 value={settings.tatoeba_language}
                 onChange={(e) => updateSetting('tatoeba_language', e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-cream-100"
+                className="w-full px-4 py-2 border rounded-lg focus:outline-none"
+                style={inputStyle}
+                onFocus={handleInputFocus}
+                onBlur={handleInputBlur}
               >
                 <option value="en">English</option>
                 <option value="es">Spanish</option>
@@ -1233,14 +1467,14 @@ const SettingsPage: React.FC = () => {
       </div>
 
       {/* Reading Settings */}
-      <div className="card mb-6">
-        <h3 className="text-lg font-semibold text-gray-800 dark:text-cream-100 mb-4">
+      <div className="card mb-6" style={cardStyle}>
+        <h3 className="text-lg font-semibold mb-4">
           📖 Reading Preferences
         </h3>
 
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-cream-200 mb-1">
+            <label className="block text-sm font-medium mb-1" style={{ color: theme.textSecondary }}>
               Default Zoom: {settings.default_zoom.toFixed(1)}x
             </label>
             <input
@@ -1250,18 +1484,22 @@ const SettingsPage: React.FC = () => {
               step="0.1"
               value={settings.default_zoom}
               onChange={(e) => updateSetting('default_zoom', parseFloat(e.target.value))}
-              className="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer accent-primary-600"
+              className="w-full h-2 rounded-lg appearance-none cursor-pointer"
+              style={{ backgroundColor: theme.panelBorder, accentColor: theme.accent }}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-cream-200 mb-1">
+            <label className="block text-sm font-medium mb-1" style={{ color: theme.textSecondary }}>
               Font Family
             </label>
             <select
               value={settings.font_family}
               onChange={(e) => updateSetting('font_family', e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-cream-100"
+              className="w-full px-4 py-2 border rounded-lg focus:outline-none"
+              style={inputStyle}
+              onFocus={handleInputFocus}
+              onBlur={handleInputBlur}
             >
               <option value="Georgia, serif">Georgia (Serif)</option>
               <option value="'Times New Roman', serif">Times New Roman</option>
@@ -1271,7 +1509,7 @@ const SettingsPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-cream-200 mb-1">
+            <label className="block text-sm font-medium mb-1" style={{ color: theme.textSecondary }}>
               Line Height: {settings.line_height.toFixed(1)}
             </label>
             <input
@@ -1281,21 +1519,22 @@ const SettingsPage: React.FC = () => {
               step="0.1"
               value={settings.line_height}
               onChange={(e) => updateSetting('line_height', parseFloat(e.target.value))}
-              className="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer accent-primary-600"
+              className="w-full h-2 rounded-lg appearance-none cursor-pointer"
+              style={{ backgroundColor: theme.panelBorder, accentColor: theme.accent }}
             />
           </div>
         </div>
       </div>
 
       {/* Pre-Study Notes Settings */}
-      <div className="card">
-        <h3 className="text-lg font-semibold text-gray-800 dark:text-cream-100 mb-4">
+      <div className="card" style={cardStyle}>
+        <h3 className="text-lg font-semibold mb-4">
           📚 Pre-Study Notes
         </h3>
 
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-cream-200 mb-1">
+            <label className="block text-sm font-medium mb-1" style={{ color: theme.textSecondary }}>
               Views to Process: {settings.pre_study_view_count}
             </label>
             <input
@@ -1305,27 +1544,31 @@ const SettingsPage: React.FC = () => {
               step="1"
               value={settings.pre_study_view_count}
               onChange={(e) => updateSetting('pre_study_view_count', parseInt(e.target.value))}
-              className="w-full h-2 bg-gray-200 dark:bg-gray-600 rounded-lg appearance-none cursor-pointer accent-primary-600"
+              className="w-full h-2 rounded-lg appearance-none cursor-pointer"
+              style={{ backgroundColor: theme.panelBorder, accentColor: theme.accent }}
             />
-            <p className="text-xs text-gray-500 dark:text-cream-300 mt-1">
+            <p className="text-xs mt-1" style={{ color: theme.textSecondary }}>
               How many views ahead to include in pre-study notes
             </p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-cream-200 mb-1">
+            <label className="block text-sm font-medium mb-1" style={{ color: theme.textSecondary }}>
               Sentences per View
             </label>
             <select
               value={settings.pre_study_sentence_limit}
               onChange={(e) => updateSetting('pre_study_sentence_limit', parseInt(e.target.value))}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-cream-100"
+              className="w-full px-4 py-2 border rounded-lg focus:outline-none"
+              style={inputStyle}
+              onFocus={handleInputFocus}
+              onBlur={handleInputBlur}
             >
               <option value="0">All sentences</option>
               <option value="1">First sentence only (fastest)</option>
               <option value="2">First 2 sentences</option>
             </select>
-            <p className="text-xs text-gray-500 dark:text-cream-300 mt-1">
+            <p className="text-xs mt-1" style={{ color: theme.textSecondary }}>
               Limit sentences for faster testing or quick previews
             </p>
           </div>
@@ -1334,20 +1577,27 @@ const SettingsPage: React.FC = () => {
 
       {/* Groq Setup Modal */}
       {showGroqSetupModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+        <div
+          className="fixed inset-0 flex items-center justify-center z-50"
+          style={{ backgroundColor: theme.shadow }}
+        >
+          <div
+            className="rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden"
+            style={{ backgroundColor: theme.panel, color: theme.text, border: `1px solid ${theme.panelBorder}` }}
+          >
             {/* Modal Header */}
-            <div className="bg-gradient-to-r from-blue-500 to-purple-600 px-6 py-4">
+            <div className="px-6 py-4" style={{ backgroundColor: theme.accent, color: accentTextColor }}>
               <div className="flex items-center justify-between">
-                <h3 className="text-xl font-bold text-white">Setup Groq (Free)</h3>
+                <h3 className="text-xl font-bold">Setup Groq (Free)</h3>
                 <button
                   onClick={() => setShowGroqSetupModal(false)}
-                  className="text-white/80 hover:text-white text-2xl leading-none"
+                  className="text-2xl leading-none"
+                  style={{ color: accentTextColor }}
                 >
                   &times;
                 </button>
               </div>
-              <p className="text-white/80 text-sm mt-1">
+              <p className="text-sm mt-1" style={{ color: accentTextColor }}>
                 Get your free API key in 3 easy steps
               </p>
             </div>
@@ -1357,56 +1607,66 @@ const SettingsPage: React.FC = () => {
               {groqSetupStep === 1 && (
                 <div className="space-y-4">
                   <div className="flex items-start gap-4">
-                    <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold flex-shrink-0">
+                    <div
+                      className="w-8 h-8 rounded-full flex items-center justify-center font-bold flex-shrink-0"
+                      style={{ backgroundColor: addAlpha(theme.accent, 0.2), color: theme.accent }}
+                    >
                       1
                     </div>
                     <div>
-                      <p className="font-medium text-gray-800 dark:text-cream-100">
+                      <p className="font-medium" style={{ color: theme.text }}>
                         Create a free Groq account
                       </p>
-                      <p className="text-sm text-gray-500 dark:text-cream-300">
+                      <p className="text-sm" style={{ color: theme.textSecondary }}>
                         Sign up with Google or email - it's completely free
                       </p>
                     </div>
                   </div>
 
                   <div className="flex items-start gap-4">
-                    <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-400 font-bold flex-shrink-0">
+                    <div
+                      className="w-8 h-8 rounded-full flex items-center justify-center font-bold flex-shrink-0"
+                      style={{ backgroundColor: theme.panelBorder, color: theme.textSecondary }}
+                    >
                       2
                     </div>
                     <div>
-                      <p className="font-medium text-gray-400">
+                      <p className="font-medium" style={{ color: theme.textSecondary }}>
                         Create an API key
                       </p>
-                      <p className="text-sm text-gray-400">
+                      <p className="text-sm" style={{ color: theme.textSecondary }}>
                         Click "Create API Key" on the Groq console
                       </p>
                     </div>
                   </div>
 
                   <div className="flex items-start gap-4">
-                    <div className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-gray-400 font-bold flex-shrink-0">
+                    <div
+                      className="w-8 h-8 rounded-full flex items-center justify-center font-bold flex-shrink-0"
+                      style={{ backgroundColor: theme.panelBorder, color: theme.textSecondary }}
+                    >
                       3
                     </div>
                     <div>
-                      <p className="font-medium text-gray-400">
+                      <p className="font-medium" style={{ color: theme.textSecondary }}>
                         Paste it here
                       </p>
-                      <p className="text-sm text-gray-400">
+                      <p className="text-sm" style={{ color: theme.textSecondary }}>
                         Copy the key and paste it in the settings
                       </p>
                     </div>
                   </div>
 
-                  <div className="pt-4 border-t border-gray-200 dark:border-gray-600">
+                  <div className="pt-4 border-t" style={{ borderTopColor: theme.border }}>
                     <button
                       onClick={handleGroqSetupOpenBrowser}
-                      className="w-full btn-primary py-3 text-lg flex items-center justify-center gap-2"
+                      className="w-full py-3 text-lg flex items-center justify-center gap-2 rounded-lg font-medium"
+                      style={{ backgroundColor: theme.accent, color: accentTextColor }}
                     >
                       <span>Open Groq Console</span>
                       <span>→</span>
                     </button>
-                    <p className="text-xs text-gray-400 text-center mt-2">
+                    <p className="text-xs text-center mt-2" style={{ color: theme.textSecondary }}>
                       Opens in your default browser
                     </p>
                   </div>
@@ -1415,61 +1675,82 @@ const SettingsPage: React.FC = () => {
 
               {groqSetupStep === 2 && (
                 <div className="space-y-4">
-                  <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-                    <p className="text-green-700 dark:text-green-300 font-medium">
+                  <div className="p-4 rounded-lg border" style={{ borderColor: theme.panelBorder, backgroundColor: addAlpha(theme.accent, 0.1) }}>
+                    <p className="font-medium" style={{ color: theme.accent }}>
                       Browser opened! Complete these steps:
                     </p>
                   </div>
 
                   <div className="flex items-start gap-4">
-                    <div className="w-8 h-8 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center text-green-600 dark:text-green-400 font-bold flex-shrink-0">
+                    <div
+                      className="w-8 h-8 rounded-full flex items-center justify-center font-bold flex-shrink-0"
+                      style={{ backgroundColor: addAlpha(theme.accent, 0.2), color: theme.accent }}
+                    >
                       ✓
                     </div>
                     <div>
-                      <p className="font-medium text-gray-800 dark:text-cream-100">
+                      <p className="font-medium" style={{ color: theme.text }}>
                         Sign in with Google or email
                       </p>
                     </div>
                   </div>
 
                   <div className="flex items-start gap-4">
-                    <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold flex-shrink-0">
+                    <div
+                      className="w-8 h-8 rounded-full flex items-center justify-center font-bold flex-shrink-0"
+                      style={{ backgroundColor: addAlpha(theme.accent, 0.2), color: theme.accent }}
+                    >
                       2
                     </div>
                     <div>
-                      <p className="font-medium text-gray-800 dark:text-cream-100">
+                      <p className="font-medium" style={{ color: theme.text }}>
                         Click "Create API Key"
                       </p>
-                      <p className="text-sm text-gray-500 dark:text-cream-300">
+                      <p className="text-sm" style={{ color: theme.textSecondary }}>
                         Give it any name (e.g., "BookReader")
                       </p>
                     </div>
                   </div>
 
                   <div className="flex items-start gap-4">
-                    <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold flex-shrink-0">
+                    <div
+                      className="w-8 h-8 rounded-full flex items-center justify-center font-bold flex-shrink-0"
+                      style={{ backgroundColor: addAlpha(theme.accent, 0.2), color: theme.accent }}
+                    >
                       3
                     </div>
                     <div>
-                      <p className="font-medium text-gray-800 dark:text-cream-100">
+                      <p className="font-medium" style={{ color: theme.text }}>
                         Copy the API key (starts with "gsk_")
                       </p>
-                      <p className="text-sm text-gray-500 dark:text-cream-300">
+                      <p className="text-sm" style={{ color: theme.textSecondary }}>
                         Click the copy button next to your new key
                       </p>
                     </div>
                   </div>
 
-                  <div className="pt-4 border-t border-gray-200 dark:border-gray-600 space-y-2">
+                  <div className="pt-4 border-t space-y-2" style={{ borderTopColor: theme.border }}>
                     <button
                       onClick={handleGroqSetupComplete}
-                      className="w-full btn-primary py-3"
+                      className="w-full py-3 rounded-lg font-medium"
+                      style={{ backgroundColor: theme.accent, color: accentTextColor }}
                     >
                       Done - I have my API key
                     </button>
                     <button
                       onClick={handleGroqSetupOpenBrowser}
-                      className="w-full btn-secondary py-2 text-sm"
+                      className="w-full py-2 text-sm rounded-lg font-medium"
+                      style={{
+                        backgroundColor: 'transparent',
+                        color: theme.textSecondary,
+                        border: `1px solid ${theme.border}`,
+                      }}
+                      onMouseEnter={(event) => {
+                        event.currentTarget.style.backgroundColor = hoverFill;
+                      }}
+                      onMouseLeave={(event) => {
+                        event.currentTarget.style.backgroundColor = 'transparent';
+                      }}
                     >
                       Reopen Groq Console
                     </button>

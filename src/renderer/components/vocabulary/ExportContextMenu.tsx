@@ -1,5 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import type { VocabularyExportType } from '../../../shared/types/ipc.types';
+import { useReaderTheme } from '../../hooks/useReaderTheme';
+import { addAlpha } from '../../utils/colorUtils';
 
 interface ExportContextMenuProps {
   x: number;
@@ -24,6 +26,7 @@ export const ExportContextMenu: React.FC<ExportContextMenuProps> = ({
   entriesCount,
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
+  const theme = useReaderTheme();
 
   const exportOptions: ExportOption[] = [
     {
@@ -83,15 +86,21 @@ export const ExportContextMenu: React.FC<ExportContextMenuProps> = ({
   return (
     <div
       ref={menuRef}
-      className="fixed z-50 bg-white dark:bg-gray-800 rounded-lg shadow-2xl border border-gray-200 dark:border-gray-700 py-2 min-w-[300px]"
+      className="fixed z-50 rounded-lg shadow-2xl border py-2 min-w-[300px]"
       style={{
         left: `${adjustedX}px`,
         top: `${adjustedY}px`,
         animation: 'fadeIn 0.15s ease-out',
+        backgroundColor: theme.panel,
+        borderColor: theme.panelBorder,
+        color: theme.text,
       }}
     >
-      <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700">
-        <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+      <div
+        className="px-3 py-2 border-b"
+        style={{ borderBottomColor: theme.border }}
+      >
+        <h3 className="text-sm font-semibold" style={{ color: theme.text }}>
           Export Vocabulary ({entriesCount} {entriesCount === 1 ? 'entry' : 'entries'})
         </h3>
       </div>
@@ -101,7 +110,13 @@ export const ExportContextMenu: React.FC<ExportContextMenuProps> = ({
           key={option.type}
           onClick={() => handleOptionClick(option.type)}
           disabled={entriesCount === 0}
-          className="w-full flex items-center gap-3 px-3 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full flex items-center gap-3 px-3 py-3 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          onMouseEnter={(event) => {
+            event.currentTarget.style.backgroundColor = theme.wordHover || addAlpha(theme.panel, 0.6);
+          }}
+          onMouseLeave={(event) => {
+            event.currentTarget.style.backgroundColor = 'transparent';
+          }}
         >
           {/* Icon */}
           <div className="text-2xl flex-shrink-0">
@@ -110,10 +125,10 @@ export const ExportContextMenu: React.FC<ExportContextMenuProps> = ({
 
           {/* Option info */}
           <div className="flex-1 text-left">
-            <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+            <div className="text-sm font-medium" style={{ color: theme.text }}>
               {option.label}
             </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+            <p className="text-xs mt-0.5" style={{ color: theme.textSecondary }}>
               {option.description}
             </p>
           </div>

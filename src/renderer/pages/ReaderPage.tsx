@@ -2,12 +2,16 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useBooks } from '../context/BookContext';
 import DynamicReaderView from '../components/reader/DynamicReaderView';
+import { useReaderTheme } from '../hooks/useReaderTheme';
+import { getContrastColor } from '../utils/colorUtils';
 
 const ReaderPage: React.FC = () => {
   const { bookId } = useParams<{ bookId: string }>();
   const navigate = useNavigate();
   const { currentBook, currentBookData, currentProgress, loading, error, loadBook } = useBooks();
   const [initialLoad, setInitialLoad] = useState(true);
+  const theme = useReaderTheme();
+  const accentTextColor = getContrastColor(theme.accent);
 
   useEffect(() => {
     if (bookId) {
@@ -22,7 +26,7 @@ const ReaderPage: React.FC = () => {
       <div className="h-full flex items-center justify-center">
         <div className="text-center">
           <div className="text-4xl mb-4 animate-pulse">📖</div>
-          <div className="text-gray-500 dark:text-cream-300">Loading book...</div>
+          <div style={{ color: theme.textSecondary }}>Loading book...</div>
         </div>
       </div>
     );
@@ -33,8 +37,14 @@ const ReaderPage: React.FC = () => {
       <div className="h-full flex items-center justify-center">
         <div className="text-center">
           <div className="text-4xl mb-4">😕</div>
-          <div className="text-red-600 dark:text-red-400 mb-4">{error}</div>
-          <button onClick={() => navigate('/library')} className="btn-primary">
+          <div className="mb-4" style={{ color: '#E85D4A' }}>
+            {error}
+          </div>
+          <button
+            onClick={() => navigate('/library')}
+            className="px-4 py-2 rounded-lg font-medium transition-opacity"
+            style={{ backgroundColor: theme.accent, color: accentTextColor }}
+          >
             Back to Library
           </button>
         </div>
@@ -47,8 +57,14 @@ const ReaderPage: React.FC = () => {
       <div className="h-full flex items-center justify-center">
         <div className="text-center">
           <div className="text-4xl mb-4">📚</div>
-          <div className="text-gray-500 dark:text-cream-300 mb-4">Book not found</div>
-          <button onClick={() => navigate('/library')} className="btn-primary">
+          <div className="mb-4" style={{ color: theme.textSecondary }}>
+            Book not found
+          </div>
+          <button
+            onClick={() => navigate('/library')}
+            className="px-4 py-2 rounded-lg font-medium transition-opacity"
+            style={{ backgroundColor: theme.accent, color: accentTextColor }}
+          >
             Back to Library
           </button>
         </div>
