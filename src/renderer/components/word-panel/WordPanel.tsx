@@ -644,7 +644,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
 
       {/* Panel */}
       <div
-        className="fixed top-0 right-0 h-full w-96 shadow-2xl z-50 overflow-hidden flex flex-col"
+        className="fixed top-0 right-0 h-full w-96 shadow-2xl z-[10000] overflow-hidden flex flex-col"
         style={{ backgroundColor: theme.background, color: theme.text }}
       >
         {/* Header - entire area clickable for word pronunciation */}
