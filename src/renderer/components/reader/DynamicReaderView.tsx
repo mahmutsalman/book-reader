@@ -61,6 +61,11 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
   const theme = useReaderTheme();
   const accentTextColor = getContrastColor(theme.accent);
   const hoverFill = theme.wordHover || addAlpha(theme.panel, 0.5);
+  const readerScrollbarStyles = {
+    '--reader-scrollbar-track': theme.panel,
+    '--reader-scrollbar-thumb': theme.panelBorder,
+    '--reader-scrollbar-thumb-hover': theme.accent,
+  } as React.CSSProperties;
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Determine if system is in dark mode
@@ -1685,12 +1690,10 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
       {/* Reading area - horizontal scroll on outer, vertical scroll inside text box */}
       <div
         className={`flex-1 overflow-x-auto overflow-y-hidden ${isFocusMode ? 'p-0' : 'p-8'} relative`}
-        onMouseEnter={() => isFocusMode && setShowFocusNavigation(true)}
-        onMouseLeave={() => isFocusMode && setShowFocusNavigation(false)}
       >
         <div
           ref={containerRef}
-          className={`h-full ${isFocusMode ? 'w-full' : 'mx-auto w-[768px] min-w-[768px]'} ${isFocusMode ? '' : 'rounded-xl shadow-sm'} p-8 reader-text overflow-y-auto transition-all duration-300`}
+          className={`h-full ${isFocusMode ? 'w-full' : 'mx-auto w-[768px] min-w-[768px]'} ${isFocusMode ? '' : 'rounded-xl shadow-sm'} p-8 reader-text reader-scrollbar overflow-y-auto transition-all duration-300`}
           onContextMenu={handleContextMenu}
           style={{
             fontSize: `${fontSize}px`,
@@ -1707,10 +1710,29 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
               ? readerThemes[settings.reader_theme]?.dark?.shadow
               : readerThemes[settings.reader_theme]?.light?.shadow)
               || readerThemes.darkComfort.dark.shadow}`,
+            ...readerScrollbarStyles,
           }}
         >
           {renderText(reflowState.currentText)}
         </div>
+
+        {/* Focus Mode - Invisible hover zones on edges */}
+        {isFocusMode && (
+          <>
+            {/* Left edge hover zone */}
+            <div
+              className="absolute left-0 top-0 bottom-0 w-24 pointer-events-auto"
+              onMouseEnter={() => setShowFocusNavigation(true)}
+              onMouseLeave={() => setShowFocusNavigation(false)}
+            />
+            {/* Right edge hover zone */}
+            <div
+              className="absolute right-0 top-0 bottom-0 w-24 pointer-events-auto"
+              onMouseEnter={() => setShowFocusNavigation(true)}
+              onMouseLeave={() => setShowFocusNavigation(false)}
+            />
+          </>
+        )}
 
         {/* Focus Mode Navigation Arrows - Shown on hover */}
         {isFocusMode && showFocusNavigation && (

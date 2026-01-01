@@ -371,6 +371,31 @@
   @apply bg-gray-600 hover:bg-gray-500;
 }
 
+/* Reader scrollbars (theme-aware) */
+.reader-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--reader-scrollbar-thumb, #9ca3af) var(--reader-scrollbar-track, #e5e7eb);
+}
+
+.reader-scrollbar::-webkit-scrollbar {
+  width: 12px;
+}
+
+.reader-scrollbar::-webkit-scrollbar-track {
+  background-color: var(--reader-scrollbar-track, #e5e7eb);
+  border-radius: 999px;
+}
+
+.reader-scrollbar::-webkit-scrollbar-thumb {
+  background-color: var(--reader-scrollbar-thumb, #9ca3af);
+  border-radius: 999px;
+  border: 3px solid var(--reader-scrollbar-track, #e5e7eb);
+}
+
+.reader-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: var(--reader-scrollbar-thumb-hover, var(--reader-scrollbar-thumb, #9ca3af));
+}
+
 /* Loading spinner */
 .spinner {
   @apply animate-spin rounded-full border-2 border-gray-200 border-t-primary-600;

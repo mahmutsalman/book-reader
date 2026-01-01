@@ -30,6 +30,11 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, bookData, initialProgress
   const { updateProgress } = useBooks();
   const theme = useReaderTheme();
   const hoverFill = theme.wordHover || addAlpha(theme.panel, 0.5);
+  const readerScrollbarStyles = {
+    '--reader-scrollbar-track': theme.panel,
+    '--reader-scrollbar-thumb': theme.panelBorder,
+    '--reader-scrollbar-thumb-hover': theme.accent,
+  } as React.CSSProperties;
   const [currentPage, setCurrentPage] = useState(initialProgress?.current_page || 1);
   const [zoom, setZoom] = useState(initialProgress?.zoom_level || ZOOM_LEVELS.DEFAULT);
   const [selectedWord, setSelectedWord] = useState<SelectedWord | null>(null);
@@ -253,7 +258,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, bookData, initialProgress
       </div>
 
       {/* Reading area */}
-      <div className="flex-1 overflow-auto p-8">
+      <div className="flex-1 overflow-auto p-8 reader-scrollbar" style={readerScrollbarStyles}>
         <div
           className="max-w-3xl mx-auto bg-white rounded-xl shadow-sm p-8 reader-text"
           style={{
