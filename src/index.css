@@ -178,7 +178,7 @@
     background-color: transparent;
   }
   50% {
-    background-color: rgba(59, 130, 246, 0.4); /* blue-500/40 */
+    background-color: rgba(var(--theme-accent-rgb), 0.4);
   }
   100% {
     background-color: transparent;
@@ -189,30 +189,10 @@
   animation: word-queued-pulse 0.4s ease-out;
 }
 
-/* Dark mode pulse animation */
-:is(html.dark .word-queued-pulse) {
-  animation: word-queued-pulse-dark 0.4s ease-out;
-}
-
-@keyframes word-queued-pulse-dark {
-  0% {
-    background-color: transparent;
-  }
-  50% {
-    background-color: rgba(96, 165, 250, 0.4); /* blue-400/40 */
-  }
-  100% {
-    background-color: transparent;
-  }
-}
-
 /* Phrase selection styles */
 .word-phrase-selected {
-  @apply bg-blue-200/40 rounded;
-}
-
-:is(html.dark .word-phrase-selected) {
-  @apply bg-blue-500/30;
+  background: rgba(var(--theme-accent-rgb), 0.2);
+  border-radius: 0.25rem;
 }
 
 /* Shift key held - selection mode cursor */
@@ -222,11 +202,11 @@
 }
 
 .word-shift-mode:hover {
-  @apply bg-blue-100;
+  background: rgba(var(--theme-accent-rgb), 0.1);
 }
 
 :is(html.dark .word-shift-mode:hover) {
-  @apply bg-blue-600/40;
+  background: rgba(var(--theme-accent-rgb), 0.25);
 }
 
 /* Drag selection mode - prevent text selection */
@@ -237,25 +217,25 @@
 }
 
 .word-drag-mode:hover {
-  @apply bg-blue-100;
+  background: rgba(var(--theme-accent-rgb), 0.1);
 }
 
 :is(html.dark .word-drag-mode:hover) {
-  @apply bg-blue-600/40;
+  background: rgba(var(--theme-accent-rgb), 0.25);
 }
 
 /* Phrase selection active indicator - subtle border */
 .word-phrase-selecting {
-  @apply ring-2 ring-blue-400 ring-offset-1;
+  box-shadow: 0 0 0 2px rgba(var(--theme-accent-rgb), 0.5), 0 0 0 3px transparent;
 }
 
 :is(html.dark .word-phrase-selecting) {
-  @apply ring-blue-500 ring-offset-gray-900;
+  box-shadow: 0 0 0 2px rgba(var(--theme-accent-rgb), 0.6), 0 0 0 3px var(--theme-background);
 }
 
 /* Grammar Mode - Part of Speech Colors */
 .word-pos-noun {
-  color: #3b82f6 !important; /* blue-500 */
+  color: #D4AF37 !important; /* golden accent */
 }
 .word-pos-verb {
   color: #ef4444 !important; /* red-500 */
@@ -290,7 +270,7 @@
 
 /* Dark mode POS colors - slightly brighter variants */
 :is(html.dark .word-pos-noun) {
-  color: #60a5fa !important; /* blue-400 */
+  color: #D4AF37 !important; /* golden accent */
 }
 :is(html.dark .word-pos-verb) {
   color: #f87171 !important; /* red-400 */

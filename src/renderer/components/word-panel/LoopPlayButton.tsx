@@ -5,6 +5,7 @@
 import React, { useCallback, useState, useEffect } from 'react';
 import { useAudioPlayer } from '../../hooks/useAudioPlayer';
 import { useAudioCache, AudioType } from '../../hooks/useAudioCache';
+import { useReaderTheme } from '../../hooks/useReaderTheme';
 
 interface LoopPlayButtonProps {
   text: string;
@@ -29,6 +30,7 @@ const LoopPlayButton: React.FC<LoopPlayButtonProps> = ({
 }) => {
   const { playLooping, stopLooping, isLooping } = useAudioPlayer();
   const { getAudio, setAudio } = useAudioCache();
+  const theme = useReaderTheme();
   const [serverError, setServerError] = useState(false);
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
 
@@ -124,7 +126,8 @@ const LoopPlayButton: React.FC<LoopPlayButtonProps> = ({
     return (
       <button
         type="button"
-        className={`${sizeClasses} flex items-center justify-center rounded-full text-gray-400 cursor-not-allowed ${className}`}
+        className={`${sizeClasses} flex items-center justify-center rounded-full cursor-not-allowed ${className}`}
+        style={{ color: theme.textSecondary }}
         title="Loop unavailable"
         disabled
       >
@@ -144,10 +147,30 @@ const LoopPlayButton: React.FC<LoopPlayButtonProps> = ({
       type="button"
       onClick={handleClick}
       className={`${sizeClasses} flex items-center justify-center rounded-full transition-all ${
-        isLooping
-          ? 'text-blue-500 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30 animate-pulse'
-          : 'text-gray-500 dark:text-cream-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+        isLooping ? 'animate-pulse' : ''
       } ${className}`}
+      style={
+        isLooping
+          ? {
+              color: theme.accent,
+              backgroundColor: theme.panel
+            }
+          : {
+              color: theme.textSecondary
+            }
+      }
+      onMouseEnter={(e) => {
+        if (!isLooping) {
+          e.currentTarget.style.color = theme.accent;
+          e.currentTarget.style.backgroundColor = 'rgba(128, 128, 128, 0.1)';
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (!isLooping) {
+          e.currentTarget.style.color = theme.textSecondary;
+          e.currentTarget.style.backgroundColor = 'transparent';
+        }
+      }}
       title={isLooping ? 'Stop loop' : title}
       disabled={isLoadingAudio}
     >

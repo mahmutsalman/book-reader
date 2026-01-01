@@ -7,6 +7,7 @@ import React, { useCallback, useState, useEffect } from 'react';
 import { useAudioPlayer } from '../../hooks/useAudioPlayer';
 import { useAudioCache, AudioType } from '../../hooks/useAudioCache';
 import { useSettings } from '../../context/SettingsContext';
+import { useReaderTheme } from '../../hooks/useReaderTheme';
 
 interface SlowLoopPlayButtonProps {
   text: string;
@@ -34,6 +35,7 @@ const SlowLoopPlayButton: React.FC<SlowLoopPlayButtonProps> = ({
   const defaultTitle = `Play slow (${slowPlaybackSpeed}x)`;
   const { playLooping, stopLooping, isLooping } = useAudioPlayer();
   const { getAudio, setAudio } = useAudioCache();
+  const theme = useReaderTheme();
   const [serverError, setServerError] = useState(false);
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
 
@@ -136,7 +138,8 @@ const SlowLoopPlayButton: React.FC<SlowLoopPlayButtonProps> = ({
     return (
       <button
         type="button"
-        className={`${sizeClasses} flex items-center justify-center rounded-full text-gray-400 cursor-not-allowed ${className}`}
+        className={`${sizeClasses} flex items-center justify-center rounded-full cursor-not-allowed ${className}`}
+        style={{ color: theme.textSecondary }}
         title="Slow loop unavailable"
         disabled
       >
@@ -154,10 +157,30 @@ const SlowLoopPlayButton: React.FC<SlowLoopPlayButtonProps> = ({
       type="button"
       onClick={handleClick}
       className={`${sizeClasses} flex items-center justify-center rounded-full transition-all ${
-        isLooping
-          ? 'text-orange-500 dark:text-orange-400 bg-orange-100 dark:bg-orange-900/30 animate-pulse'
-          : 'text-gray-500 dark:text-cream-300 hover:text-orange-600 dark:hover:text-orange-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+        isLooping ? 'animate-pulse' : ''
       } ${className}`}
+      style={
+        isLooping
+          ? {
+              color: theme.accent,
+              backgroundColor: theme.panel
+            }
+          : {
+              color: theme.textSecondary
+            }
+      }
+      onMouseEnter={(e) => {
+        if (!isLooping) {
+          e.currentTarget.style.color = theme.accent;
+          e.currentTarget.style.backgroundColor = 'rgba(128, 128, 128, 0.1)';
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (!isLooping) {
+          e.currentTarget.style.color = theme.textSecondary;
+          e.currentTarget.style.backgroundColor = 'transparent';
+        }
+      }}
       title={isLooping ? 'Stop slow loop' : (title || defaultTitle)}
       disabled={isLoadingAudio}
     >

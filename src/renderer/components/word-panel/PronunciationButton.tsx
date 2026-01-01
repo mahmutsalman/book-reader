@@ -5,6 +5,7 @@
 import React, { useCallback, useState } from 'react';
 import { useAudioPlayer } from '../../hooks/useAudioPlayer';
 import { useAudioCache, AudioType } from '../../hooks/useAudioCache';
+import { useReaderTheme } from '../../hooks/useReaderTheme';
 
 interface PronunciationButtonProps {
   text: string;
@@ -29,6 +30,7 @@ const PronunciationButton: React.FC<PronunciationButtonProps> = ({
 }) => {
   const { playAudio, stop, isPlaying, isLoading, setIsLoading, error } = useAudioPlayer();
   const { getAudio, setAudio } = useAudioCache();
+  const theme = useReaderTheme();
   const [serverError, setServerError] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -140,7 +142,8 @@ const PronunciationButton: React.FC<PronunciationButtonProps> = ({
     return (
       <button
         type="button"
-        className={`${sizeClasses} flex items-center justify-center rounded-full text-gray-400 cursor-not-allowed ${className}`}
+        className={`${sizeClasses} flex items-center justify-center rounded-full cursor-not-allowed ${className}`}
+        style={{ color: theme.textSecondary }}
         title={errorMessage || "Pronunciation unavailable"}
         disabled
       >
@@ -156,11 +159,29 @@ const PronunciationButton: React.FC<PronunciationButtonProps> = ({
     <button
       type="button"
       onClick={handleClick}
-      className={`${sizeClasses} flex items-center justify-center rounded-full transition-all ${
+      className={`${sizeClasses} flex items-center justify-center rounded-full transition-all ${className}`}
+      style={
         isPlaying
-          ? 'text-blue-500 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/30'
-          : 'text-gray-500 dark:text-cream-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-700'
-      } ${className}`}
+          ? {
+              color: theme.accent,
+              backgroundColor: theme.panel
+            }
+          : {
+              color: theme.textSecondary
+            }
+      }
+      onMouseEnter={(e) => {
+        if (!isPlaying) {
+          e.currentTarget.style.color = theme.accent;
+          e.currentTarget.style.backgroundColor = 'rgba(128, 128, 128, 0.1)';
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (!isPlaying) {
+          e.currentTarget.style.color = theme.textSecondary;
+          e.currentTarget.style.backgroundColor = 'transparent';
+        }
+      }}
       title={isPlaying ? 'Stop' : title}
       disabled={isLoading}
     >

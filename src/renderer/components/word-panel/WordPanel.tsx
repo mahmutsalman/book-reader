@@ -12,6 +12,7 @@ import LoopPlayButton from './LoopPlayButton';
 import SlowLoopPlayButton from './SlowLoopPlayButton';
 import { useAudioCache, AudioType } from '../../hooks/useAudioCache';
 import { useAudioPlayer } from '../../hooks/useAudioPlayer';
+import { useReaderTheme } from '../../hooks/useReaderTheme';
 
 interface SelectedWord {
   word: string;
@@ -95,6 +96,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
   const { addSessionEntry } = useSessionVocabulary();
   const { preloadAudio, getAudio, setAudio } = useAudioCache();
   const { playAudio, stop: stopAudio, isLoading: isLoadingAudio, setIsLoading } = useAudioPlayer();
+  const theme = useReaderTheme();
   const [wordData, setWordData] = useState<WordData>({ loading: false });
   const isNonEnglish = bookLanguage !== 'en';
   const [saved, setSaved] = useState(false);
@@ -641,10 +643,18 @@ const WordPanel: React.FC<WordPanelProps> = ({
       />
 
       {/* Panel */}
-      <div className="fixed top-0 right-0 h-full w-96 bg-white dark:bg-gray-800 shadow-2xl z-50 overflow-hidden flex flex-col">
+      <div
+        className="fixed top-0 right-0 h-full w-96 shadow-2xl z-50 overflow-hidden flex flex-col"
+        style={{ backgroundColor: theme.background, color: theme.text }}
+      >
         {/* Header - entire area clickable for word pronunciation */}
         <div
-          className={`bg-primary-600 text-white px-4 py-3 flex items-center justify-between ${!selectedWord.isPhrase ? 'cursor-pointer hover:bg-primary-700 transition-colors' : ''}`}
+          className={`px-3 py-2.5 flex items-center justify-between transition-colors ${!selectedWord.isPhrase ? 'cursor-pointer' : ''}`}
+          style={{
+            backgroundColor: theme.panel,
+            color: theme.text,
+            borderBottom: `1px solid ${theme.panelBorder}`
+          }}
           onClick={() => {
             if (!selectedWord.isPhrase) {
               const wordText = wordData.germanArticle
@@ -653,13 +663,23 @@ const WordPanel: React.FC<WordPanelProps> = ({
               playText(wordText, bookLanguage, AudioType.WORD);
             }
           }}
+          onMouseEnter={(e) => {
+            if (!selectedWord.isPhrase) {
+              e.currentTarget.style.backgroundColor = theme.background;
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (!selectedWord.isPhrase) {
+              e.currentTarget.style.backgroundColor = theme.panel;
+            }
+          }}
           title={!selectedWord.isPhrase ? 'Click anywhere to hear pronunciation' : undefined}
         >
           <div className="flex items-center gap-2">
             <div>
               <div className="flex items-center gap-2">
                 {/* Display word with German article if available */}
-                <h2 className="text-xl font-semibold">
+                <h2 className="text-lg font-semibold">
                   {wordData.germanArticle
                     ? `${wordData.germanArticle} ${capitalizeGermanNoun(selectedWord.word)}`
                     : selectedWord.word}
@@ -675,7 +695,6 @@ const WordPanel: React.FC<WordPanelProps> = ({
                       audioType={AudioType.WORD}
                       size="sm"
                       title="Pronounce word"
-                      className="text-white/80 hover:text-white hover:bg-white/20"
                     />
                     <LoopPlayButton
                       text={wordData.germanArticle
@@ -685,7 +704,6 @@ const WordPanel: React.FC<WordPanelProps> = ({
                       audioType={AudioType.WORD}
                       size="sm"
                       title="Loop pronunciation"
-                      className="text-white/80 hover:text-white hover:bg-white/20"
                     />
                     <SlowLoopPlayButton
                       text={wordData.germanArticle
@@ -694,7 +712,6 @@ const WordPanel: React.FC<WordPanelProps> = ({
                       language={bookLanguage}
                       audioType={AudioType.WORD}
                       size="sm"
-                      className="text-white/80 hover:text-white hover:bg-white/20"
                     />
                   </div>
                 )}
@@ -703,12 +720,12 @@ const WordPanel: React.FC<WordPanelProps> = ({
               {!selectedWord.isPhrase && (wordData.ipa || wordData.syllables) && (
                 <div className="flex items-center gap-2 text-sm">
                   {wordData.ipa && (
-                    <span className="text-primary-100 font-mono">
+                    <span className="font-mono" style={{ color: theme.textSecondary }}>
                       /{wordData.ipa}/
                     </span>
                   )}
                   {wordData.syllables && (
-                    <span className="text-primary-200">
+                    <span style={{ color: theme.textSecondary }}>
                       {wordData.syllables}
                     </span>
                   )}
@@ -716,12 +733,15 @@ const WordPanel: React.FC<WordPanelProps> = ({
               )}
               {/* Word type badge - on its own line to avoid crowding IPA */}
               {!selectedWord.isPhrase && wordData.wordType && (
-                <span className="px-2 py-0.5 text-xs rounded-full bg-white/20 text-primary-100 inline-block mt-1">
+                <span
+                  className="px-2 py-0.5 text-xs rounded-full inline-block mt-1"
+                  style={{ backgroundColor: theme.background, color: theme.text }}
+                >
                   {wordData.wordType}
                 </span>
               )}
               {selectedWord.isPhrase && (
-                <span className="text-primary-200 text-xs">
+                <span className="text-xs" style={{ color: theme.textSecondary }}>
                   phrase
                 </span>
               )}
@@ -732,68 +752,98 @@ const WordPanel: React.FC<WordPanelProps> = ({
               e.stopPropagation();
               onClose();
             }}
-            className="text-white/80 hover:text-white text-2xl hover:bg-white/20 rounded-lg px-2 py-1 transition-colors"
+            className="text-2xl rounded-lg px-2 py-1 transition-colors"
+            style={{ color: theme.textSecondary }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = theme.text;
+              e.currentTarget.style.backgroundColor = theme.background;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = theme.textSecondary;
+              e.currentTarget.style.backgroundColor = 'transparent';
+            }}
           >
             ×
           </button>
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-auto p-4 space-y-4">
+        <div className="flex-1 overflow-auto p-3 space-y-3">
           {/* Meaning Mode Content */}
           {isMeaningMode ? (
             <>
               {/* Analysis Type Buttons */}
-              <div className="grid grid-cols-2 gap-3 mb-4">
+              <div className="grid grid-cols-2 gap-2 mb-3">
                 {/* Narrative Analysis Button */}
                 <button
                   onClick={() => setSelectedMeaningType('narrative')}
-                  className={`p-4 rounded-lg border-2 transition-all ${
-                    selectedMeaningType === 'narrative'
-                      ? 'bg-blue-600 text-white border-blue-600 shadow-lg'
-                      : 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/50'
+                  className={`p-3 rounded-lg border-2 transition-all shadow-lg ${
+                    selectedMeaningType === 'narrative' ? 'font-semibold' : ''
                   }`}
+                  style={
+                    selectedMeaningType === 'narrative'
+                      ? {
+                          backgroundColor: theme.accent,
+                          color: theme.background,
+                          borderColor: theme.accent
+                        }
+                      : {
+                          backgroundColor: theme.panel,
+                          color: theme.textSecondary,
+                          borderColor: theme.panelBorder
+                        }
+                  }
+                  onMouseEnter={(e) => {
+                    if (selectedMeaningType !== 'narrative') {
+                      e.currentTarget.style.backgroundColor = theme.background;
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (selectedMeaningType !== 'narrative') {
+                      e.currentTarget.style.backgroundColor = theme.panel;
+                    }
+                  }}
                 >
-                  <div className="text-2xl mb-1">📖</div>
+                  <div className="text-xl mb-1">📖</div>
                   <div className="font-semibold text-sm">Narrative Context</div>
                 </button>
 
                 {/* Literary Analysis Button */}
                 <button
                   onClick={() => setSelectedMeaningType('literary')}
-                  className={`p-4 rounded-lg border-2 transition-all ${
+                  className={`p-3 rounded-lg border-2 transition-all ${
                     selectedMeaningType === 'literary'
                       ? 'bg-green-600 text-white border-green-600 shadow-lg'
                       : 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800 hover:bg-green-100 dark:hover:bg-green-900/50'
                   }`}
                 >
-                  <div className="text-2xl mb-1">✨</div>
+                  <div className="text-xl mb-1">✨</div>
                   <div className="font-semibold text-sm">Literary Analysis</div>
                 </button>
 
                 {/* Semantic Analysis Button */}
                 <button
                   onClick={() => setSelectedMeaningType('semantic')}
-                  className={`p-4 rounded-lg border-2 transition-all ${
+                  className={`p-3 rounded-lg border-2 transition-all ${
                     selectedMeaningType === 'semantic'
                       ? 'bg-amber-600 text-white border-amber-600 shadow-lg'
                       : 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/50'
                   }`}
                 >
-                  <div className="text-2xl mb-1">🔍</div>
+                  <div className="text-xl mb-1">🔍</div>
                   <div className="font-semibold text-sm">Semantic Analysis</div>
                 </button>
 
                 {/* Simplified Explanation Button */}
                 <button
                   onClick={() => setSelectedMeaningType('simplified')}
-                  className={`p-4 rounded-lg border-2 transition-all ${
+                  className={`p-3 rounded-lg border-2 transition-all ${
                     selectedMeaningType === 'simplified'
                       ? 'bg-purple-600 text-white border-purple-600 shadow-lg'
                       : 'bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900/50'
                   }`}
                 >
-                  <div className="text-2xl mb-1">📝</div>
+                  <div className="text-xl mb-1">📝</div>
                   <div className="font-semibold text-sm">Simplified</div>
                 </button>
               </div>
@@ -802,42 +852,42 @@ const WordPanel: React.FC<WordPanelProps> = ({
               {meaningLoading ? (
                 <div className="text-center py-8">
                   <div className="text-4xl animate-pulse mb-2">🔍</div>
-                  <div className="text-gray-500 dark:text-cream-300">
+                  <div style={{ color: theme.textSecondary }}>
                     Analyzing context...
                   </div>
                 </div>
               ) : meaningError ? (
-                <div className="bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 p-4 rounded-lg">
+                <div className="bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 p-3 rounded-lg">
                   <p>{meaningError}</p>
                 </div>
               ) : meaningAnalysis && selectedMeaningType ? (
                 <>
                   {/* Narrative Analysis Content */}
                   {selectedMeaningType === 'narrative' && meaningAnalysis.narrative && (
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                       <section>
-                        <h3 className="font-semibold text-blue-700 dark:text-blue-300 mb-2">
+                        <h3 className="font-semibold mb-2" style={{ color: theme.accent }}>
                           📖 Plot Context
                         </h3>
-                        <p className="text-gray-600 dark:text-cream-200 bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg">
+                        <p className="p-3 rounded-lg" style={{ backgroundColor: theme.panel, color: theme.text }}>
                           {meaningAnalysis.narrative.plotContext}
                         </p>
                       </section>
 
                       <section>
-                        <h3 className="font-semibold text-blue-700 dark:text-blue-300 mb-2">
+                        <h3 className="font-semibold mb-2" style={{ color: theme.accent }}>
                           👥 Character Dynamics
                         </h3>
-                        <p className="text-gray-600 dark:text-cream-200 bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg">
+                        <p className="p-3 rounded-lg" style={{ backgroundColor: theme.panel, color: theme.text }}>
                           {meaningAnalysis.narrative.characterDynamics}
                         </p>
                       </section>
 
                       <section>
-                        <h3 className="font-semibold text-blue-700 dark:text-blue-300 mb-2">
+                        <h3 className="font-semibold mb-2" style={{ color: theme.accent }}>
                           🎯 Narrative Function
                         </h3>
-                        <p className="text-gray-600 dark:text-cream-200 bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg">
+                        <p className="p-3 rounded-lg" style={{ backgroundColor: theme.panel, color: theme.text }}>
                           {meaningAnalysis.narrative.narrativeFunction}
                         </p>
                       </section>
@@ -845,36 +895,43 @@ const WordPanel: React.FC<WordPanelProps> = ({
                       {/* Word-Specific Analysis (Micro View) */}
                       {meaningAnalysis.narrative.wordSpecific && (
                         <>
-                          <div className="border-t-2 border-blue-200 dark:border-blue-800 my-4" />
-                          <div className="bg-blue-100 dark:bg-blue-900/50 p-2 rounded-lg mb-2">
-                            <h4 className="font-semibold text-blue-900 dark:text-blue-200 text-sm">
+                          <div className="border-t-2 my-3" style={{ borderColor: theme.panelBorder }} />
+                          <div
+                            className="p-2 rounded-lg mb-2 border-l-4"
+                            style={{
+                              backgroundColor: theme.panel,
+                              borderLeftColor: theme.accent,
+                              color: theme.text
+                            }}
+                          >
+                            <h4 className="font-semibold text-sm" style={{ color: theme.accent }}>
                               🔍 Word-Level Focus: "{selectedWord?.word}"
                             </h4>
                           </div>
 
                           <section>
-                            <h3 className="font-semibold text-blue-700 dark:text-blue-300 mb-2">
+                            <h3 className="font-semibold mb-2" style={{ color: theme.accent }}>
                               🎬 Word's Role in Plot
                             </h3>
-                            <p className="text-gray-600 dark:text-cream-200 bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg">
+                            <p className="p-3 rounded-lg" style={{ backgroundColor: theme.panel, color: theme.text }}>
                               {meaningAnalysis.narrative.wordSpecific.wordInPlot}
                             </p>
                           </section>
 
                           <section>
-                            <h3 className="font-semibold text-blue-700 dark:text-blue-300 mb-2">
+                            <h3 className="font-semibold mb-2" style={{ color: theme.accent }}>
                               👤 Character Insight
                             </h3>
-                            <p className="text-gray-600 dark:text-cream-200 bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg">
+                            <p className="p-3 rounded-lg" style={{ backgroundColor: theme.panel, color: theme.text }}>
                               {meaningAnalysis.narrative.wordSpecific.characterInsight}
                             </p>
                           </section>
 
                           <section>
-                            <h3 className="font-semibold text-blue-700 dark:text-blue-300 mb-2">
+                            <h3 className="font-semibold mb-2" style={{ color: theme.accent }}>
                               🎭 Thematic Role
                             </h3>
-                            <p className="text-gray-600 dark:text-cream-200 bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg">
+                            <p className="p-3 rounded-lg" style={{ backgroundColor: theme.panel, color: theme.text }}>
                               {meaningAnalysis.narrative.wordSpecific.thematicRole}
                             </p>
                           </section>
@@ -885,12 +942,12 @@ const WordPanel: React.FC<WordPanelProps> = ({
 
                   {/* Literary Analysis Content */}
                   {selectedMeaningType === 'literary' && meaningAnalysis.literary && (
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                       <section>
                         <h3 className="font-semibold text-green-700 dark:text-green-300 mb-2">
                           ✍️ Word Choice
                         </h3>
-                        <p className="text-gray-600 dark:text-cream-200 bg-green-50 dark:bg-green-900/30 p-3 rounded-lg">
+                        <p className="bg-green-50 dark:bg-green-900/30 p-3 rounded-lg" style={{ color: theme.text }}>
                           {meaningAnalysis.literary.wordChoice}
                         </p>
                       </section>
@@ -899,7 +956,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
                         <h3 className="font-semibold text-green-700 dark:text-green-300 mb-2">
                           🎭 Tone & Atmosphere
                         </h3>
-                        <p className="text-gray-600 dark:text-cream-200 bg-green-50 dark:bg-green-900/30 p-3 rounded-lg">
+                        <p className="bg-green-50 dark:bg-green-900/30 p-3 rounded-lg" style={{ color: theme.text }}>
                           {meaningAnalysis.literary.tone}
                         </p>
                       </section>
@@ -909,9 +966,9 @@ const WordPanel: React.FC<WordPanelProps> = ({
                           <h3 className="font-semibold text-green-700 dark:text-green-300 mb-2">
                             ✨ Literary Devices
                           </h3>
-                          <ul className="space-y-2 bg-green-50 dark:bg-green-900/30 p-3 rounded-lg">
+                          <ul className="space-y-2 bg-green-50 dark:bg-green-900/30 p-3 rounded-lg" style={{ color: theme.text }}>
                             {meaningAnalysis.literary.literaryDevices.map((device, idx) => (
-                              <li key={idx} className="flex items-start gap-2 text-gray-600 dark:text-cream-200">
+                              <li key={idx} className="flex items-start gap-2">
                                 <span className="text-green-500">•</span>
                                 <span>{device}</span>
                               </li>
@@ -923,7 +980,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
                       {/* Word-Specific Analysis (Micro View) */}
                       {meaningAnalysis.literary.wordSpecific && (
                         <>
-                          <div className="border-t-2 border-green-200 dark:border-green-800 my-4" />
+                          <div className="border-t-2 border-green-200 dark:border-green-800 my-3" />
                           <div className="bg-green-100 dark:bg-green-900/50 p-2 rounded-lg mb-2">
                             <h4 className="font-semibold text-green-900 dark:text-green-200 text-sm">
                               🔍 Word-Level Focus: "{selectedWord?.word}"
@@ -934,7 +991,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
                             <h3 className="font-semibold text-green-700 dark:text-green-300 mb-2">
                               🎯 Rhetorical Effect
                             </h3>
-                            <p className="text-gray-600 dark:text-cream-200 bg-green-50 dark:bg-green-900/30 p-3 rounded-lg">
+                            <p className="bg-green-50 dark:bg-green-900/30 p-3 rounded-lg" style={{ color: theme.text }}>
                               {meaningAnalysis.literary.wordSpecific.rhetoricalEffect}
                             </p>
                           </section>
@@ -943,7 +1000,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
                             <h3 className="font-semibold text-green-700 dark:text-green-300 mb-2">
                               💫 Emotional Impact
                             </h3>
-                            <p className="text-gray-600 dark:text-cream-200 bg-green-50 dark:bg-green-900/30 p-3 rounded-lg">
+                            <p className="bg-green-50 dark:bg-green-900/30 p-3 rounded-lg" style={{ color: theme.text }}>
                               {meaningAnalysis.literary.wordSpecific.emotionalImpact}
                             </p>
                           </section>
@@ -952,7 +1009,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
                             <h3 className="font-semibold text-green-700 dark:text-green-300 mb-2">
                               ✨ Stylistic Purpose
                             </h3>
-                            <p className="text-gray-600 dark:text-cream-200 bg-green-50 dark:bg-green-900/30 p-3 rounded-lg">
+                            <p className="bg-green-50 dark:bg-green-900/30 p-3 rounded-lg" style={{ color: theme.text }}>
                               {meaningAnalysis.literary.wordSpecific.stylisticPurpose}
                             </p>
                           </section>
@@ -963,15 +1020,15 @@ const WordPanel: React.FC<WordPanelProps> = ({
 
                   {/* Semantic Analysis Content */}
                   {selectedMeaningType === 'semantic' && meaningAnalysis.semantic && (
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                       {meaningAnalysis.semantic.multipleMeanings.length > 0 && (
                         <section>
                           <h3 className="font-semibold text-amber-700 dark:text-amber-300 mb-2">
                             🔄 Multiple Interpretations
                           </h3>
-                          <ul className="space-y-2 bg-amber-50 dark:bg-amber-900/30 p-3 rounded-lg">
+                          <ul className="space-y-2 bg-amber-50 dark:bg-amber-900/30 p-3 rounded-lg" style={{ color: theme.text }}>
                             {meaningAnalysis.semantic.multipleMeanings.map((meaning, idx) => (
-                              <li key={idx} className="flex items-start gap-2 text-gray-600 dark:text-cream-200">
+                              <li key={idx} className="flex items-start gap-2">
                                 <span className="text-amber-500">{idx + 1}.</span>
                                 <span>{meaning}</span>
                               </li>
@@ -984,7 +1041,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
                         <h3 className="font-semibold text-amber-700 dark:text-amber-300 mb-2">
                           💭 Nuances
                         </h3>
-                        <p className="text-gray-600 dark:text-cream-200 bg-amber-50 dark:bg-amber-900/30 p-3 rounded-lg">
+                        <p className="bg-amber-50 dark:bg-amber-900/30 p-3 rounded-lg" style={{ color: theme.text }}>
                           {meaningAnalysis.semantic.nuances}
                         </p>
                       </section>
@@ -993,7 +1050,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
                         <h3 className="font-semibold text-amber-700 dark:text-amber-300 mb-2">
                           🌍 Cultural Context
                         </h3>
-                        <p className="text-gray-600 dark:text-cream-200 bg-amber-50 dark:bg-amber-900/30 p-3 rounded-lg">
+                        <p className="bg-amber-50 dark:bg-amber-900/30 p-3 rounded-lg" style={{ color: theme.text }}>
                           {meaningAnalysis.semantic.culturalContext}
                         </p>
                       </section>
@@ -1001,7 +1058,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
                       {/* Word-Specific Analysis (Micro View) */}
                       {meaningAnalysis.semantic.wordSpecific && (
                         <>
-                          <div className="border-t-2 border-amber-200 dark:border-amber-800 my-4" />
+                          <div className="border-t-2 border-amber-200 dark:border-amber-800 my-3" />
                           <div className="bg-amber-100 dark:bg-amber-900/50 p-2 rounded-lg mb-2">
                             <h4 className="font-semibold text-amber-900 dark:text-amber-200 text-sm">
                               🔍 Word-Level Focus: "{selectedWord?.word}"
@@ -1012,7 +1069,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
                             <h3 className="font-semibold text-amber-700 dark:text-amber-300 mb-2">
                               📝 Contextual Meaning
                             </h3>
-                            <p className="text-gray-600 dark:text-cream-200 bg-amber-50 dark:bg-amber-900/30 p-3 rounded-lg">
+                            <p className="bg-amber-50 dark:bg-amber-900/30 p-3 rounded-lg" style={{ color: theme.text }}>
                               {meaningAnalysis.semantic.wordSpecific.contextualMeaning}
                             </p>
                           </section>
@@ -1021,7 +1078,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
                             <h3 className="font-semibold text-amber-700 dark:text-amber-300 mb-2">
                               🔀 Ambiguity Analysis
                             </h3>
-                            <p className="text-gray-600 dark:text-cream-200 bg-amber-50 dark:bg-amber-900/30 p-3 rounded-lg">
+                            <p className="bg-amber-50 dark:bg-amber-900/30 p-3 rounded-lg" style={{ color: theme.text }}>
                               {meaningAnalysis.semantic.wordSpecific.ambiguityAnalysis}
                             </p>
                           </section>
@@ -1030,7 +1087,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
                             <h3 className="font-semibold text-amber-700 dark:text-amber-300 mb-2">
                               🌏 Cultural Significance
                             </h3>
-                            <p className="text-gray-600 dark:text-cream-200 bg-amber-50 dark:bg-amber-900/30 p-3 rounded-lg">
+                            <p className="bg-amber-50 dark:bg-amber-900/30 p-3 rounded-lg" style={{ color: theme.text }}>
                               {meaningAnalysis.semantic.wordSpecific.culturalSignificance}
                             </p>
                           </section>
@@ -1041,12 +1098,12 @@ const WordPanel: React.FC<WordPanelProps> = ({
 
                   {/* Simplified Analysis Content */}
                   {selectedMeaningType === 'simplified' && meaningAnalysis.simplified && (
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                       <section>
                         <h3 className="font-semibold text-purple-700 dark:text-purple-300 mb-2">
                           💡 Main Idea
                         </h3>
-                        <p className="text-gray-600 dark:text-cream-200 bg-purple-50 dark:bg-purple-900/30 p-3 rounded-lg">
+                        <p className="bg-purple-50 dark:bg-purple-900/30 p-3 rounded-lg" style={{ color: theme.text }}>
                           {meaningAnalysis.simplified.mainIdea}
                         </p>
                       </section>
@@ -1055,7 +1112,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
                         <h3 className="font-semibold text-purple-700 dark:text-purple-300 mb-2">
                           📝 Breakdown
                         </h3>
-                        <p className="text-gray-600 dark:text-cream-200 bg-purple-50 dark:bg-purple-900/30 p-3 rounded-lg whitespace-pre-wrap">
+                        <p className="bg-purple-50 dark:bg-purple-900/30 p-3 rounded-lg whitespace-pre-wrap" style={{ color: theme.text }}>
                           {meaningAnalysis.simplified.breakdown}
                         </p>
                       </section>
@@ -1065,9 +1122,9 @@ const WordPanel: React.FC<WordPanelProps> = ({
                           <h3 className="font-semibold text-purple-700 dark:text-purple-300 mb-2">
                             📚 Key Vocabulary
                           </h3>
-                          <ul className="space-y-2 bg-purple-50 dark:bg-purple-900/30 p-3 rounded-lg">
+                          <ul className="space-y-2 bg-purple-50 dark:bg-purple-900/30 p-3 rounded-lg" style={{ color: theme.text }}>
                             {meaningAnalysis.simplified.keyVocabulary.map((vocab, idx) => (
-                              <li key={idx} className="flex items-start gap-2 text-gray-600 dark:text-cream-200">
+                              <li key={idx} className="flex items-start gap-2">
                                 <span className="text-purple-500">•</span>
                                 <span>{vocab}</span>
                               </li>
@@ -1079,7 +1136,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
                       {/* Word-Specific Analysis (Micro View) */}
                       {meaningAnalysis.simplified.wordSpecific && (
                         <>
-                          <div className="border-t-2 border-purple-200 dark:border-purple-800 my-4" />
+                          <div className="border-t-2 border-purple-200 dark:border-purple-800 my-3" />
                           <div className="bg-purple-100 dark:bg-purple-900/50 p-2 rounded-lg mb-2">
                             <h4 className="font-semibold text-purple-900 dark:text-purple-200 text-sm">
                               🔍 Word-Level Focus: "{selectedWord?.word}"
@@ -1090,7 +1147,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
                             <h3 className="font-semibold text-purple-700 dark:text-purple-300 mb-2">
                               📖 Simple Definition
                             </h3>
-                            <p className="text-gray-600 dark:text-cream-200 bg-purple-50 dark:bg-purple-900/30 p-3 rounded-lg">
+                            <p className="bg-purple-50 dark:bg-purple-900/30 p-3 rounded-lg" style={{ color: theme.text }}>
                               {meaningAnalysis.simplified.wordSpecific.simpleDefinition}
                             </p>
                           </section>
@@ -1099,7 +1156,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
                             <h3 className="font-semibold text-purple-700 dark:text-purple-300 mb-2">
                               💬 Usage Example
                             </h3>
-                            <p className="text-gray-600 dark:text-cream-200 bg-purple-50 dark:bg-purple-900/30 p-3 rounded-lg">
+                            <p className="bg-purple-50 dark:bg-purple-900/30 p-3 rounded-lg" style={{ color: theme.text }}>
                               {meaningAnalysis.simplified.wordSpecific.usageExample}
                             </p>
                           </section>
@@ -1108,7 +1165,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
                             <h3 className="font-semibold text-purple-700 dark:text-purple-300 mb-2">
                               💡 Learner Tip
                             </h3>
-                            <p className="text-gray-600 dark:text-cream-200 bg-purple-50 dark:bg-purple-900/30 p-3 rounded-lg">
+                            <p className="bg-purple-50 dark:bg-purple-900/30 p-3 rounded-lg" style={{ color: theme.text }}>
                               {meaningAnalysis.simplified.wordSpecific.learnerTip}
                             </p>
                           </section>
@@ -1118,7 +1175,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
                   )}
                 </>
               ) : (
-                <div className="text-center py-8 text-gray-500 dark:text-cream-300">
+                <div className="text-center py-8" style={{ color: theme.textSecondary }}>
                   Select an analysis type to explore the context
                 </div>
               )}
@@ -1127,25 +1184,25 @@ const WordPanel: React.FC<WordPanelProps> = ({
             grammarLoading ? (
               <div className="text-center py-8">
                 <div className="text-4xl animate-pulse mb-2">📚</div>
-                <div className="text-gray-500 dark:text-cream-300">
+                <div style={{ color: theme.textSecondary }}>
                   Analyzing grammar structure...
                 </div>
               </div>
             ) : grammarError ? (
-              <div className="bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 p-4 rounded-lg">
+              <div className="bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 p-3 rounded-lg">
                 <p>{grammarError}</p>
               </div>
             ) : grammarData ? (
               <>
                 {/* Grammar Structure */}
                 <section>
-                  <h3 className="font-semibold text-gray-700 dark:text-cream-200 mb-2 flex items-center gap-2">
+                  <h3 className="font-semibold mb-2 flex items-center gap-2" style={{ color: theme.text }}>
                     🏗️ Grammar Structure
                     <span className="px-2 py-0.5 text-xs rounded-full bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300">
                       {grammarData.structure.type}
                     </span>
                   </h3>
-                  <p className="text-gray-600 dark:text-cream-200 bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
+                  <p className="p-3 rounded-lg" style={{ backgroundColor: theme.panel, color: theme.text }}>
                     {grammarData.structure.description}
                   </p>
                 </section>
@@ -1153,10 +1210,10 @@ const WordPanel: React.FC<WordPanelProps> = ({
                 {/* Parts of Speech - Color coded words from sentence */}
                 {grammarData.partsOfSpeech.length > 0 && (
                   <section>
-                    <h3 className="font-semibold text-gray-700 dark:text-cream-200 mb-2">
+                    <h3 className="font-semibold mb-2" style={{ color: theme.text }}>
                       🏷️ Parts of Speech
                     </h3>
-                    <div className="flex flex-wrap gap-2 bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
+                    <div className="flex flex-wrap gap-2 p-3 rounded-lg" style={{ backgroundColor: theme.panel, color: theme.text }}>
                       {grammarData.partsOfSpeech.map((item, idx) => (
                         <span
                           key={idx}
@@ -1168,7 +1225,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
                       ))}
                     </div>
                     {/* POS Legend */}
-                    <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500 dark:text-cream-300">
+                    <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs" style={{ color: theme.textSecondary }}>
                       <span><span className="word-pos-noun">●</span> noun</span>
                       <span><span className="word-pos-verb">●</span> verb</span>
                       <span><span className="word-pos-adjective">●</span> adj</span>
@@ -1181,30 +1238,37 @@ const WordPanel: React.FC<WordPanelProps> = ({
 
                 {/* Rule Explanation */}
                 <section>
-                  <h3 className="font-semibold text-gray-700 dark:text-cream-200 mb-2">
+                  <h3 className="font-semibold mb-2" style={{ color: theme.text }}>
                     📖 Rule Explanation
                   </h3>
-                  <p className="text-gray-600 dark:text-cream-200 bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg">
+                  <p className="p-3 rounded-lg" style={{ backgroundColor: theme.panel, color: theme.text }}>
                     {grammarData.ruleExplanation}
                   </p>
                 </section>
 
                 {/* Context Analysis */}
                 <section>
-                  <h3 className="font-semibold text-gray-700 dark:text-cream-200 mb-2">
+                  <h3 className="font-semibold mb-2" style={{ color: theme.text }}>
                     🎯 Why This Structure?
                   </h3>
-                  <p className="text-gray-600 dark:text-cream-200 bg-purple-50 dark:bg-purple-900/30 p-3 rounded-lg">
+                  <p className="bg-purple-50 dark:bg-purple-900/30 p-3 rounded-lg" style={{ color: theme.text }}>
                     {grammarData.contextAnalysis}
                   </p>
                 </section>
 
                 {/* Pattern Template */}
                 <section>
-                  <h3 className="font-semibold text-gray-700 dark:text-cream-200 mb-2">
+                  <h3 className="font-semibold mb-2" style={{ color: theme.text }}>
                     📝 Reusable Pattern
                   </h3>
-                  <div className="bg-gray-800 dark:bg-gray-900 text-green-400 p-3 rounded-lg font-mono text-sm overflow-x-auto">
+                  <div
+                    className="p-3 rounded-lg font-mono text-sm overflow-x-auto border"
+                    style={{
+                      backgroundColor: theme.panel,
+                      color: theme.textSecondary,
+                      borderColor: theme.panelBorder
+                    }}
+                  >
                     {grammarData.pattern}
                   </div>
                 </section>
@@ -1212,7 +1276,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
                 {/* Examples */}
                 {grammarData.examples.length > 0 && (
                   <section>
-                    <h3 className="font-semibold text-gray-700 dark:text-cream-200 mb-2">
+                    <h3 className="font-semibold mb-2" style={{ color: theme.text }}>
                       💡 Example Sentences
                     </h3>
                     <div className="space-y-2">
@@ -1238,9 +1302,9 @@ const WordPanel: React.FC<WordPanelProps> = ({
                               {example.complexity}
                             </span>
                           </div>
-                          <p className="text-gray-700 dark:text-cream-200">{example.sentence}</p>
+                          <p style={{ color: theme.text }}>{example.sentence}</p>
                           {example.translation && (
-                            <p className="text-sm text-gray-500 dark:text-cream-300 mt-1 italic">
+                            <p className="text-sm mt-1 italic" style={{ color: theme.textSecondary }}>
                               {example.translation}
                             </p>
                           )}
@@ -1253,12 +1317,12 @@ const WordPanel: React.FC<WordPanelProps> = ({
                 {/* Common Mistakes */}
                 {grammarData.commonMistakes.length > 0 && (
                   <section>
-                    <h3 className="font-semibold text-gray-700 dark:text-cream-200 mb-2">
+                    <h3 className="font-semibold mb-2" style={{ color: theme.text }}>
                       ⚠️ Common Mistakes
                     </h3>
-                    <ul className="space-y-2 bg-orange-50 dark:bg-orange-900/30 p-3 rounded-lg">
+                    <ul className="space-y-2 bg-orange-50 dark:bg-orange-900/30 p-3 rounded-lg" style={{ color: theme.text }}>
                       {grammarData.commonMistakes.map((mistake, idx) => (
-                        <li key={idx} className="flex items-start gap-2 text-gray-600 dark:text-cream-200">
+                        <li key={idx} className="flex items-start gap-2">
                           <span className="text-orange-500">✗</span>
                           <span>{mistake}</span>
                         </li>
@@ -1269,15 +1333,22 @@ const WordPanel: React.FC<WordPanelProps> = ({
 
                 {/* Practice Task */}
                 <section>
-                  <h3 className="font-semibold text-gray-700 dark:text-cream-200 mb-2">
+                  <h3 className="font-semibold mb-2" style={{ color: theme.text }}>
                     ✏️ Practice Task
                   </h3>
                   <div className="bg-teal-50 dark:bg-teal-900/30 p-3 rounded-lg">
-                    <p className="text-gray-700 dark:text-cream-200 mb-2">
+                    <p className="mb-2" style={{ color: theme.text }}>
                       {grammarData.practiceTask.instruction}
                     </p>
                     {grammarData.practiceTask.template && (
-                      <div className="bg-white dark:bg-gray-800 p-2 rounded border-2 border-dashed border-teal-300 dark:border-teal-600 font-mono text-sm text-gray-600 dark:text-cream-300">
+                      <div
+                        className="p-2 rounded border-2 border-dashed font-mono text-sm"
+                        style={{
+                          backgroundColor: theme.panel,
+                          color: theme.textSecondary,
+                          borderColor: theme.panelBorder
+                        }}
+                      >
                         {grammarData.practiceTask.template}
                       </div>
                     )}
@@ -1285,24 +1356,34 @@ const WordPanel: React.FC<WordPanelProps> = ({
                 </section>
               </>
             ) : (
-              <div className="text-center py-8 text-gray-500 dark:text-cream-300">
+              <div className="text-center py-8" style={{ color: theme.textSecondary }}>
                 Select a word or phrase to analyze grammar
               </div>
             )
           ) : wordData.loading ? (
             <div className="text-center py-8">
               <div className="text-4xl animate-pulse mb-2">🔍</div>
-              <div className="text-gray-500 dark:text-cream-300">
+              <div style={{ color: theme.textSecondary }}>
                 {selectedWord.isPhrase ? 'Looking up phrase...' : 'Looking up word...'}
               </div>
             </div>
           ) : wordData.error ? (
-            <div className="bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 p-4 rounded-lg">
+            <div className="bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 p-3 rounded-lg">
               <p>{wordData.error}</p>
               {wordData.error.toLowerCase().includes('rate limit') && (
                 <button
                   onClick={handleRetry}
-                  className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors flex items-center gap-2"
+                  className="mt-3 px-4 py-2 font-semibold rounded-lg text-sm transition-colors flex items-center gap-2"
+                  style={{
+                    backgroundColor: theme.accent,
+                    color: theme.background
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.opacity = '0.8';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.opacity = '1';
+                  }}
                 >
                   🔄 Try Next AI Model
                 </button>
@@ -1312,14 +1393,20 @@ const WordPanel: React.FC<WordPanelProps> = ({
             <>
               {/* Definition / Phrase Meaning */}
               <section>
-                <h3 className="font-semibold text-gray-700 dark:text-cream-200 mb-2">
+                <h3 className="font-semibold mb-2" style={{ color: theme.text }}>
                   {selectedWord.isPhrase ? '📖 Phrase Meaning' : '📖 Definition'}
                 </h3>
 
                 {/* Short Definition - Prominent Display */}
                 {(wordData.shortDefinition || (selectedWord.isPhrase && wordData.shortMeaning)) && (
-                  <div className="mb-3 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border-l-4 border-blue-500">
-                    <p className="text-xl font-bold text-blue-900 dark:text-blue-100">
+                  <div
+                    className="mb-3 p-3 rounded-lg border-l-4"
+                    style={{
+                      backgroundColor: theme.panel,
+                      borderLeftColor: theme.accent
+                    }}
+                  >
+                    <p className="text-lg font-bold" style={{ color: theme.accent }}>
                       {selectedWord.isPhrase ? wordData.shortMeaning : wordData.shortDefinition}
                     </p>
                   </div>
@@ -1327,7 +1414,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
 
                 {/* English translation of word/phrase (for non-English books) - shown prominently */}
                 {isNonEnglish && (wordData.wordTranslation || wordData.phraseTranslation) && (
-                  <p className="text-sm text-blue-600 dark:text-blue-400 mb-2 flex items-center gap-1 font-medium">
+                  <p className="text-sm mb-2 flex items-center gap-1 font-medium" style={{ color: theme.accent }}>
                     <span>🇬🇧</span>
                     <span>{selectedWord.isPhrase ? wordData.phraseTranslation : wordData.wordTranslation}</span>
                   </p>
@@ -1335,24 +1422,44 @@ const WordPanel: React.FC<WordPanelProps> = ({
 
                 {/* Detailed Definition - Below short version */}
                 <div className="mt-3">
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-1 font-medium">
+                  <p className="text-sm mb-1 font-medium" style={{ color: theme.textSecondary }}>
                     Detailed Explanation:
                   </p>
-                  <p className="text-gray-600 dark:text-cream-200 bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
+                  <p
+                    className="p-3 rounded-lg"
+                    style={{ backgroundColor: theme.panel, color: theme.text }}
+                  >
                     {wordData.definition || (selectedWord.isPhrase ? wordData.meaning : null) || 'No definition available'}
                   </p>
                 </div>
 
                 {/* Retry button for rate limit errors */}
                 {retryingModel ? (
-                  <div className="mt-3 px-4 py-2 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg text-sm flex items-center gap-2">
+                  <div
+                    className="mt-3 px-4 py-2 rounded-lg text-sm flex items-center gap-2 border-l-4"
+                    style={{
+                      backgroundColor: theme.panel,
+                      color: theme.textSecondary,
+                      borderLeftColor: theme.accent
+                    }}
+                  >
                     <span className="inline-block animate-spin">⏳</span>
                     Trying {formatModelName(retryingModel)}...
                   </div>
                 ) : wordData.definition?.toLowerCase().includes('rate limit') && (
                   <button
                     onClick={handleRetry}
-                    className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors flex items-center gap-2"
+                    className="mt-3 px-4 py-2 font-semibold rounded-lg text-sm transition-colors flex items-center gap-2"
+                    style={{
+                      backgroundColor: theme.accent,
+                      color: theme.background
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.opacity = '0.8';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.opacity = '1';
+                    }}
                   >
                     🔄 Try Next AI Model
                   </button>
@@ -1362,7 +1469,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
               {/* Original Sentence */}
               <section>
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-semibold text-gray-700 dark:text-cream-200">📝 Original Sentence</h3>
+                  <h3 className="font-semibold" style={{ color: theme.text }}>📝 Original Sentence</h3>
                   <div className="flex items-center gap-0.5">
                     <PronunciationButton
                       text={normalizeForTTS(selectedWord.sentence)}
@@ -1392,9 +1499,33 @@ const WordPanel: React.FC<WordPanelProps> = ({
                         syllableModeEnabled
                           ? 'bg-green-500 text-white hover:bg-green-600'
                           : syllableModeLoading
-                            ? 'bg-gray-300 dark:bg-gray-600 text-gray-500 cursor-wait'
-                            : 'text-gray-500 dark:text-cream-300 hover:text-gray-700 dark:hover:text-cream-100 hover:bg-gray-100 dark:hover:bg-gray-700'
+                            ? 'cursor-wait'
+                            : ''
                       }`}
+                      style={
+                        syllableModeEnabled
+                          ? undefined
+                          : syllableModeLoading
+                            ? {
+                                backgroundColor: theme.panel,
+                                color: theme.textSecondary
+                              }
+                            : {
+                                color: theme.textSecondary
+                              }
+                      }
+                      onMouseEnter={(e) => {
+                        if (!syllableModeEnabled && !syllableModeLoading) {
+                          e.currentTarget.style.color = theme.text;
+                          e.currentTarget.style.backgroundColor = theme.background;
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!syllableModeEnabled && !syllableModeLoading) {
+                          e.currentTarget.style.color = theme.textSecondary;
+                          e.currentTarget.style.backgroundColor = 'transparent';
+                        }
+                      }}
                       title={syllableModeEnabled ? 'Hide syllables' : 'Show syllables & IPA'}
                     >
                       {syllableModeLoading ? (
@@ -1410,7 +1541,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
                 </div>
                 {/* Sentence display - normal or syllable mode */}
                 {syllableModeEnabled && sentenceWordData.size > 0 ? (
-                  <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
+                  <div className="p-3 rounded-lg" style={{ backgroundColor: theme.panel }}>
                     <div className="flex flex-wrap gap-x-4 gap-y-3 italic">
                       {selectedWord.sentence.split(/(\s+)/).map((token, idx) => {
                         // Check if token is a word (contains letters)
@@ -1429,18 +1560,21 @@ const WordPanel: React.FC<WordPanelProps> = ({
                         return (
                           <div key={idx} className="flex flex-col items-center">
                             {/* IPA above */}
-                            <span className="text-[10px] font-mono text-primary-500 dark:text-primary-400 leading-none">
+                            <span className="text-[10px] font-mono leading-none" style={{ color: theme.textSecondary }}>
                               {data?.ipa ? `/${data.ipa}/` : '\u00A0'}
                             </span>
                             {/* Word */}
-                            <span className={isHighlighted
-                              ? 'text-red-600 dark:text-red-400 font-semibold not-italic'
-                              : 'text-gray-600 dark:text-cream-200'
-                            }>
+                            <span
+                              className={isHighlighted
+                                ? 'text-red-600 dark:text-red-400 font-semibold not-italic'
+                                : ''
+                              }
+                              style={isHighlighted ? undefined : { color: theme.text }}
+                            >
                               {token}
                             </span>
                             {/* Syllables below */}
-                            <span className="text-[10px] text-gray-500 dark:text-cream-300 leading-none">
+                            <span className="text-[10px] leading-none" style={{ color: theme.textSecondary }}>
                               {data?.syllables || '\u00A0'}
                             </span>
                           </div>
@@ -1450,16 +1584,23 @@ const WordPanel: React.FC<WordPanelProps> = ({
                   </div>
                 ) : (
                   <p
-                    className="text-gray-600 dark:text-cream-200 bg-gray-50 dark:bg-gray-700 p-3 rounded-lg italic cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+                    className="p-3 rounded-lg italic cursor-pointer transition-colors"
+                    style={{ backgroundColor: theme.panel, color: theme.text }}
                     onClick={() => playText(normalizeForTTS(selectedWord.sentence), bookLanguage, AudioType.SENTENCE)}
                     title="Click to hear sentence"
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.opacity = '0.8';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.opacity = '1';
+                    }}
                   >
                     "{highlightWord(selectedWord.sentence, selectedWord.word)}"
                   </p>
                 )}
                 {/* English translation of sentence (for non-English books) */}
                 {isNonEnglish && wordData.sentenceTranslation && (
-                  <p className="text-sm text-blue-600 dark:text-blue-400 mt-2 flex items-start gap-1">
+                  <p className="text-sm mt-2 flex items-start gap-1" style={{ color: theme.accent }}>
                     <span>🇬🇧</span>
                     <span>"{wordData.sentenceTranslation}"</span>
                   </p>
@@ -1470,7 +1611,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
               {!selectedWord.isPhrase && wordData.simplifiedSentence && (
                 <section>
                   <div className="flex items-center justify-between mb-2">
-                    <h3 className="font-semibold text-gray-700 dark:text-cream-200">✨ Simplified</h3>
+                    <h3 className="font-semibold" style={{ color: theme.text }}>✨ Simplified</h3>
                     <div className="flex items-center gap-0.5">
                       <PronunciationButton
                         text={wordData.simplifiedSentence}
@@ -1495,9 +1636,16 @@ const WordPanel: React.FC<WordPanelProps> = ({
                     </div>
                   </div>
                   <p
-                    className="text-gray-600 dark:text-cream-200 bg-green-50 dark:bg-green-900/30 p-3 rounded-lg cursor-pointer hover:bg-green-100 dark:hover:bg-green-900/50 transition-colors"
+                    className="p-3 rounded-lg cursor-pointer transition-colors"
+                    style={{ backgroundColor: theme.panel, color: theme.text }}
                     onClick={() => playText(wordData.simplifiedSentence!, bookLanguage, AudioType.SIMPLIFIED)}
                     title="Click to hear simplified sentence"
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.opacity = '0.8';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.opacity = '1';
+                    }}
                   >
                     {wordData.wordEquivalent
                       ? highlightWord(wordData.simplifiedSentence, wordData.wordEquivalent)
@@ -1505,7 +1653,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
                   </p>
                   {/* English translation of simplified sentence (for non-English books) */}
                   {isNonEnglish && wordData.simplifiedTranslation && (
-                    <p className="text-sm text-blue-600 dark:text-blue-400 mt-2 flex items-start gap-1">
+                    <p className="text-sm mt-2 flex items-start gap-1" style={{ color: theme.accent }}>
                       <span>🇬🇧</span>
                       <span>"{wordData.simplifiedTranslation}"</span>
                     </p>
@@ -1516,7 +1664,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
               {/* Other Occurrences - only for single words */}
               {!selectedWord.isPhrase && wordData.occurrences && wordData.occurrences.length > 1 && (
                 <section>
-                  <h3 className="font-semibold text-gray-700 dark:text-cream-200 mb-2">
+                  <h3 className="font-semibold mb-2" style={{ color: theme.text }}>
                     📍 Other Occurrences ({wordData.occurrences.length})
                   </h3>
                   <div className="space-y-2 max-h-48 overflow-auto custom-scrollbar">
@@ -1529,9 +1677,16 @@ const WordPanel: React.FC<WordPanelProps> = ({
                             onClose();
                           }
                         }}
-                        className="w-full text-left text-sm text-gray-600 dark:text-cream-200 bg-gray-50 dark:bg-gray-700 p-2 rounded cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors"
+                        className="w-full text-left text-sm p-2 rounded cursor-pointer transition-colors"
+                        style={{ backgroundColor: theme.panel, color: theme.text }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.opacity = '0.8';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.opacity = '1';
+                        }}
                       >
-                        <span className="text-xs text-primary-600 dark:text-primary-400 font-medium">Page {occ.page} →</span>
+                        <span className="text-xs font-medium" style={{ color: theme.accent }}>Page {occ.page} →</span>
                         <p className="line-clamp-2 mt-1">"{occ.sentence}"</p>
                       </button>
                     ))}
@@ -1542,15 +1697,15 @@ const WordPanel: React.FC<WordPanelProps> = ({
               {/* Tatoeba Examples - only for single words */}
               {!selectedWord.isPhrase && settings.tatoeba_enabled && wordData.tatoebaExamples && wordData.tatoebaExamples.length > 0 && (
                 <section>
-                  <h3 className="font-semibold text-gray-700 dark:text-cream-200 mb-2">
+                  <h3 className="font-semibold mb-2" style={{ color: theme.text }}>
                     🌐 Example Sentences (Tatoeba)
                   </h3>
                   <div className="space-y-2 max-h-48 overflow-auto">
                     {wordData.tatoebaExamples.slice(0, 5).map((ex, idx) => (
-                      <div key={idx} className="text-sm bg-blue-50 dark:bg-blue-900/30 p-2 rounded">
-                        <p className="text-gray-700 dark:text-cream-200">{ex.sentence}</p>
+                      <div key={idx} className="text-sm p-2 rounded" style={{ backgroundColor: theme.panel }}>
+                        <p style={{ color: theme.text }}>{ex.sentence}</p>
                         {ex.translation && (
-                          <p className="text-gray-500 dark:text-cream-300 text-xs mt-1">{ex.translation}</p>
+                          <p className="text-xs mt-1" style={{ color: theme.textSecondary }}>{ex.translation}</p>
                         )}
                       </div>
                     ))}
@@ -1562,15 +1717,33 @@ const WordPanel: React.FC<WordPanelProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="border-t border-gray-200 dark:border-gray-700 p-4">
+        <div className="border-t p-3" style={{ borderColor: theme.panelBorder }}>
           <button
             onClick={handleSave}
             disabled={saved || wordData.loading}
             className={`w-full py-2 rounded-lg font-medium transition-colors ${
               saved
                 ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
-                : 'bg-primary-600 text-white hover:bg-primary-700'
+                : ''
             }`}
+            style={
+              saved
+                ? undefined
+                : {
+                    backgroundColor: theme.accent,
+                    color: theme.background
+                  }
+            }
+            onMouseEnter={(e) => {
+              if (!saved && !wordData.loading) {
+                e.currentTarget.style.opacity = '0.85';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!saved && !wordData.loading) {
+                e.currentTarget.style.opacity = '1';
+              }
+            }}
           >
             {saved
               ? '✓ Saved to Vocabulary'

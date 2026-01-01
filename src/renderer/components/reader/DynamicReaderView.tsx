@@ -21,6 +21,7 @@ import { ThemeContextMenu } from './ThemeContextMenu';
 import { ClearSelectionsMenu } from './ClearSelectionsMenu';
 import { RemoveWordMenu } from './RemoveWordMenu';
 import { readerThemes } from '../../config/readerThemes';
+import { useReaderTheme } from '../../hooks/useReaderTheme';
 
 const MAX_PHRASE_WORDS = 10;
 
@@ -56,6 +57,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
   const { queueWord, isWordReady, getWordData, getWordStatus, fetchingCount, pendingCount } = useDeferredWords();
   const { settings, updateSetting } = useSettings();
   const { isFocusMode, setIsFocusMode } = useFocusMode();
+  const theme = useReaderTheme();
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Determine if system is in dark mode
@@ -168,6 +170,29 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
       startPage,
     }));
   }, [bookData.pages]);
+
+  // Set CSS custom properties for theme colors (for use in CSS animations and global styles)
+  useEffect(() => {
+    const root = document.documentElement;
+
+    // Helper function to convert hex to RGB
+    const hexToRgb = (hex: string): string => {
+      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+      if (!result) return '0, 0, 0';
+      return `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}`;
+    };
+
+    // Set CSS variables for current theme
+    root.style.setProperty('--theme-accent', theme.accent);
+    root.style.setProperty('--theme-accent-rgb', hexToRgb(theme.accent));
+    root.style.setProperty('--theme-panel', theme.panel);
+    root.style.setProperty('--theme-panel-rgb', hexToRgb(theme.panel));
+    root.style.setProperty('--theme-text', theme.text);
+    root.style.setProperty('--theme-text-secondary', theme.textSecondary);
+    root.style.setProperty('--theme-background', theme.background);
+    root.style.setProperty('--theme-border', theme.border);
+    root.style.setProperty('--theme-panel-border', theme.panelBorder);
+  }, [theme]);
 
   // Debounced reflow when zoom changes
   useEffect(() => {

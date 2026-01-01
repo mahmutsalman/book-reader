@@ -4,6 +4,7 @@ import { useSessionVocabulary } from '../context/SessionVocabularyContext';
 import VocabularyTabs, { type VocabularyTab } from '../components/vocabulary/VocabularyTabs';
 import BookFilter from '../components/vocabulary/BookFilter';
 import { ExportContextMenu } from '../components/vocabulary/ExportContextMenu';
+import { useReaderTheme } from '../hooks/useReaderTheme';
 
 const VocabularyPage: React.FC = () => {
   const [vocabulary, setVocabulary] = useState<VocabularyEntry[]>([]);
@@ -17,6 +18,7 @@ const VocabularyPage: React.FC = () => {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [exportMenuPosition, setExportMenuPosition] = useState({ x: 0, y: 0 });
   const exportButtonRef = useRef<HTMLButtonElement>(null);
+  const theme = useReaderTheme();
 
   const { getSessionEntries, getSessionCounts, totalSessionCount } = useSessionVocabulary();
 
@@ -252,32 +254,59 @@ const VocabularyPage: React.FC = () => {
           {activeTab === 'session' ? (
             // Session entries (from context)
             sessionEntries.map((entry, index) => (
-              <div key={`session-${index}`} className={`card ${
-                entry.word_type === 'phrasal_verb'
-                  ? 'bg-purple-50 dark:bg-purple-900/20 border-l-4 border-purple-400'
-                  : entry.word_type === 'word_group'
-                  ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-400'
-                  : 'bg-green-50 dark:bg-green-900/20 border-l-4 border-green-400'
-              }`}>
+              <div
+                key={`session-${index}`}
+                className={`card ${
+                  entry.word_type === 'phrasal_verb'
+                    ? 'bg-purple-50 dark:bg-purple-900/20 border-l-4 border-purple-400'
+                    : entry.word_type === 'word_group'
+                    ? 'border-l-4'
+                    : 'bg-green-50 dark:bg-green-900/20 border-l-4 border-green-400'
+                }`}
+                style={
+                  entry.word_type === 'word_group'
+                    ? {
+                        backgroundColor: theme.panel,
+                        borderLeftColor: theme.accent
+                      }
+                    : undefined
+                }
+              >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
                       <h3 className="text-lg font-semibold text-gray-800 dark:text-cream-100">
                         {entry.word}
                       </h3>
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${
-                        entry.word_type === 'phrasal_verb'
-                          ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
-                          : entry.word_type === 'word_group'
-                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
-                          : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
-                      }`}>
+                      <span
+                        className={`text-xs px-2 py-0.5 rounded-full ${
+                          entry.word_type === 'phrasal_verb'
+                            ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
+                            : entry.word_type === 'word_group'
+                            ? 'font-semibold'
+                            : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                        }`}
+                        style={
+                          entry.word_type === 'word_group'
+                            ? {
+                                backgroundColor: theme.panelBorder,
+                                color: theme.accent
+                              }
+                            : undefined
+                        }
+                      >
                         {entry.word_type === 'phrasal_verb' ? 'Phrasal Verb' : entry.word_type === 'word_group' ? 'Word Group' : 'Word'}
                       </span>
                     </div>
                     {entry.short_definition && (
-                      <div className="mb-2 p-2 bg-blue-50 dark:bg-blue-900/30 rounded border-l-2 border-blue-500">
-                        <p className="text-base font-semibold text-blue-900 dark:text-blue-100">
+                      <div
+                        className="mb-2 p-2 rounded border-l-2"
+                        style={{
+                          backgroundColor: theme.panel,
+                          borderLeftColor: theme.accent
+                        }}
+                      >
+                        <p className="text-base font-semibold" style={{ color: theme.accent }}>
                           {entry.short_definition}
                         </p>
                       </div>
@@ -302,13 +331,24 @@ const VocabularyPage: React.FC = () => {
           ) : (
             // Persistent entries (from database)
             vocabulary.map((entry) => (
-              <div key={entry.id} className={`card ${
-                entry.word_type === 'phrasal_verb'
-                  ? 'bg-purple-50 dark:bg-purple-900/20 border-l-4 border-purple-400'
-                  : entry.word_type === 'word_group'
-                  ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-400'
-                  : 'bg-green-50 dark:bg-green-900/20 border-l-4 border-green-400'
-              }`}>
+              <div
+                key={entry.id}
+                className={`card ${
+                  entry.word_type === 'phrasal_verb'
+                    ? 'bg-purple-50 dark:bg-purple-900/20 border-l-4 border-purple-400'
+                    : entry.word_type === 'word_group'
+                    ? 'border-l-4'
+                    : 'bg-green-50 dark:bg-green-900/20 border-l-4 border-green-400'
+                }`}
+                style={
+                  entry.word_type === 'word_group'
+                    ? {
+                        backgroundColor: theme.panel,
+                        borderLeftColor: theme.accent
+                      }
+                    : undefined
+                }
+              >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
@@ -322,8 +362,14 @@ const VocabularyPage: React.FC = () => {
                       )}
                     </div>
                     {entry.short_definition && (
-                      <div className="mb-2 p-2 bg-blue-50 dark:bg-blue-900/30 rounded border-l-2 border-blue-500">
-                        <p className="text-base font-semibold text-blue-900 dark:text-blue-100">
+                      <div
+                        className="mb-2 p-2 rounded border-l-2"
+                        style={{
+                          backgroundColor: theme.panel,
+                          borderLeftColor: theme.accent
+                        }}
+                      >
+                        <p className="text-base font-semibold" style={{ color: theme.accent }}>
                           {entry.short_definition}
                         </p>
                       </div>

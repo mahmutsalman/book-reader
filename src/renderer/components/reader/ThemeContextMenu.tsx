@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { readerThemes, type ReaderTheme } from '../../config/readerThemes';
 import { useSettings } from '../../context/SettingsContext';
+import { useReaderTheme } from '../../hooks/useReaderTheme';
 
 interface ThemeContextMenuProps {
   x: number;
@@ -19,6 +20,7 @@ export const ThemeContextMenu: React.FC<ThemeContextMenuProps> = ({
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
   const { settings } = useSettings();
+  const currentThemeColors = useReaderTheme();
 
   // Determine if system is in dark mode
   const isDarkMode = React.useMemo(() => {
@@ -99,9 +101,10 @@ export const ThemeContextMenu: React.FC<ThemeContextMenuProps> = ({
               </span>
               {currentTheme === theme.id && (
                 <svg
-                  className="w-4 h-4 text-blue-600 dark:text-blue-400"
+                  className="w-4 h-4"
                   fill="currentColor"
                   viewBox="0 0 20 20"
+                  style={{ color: currentThemeColors.accent }}
                 >
                   <path
                     fillRule="evenodd"
