@@ -8,6 +8,7 @@ import { ZOOM_LEVELS, REFLOW_SETTINGS } from '../../../shared/constants';
 import type { Book, BookData, ReadingProgress } from '../../../shared/types';
 import type { CachedWordData } from '../../../shared/types/deferred-word.types';
 import type { PreStudyProgress } from '../../../shared/types/pre-study-notes.types';
+import type { GrammarAnalysis } from '../../../shared/types/grammar.types';
 import { calculateMiddleIndex, isWithinAdjacency } from '../../../shared/types/deferred-word.types';
 import { cleanWord, createWordBoundaryRegex } from '../../../shared/utils/text-utils';
 import WordPanel from '../word-panel/WordPanel';
@@ -79,6 +80,9 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
   const [selectedIndices, setSelectedIndices] = useState<number[]>([]);
   const [isShiftHeld, setIsShiftHeld] = useState(false);
   const [phraseRanges, setPhraseRanges] = useState<Map<string, PhraseRange>>(new Map());
+
+  // Grammar analysis cache - stores background analysis results
+  const [grammarCache, setGrammarCache] = useState<Map<string, GrammarAnalysis>>(new Map());
 
   // Drag selection state
   const [isDragging, setIsDragging] = useState(false);
@@ -313,6 +317,55 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
     return words.filter(Boolean).join(' ');
   }, []);
 
+  // Trigger background grammar analysis (like vocabulary mode)
+  const analyzeGrammarInBackground = useCallback(async (phrase: string, sentence: string) => {
+    console.log('[GRAMMAR DEBUG] Starting background analysis for:', phrase);
+
+    try {
+      // Call AI grammar analysis API
+      const result = await window.electronAPI?.ai.getGrammarAnalysis(
+        phrase,
+        sentence,
+        book.language
+      );
+
+      if (result?.success) {
+        console.log('[GRAMMAR DEBUG] Analysis successful, caching result for:', phrase);
+
+        // Cache the grammar analysis result
+        setGrammarCache(prev => {
+          const newCache = new Map(prev);
+          newCache.set(phrase, {
+            partsOfSpeech: result.partsOfSpeech || [],
+            structure: result.structure || { type: 'Unknown', description: '' },
+            ruleExplanation: result.ruleExplanation || '',
+            contextAnalysis: result.contextAnalysis || '',
+            pattern: result.pattern || '',
+            examples: result.examples || [],
+            commonMistakes: result.commonMistakes || [],
+            practiceTask: result.practiceTask || { instruction: '', template: '' },
+          });
+          return newCache;
+        });
+
+        // Update phrase range status to 'ready' (yellow dot → red dot)
+        setPhraseRanges(prev => {
+          const newMap = new Map(prev);
+          const range = newMap.get(phrase);
+          if (range && range.status === 'loading') {
+            newMap.set(phrase, { ...range, status: 'ready' });
+            console.log('[GRAMMAR DEBUG] Updated phrase status to ready:', phrase);
+          }
+          return newMap;
+        });
+      } else {
+        console.error('[GRAMMAR DEBUG] Analysis failed:', result?.error);
+      }
+    } catch (error) {
+      console.error('[GRAMMAR DEBUG] Error analyzing grammar:', error);
+    }
+  }, [book.language]);
+
   // Finalize phrase selection and trigger AI lookup
   const finalizePhrase = useCallback(() => {
     console.log('[PHRASE DEBUG] finalizePhrase called with selectedIndices:', selectedIndices);
@@ -325,39 +378,37 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
     }
 
     const sortedIndices = [...selectedIndices].sort((a, b) => a - b);
-    const phrase = buildPhraseFromIndices(sortedIndices);
-    const middleIndex = calculateMiddleIndex(sortedIndices);
+    const wordOnlyIndices = sortedIndices.filter(index => {
+      const word = wordIndexMapRef.current.get(index);
+      return word && word.trim().length > 0;
+    });
+
+    if (wordOnlyIndices.length <= 1) {
+      console.log('[PHRASE DEBUG] Word-only selection too short, clearing selection');
+      setSelectedIndices([]);
+      return;
+    }
+
+    const phrase = buildPhraseFromIndices(wordOnlyIndices);
+    const middleIndex = calculateMiddleIndex(wordOnlyIndices);
     const fullSentence = extractSentenceFromCurrentView(phrase);
 
-    console.log('[PHRASE DEBUG] finalizePhrase:', { sortedIndices, phrase, middleIndex, fullSentence });
+    console.log('[PHRASE DEBUG] finalizePhrase:', { sortedIndices, wordOnlyIndices, phrase, middleIndex, fullSentence });
 
-    // Check if phrase is already cached (using sentence for cache key)
-    const isPhraseReady = isWordReady(phrase, fullSentence, book.id);
+    // Grammar mode: create phrase range with loading state, don't open panel yet
+    if (isGrammarMode) {
+      console.log('[PHRASE DEBUG] Grammar mode: creating phrase range with loading status');
 
-    if (isPhraseReady) {
-      // Phrase is ready - open panel with cached data
-      setSelectedWord({
-        word: phrase,
-        sentence: fullSentence,
-        pageNumber: reflowState.originalPage,
-        isPhrase: true,
-        wordIndices: sortedIndices,
-      });
-      setPreloadedData(getWordData(phrase, fullSentence, book.id));
-      setIsPanelOpen(true);
-    } else {
-      // Queue phrase for background fetch
-      queueWord(phrase, fullSentence, book.id, book.language);
-
-      // Add to phrase ranges for dot display
+      // Create phrase range with 'loading' status (yellow dot should appear)
       setPhraseRanges(prev => {
         const newMap = new Map(prev);
         newMap.set(phrase, {
-          indices: sortedIndices,
+          indices: wordOnlyIndices,
           middleIndex,
           phrase,
           status: 'loading',
         });
+        console.log('[PHRASE DEBUG] Created phrase range:', { phrase, middleIndex, status: 'loading', indices: wordOnlyIndices });
         return newMap;
       });
 
@@ -370,11 +421,57 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
           return newSet;
         });
       }, 400);
+
+      // Trigger background grammar analysis (yellow dot → red dot when complete)
+      analyzeGrammarInBackground(phrase, fullSentence);
+
+      // Note: Panel will open when user clicks on any word in the phrase (handled by handleWordClick)
+    } else {
+      // Vocabulary mode: existing background fetch logic
+      const isPhraseReady = isWordReady(phrase, fullSentence, book.id);
+
+      if (isPhraseReady) {
+        // Phrase is ready - open panel with cached data
+        setSelectedWord({
+          word: phrase,
+          sentence: fullSentence,
+          pageNumber: reflowState.originalPage,
+          isPhrase: true,
+          wordIndices: wordOnlyIndices,
+        });
+        setPreloadedData(getWordData(phrase, fullSentence, book.id));
+        setIsPanelOpen(true);
+      } else {
+        // Queue phrase for background fetch
+        queueWord(phrase, fullSentence, book.id, book.language);
+
+        // Add to phrase ranges for dot display
+        setPhraseRanges(prev => {
+          const newMap = new Map(prev);
+        newMap.set(phrase, {
+          indices: wordOnlyIndices,
+          middleIndex,
+          phrase,
+          status: 'loading',
+        });
+          return newMap;
+        });
+
+        // Add pulse animation
+        setPulsingWords(prev => new Set(prev).add(phrase));
+        setTimeout(() => {
+          setPulsingWords(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(phrase);
+            return newSet;
+          });
+        }, 400);
+      }
     }
 
     // Clear selection
     setSelectedIndices([]);
-  }, [selectedIndices, buildPhraseFromIndices, extractSentenceFromCurrentView, reflowState.originalPage, book.id, isWordReady, getWordData, queueWord]);
+  }, [selectedIndices, buildPhraseFromIndices, extractSentenceFromCurrentView, reflowState.originalPage, book.id, isGrammarMode, isWordReady, getWordData, queueWord, analyzeGrammarInBackground]);
 
   // Handle context menu for theme selection
   const handleContextMenu = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
@@ -434,7 +531,16 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
 
     // Check if clicked word is part of a cached phrase (before treating as single word)
     for (const [phrase, range] of phraseRanges) {
-      if (range.indices.includes(wordIndex) && range.status === 'ready') {
+      // Accept phrase if:
+      // - Word is part of the phrase range AND
+      // - Status is 'ready' (vocabulary mode with cached data) OR
+      // - Status is 'loading' AND grammar mode is active (immediate panel opening)
+      const acceptPhrase = range.indices.includes(wordIndex) && (
+        range.status === 'ready' ||
+        (isGrammarMode && range.status === 'loading')
+      );
+
+      if (acceptPhrase) {
         const phraseSentence = extractSentenceFromCurrentView(phrase);
         setSelectedWord({
           word: phrase,
@@ -445,7 +551,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
         });
         setPreloadedData(getWordData(phrase, phraseSentence, book.id));
         setIsPanelOpen(true);
-        console.log('[PHRASE DEBUG] Opened cached phrase panel:', phrase);
+        console.log('[PHRASE DEBUG] Opened phrase panel:', phrase, 'mode:', isGrammarMode ? 'grammar' : 'vocabulary');
         return;
       }
     }
@@ -770,6 +876,27 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
     }
   }, [phraseRanges, isWordReady, book.id, extractSentenceFromCurrentView]);
 
+  // Update phrase status to 'ready' after grammar analysis completes
+  // This makes the yellow dot turn red when the grammar panel closes
+  useEffect(() => {
+    if (!isPanelOpen && selectedWord && isGrammarMode) {
+      setPhraseRanges(prev => {
+        const newMap = new Map(prev);
+        let hasChanges = false;
+
+        for (const [phrase, range] of newMap.entries()) {
+          if (phrase === selectedWord.word && range.status === 'loading') {
+            newMap.set(phrase, { ...range, status: 'ready' });
+            hasChanges = true;
+            console.log('[PHRASE DEBUG] Updated phrase status to ready:', phrase);
+          }
+        }
+
+        return hasChanges ? newMap : prev;
+      });
+    }
+  }, [isPanelOpen, selectedWord, isGrammarMode]);
+
   // Auto-queue known words after 5 seconds on a page
   // This turns gray dots into yellow dots and fetches AI translations for the new context
   // The 5-second delay gives the user time to navigate away before wasting AI calls
@@ -921,11 +1048,13 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
 
   // Helper to check if an index is part of any phrase range
   const getPhraseInfoForIndex = useCallback((index: number): { isInPhrase: boolean; isMiddle: boolean; status: 'loading' | 'ready' | null } => {
-    for (const [, range] of phraseRanges) {
+    for (const [phrase, range] of phraseRanges) {
       if (range.indices.includes(index)) {
+        const isMiddle = index === range.middleIndex;
+        console.log('[DOT DEBUG] getPhraseInfoForIndex match:', { index, phrase, middleIndex: range.middleIndex, isMiddle, status: range.status, allIndices: range.indices });
         return {
           isInPhrase: true,
-          isMiddle: index === range.middleIndex,
+          isMiddle,
           status: range.status,
         };
       }
@@ -936,6 +1065,16 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
   // Render text with clickable words and ready indicators
   const renderText = (text: string) => {
     if (!text) return <span className="text-gray-400 dark:text-cream-400 italic">Empty page</span>;
+
+    // Debug: Log phrase ranges on each render
+    if (phraseRanges.size > 0) {
+      console.log('[DOT DEBUG] renderText - phraseRanges:', Array.from(phraseRanges.entries()).map(([phrase, range]) => ({
+        phrase,
+        middleIndex: range.middleIndex,
+        status: range.status,
+        indices: range.indices
+      })));
+    }
 
     // Split by words while preserving whitespace and newlines
     const parts = text.split(/(\s+)/);
@@ -990,6 +1129,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
         if (phraseInfo.isMiddle) {
           showRedDot = phraseInfo.status === 'ready';
           showYellowDot = phraseInfo.status === 'loading';
+          console.log('[DOT DEBUG] Phrase middle word - dot decision:', { index, showRedDot, showYellowDot, status: phraseInfo.status });
         }
       } else {
         // Single word behavior - three-dot system
@@ -1327,6 +1467,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
         bookLanguage={book.language}
         onNavigateToPage={goToOriginalPage}
         preloadedData={preloadedData}
+        preloadedGrammarData={selectedWord ? grammarCache.get(selectedWord.word) : undefined}
         isGrammarMode={isGrammarMode}
         isMeaningMode={isMeaningMode}
         pageContent={reflowState.currentText}

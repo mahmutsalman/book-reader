@@ -29,6 +29,7 @@ interface WordPanelProps {
   bookLanguage?: BookLanguage;
   onNavigateToPage?: (page: number) => void;
   preloadedData?: CachedWordData | null;
+  preloadedGrammarData?: GrammarAnalysis;
   isGrammarMode?: boolean;
   isMeaningMode?: boolean;
   pageContent?: string;
@@ -84,6 +85,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
   bookLanguage = 'en',
   onNavigateToPage,
   preloadedData,
+  preloadedGrammarData,
   isGrammarMode = false,
   isMeaningMode = false,
   pageContent,
@@ -289,6 +291,16 @@ const WordPanel: React.FC<WordPanelProps> = ({
     }
 
     const fetchGrammarAnalysis = async () => {
+      // Check if we have preloaded data from background analysis
+      if (preloadedGrammarData) {
+        console.log('[GRAMMAR DEBUG] Using preloaded grammar data from cache');
+        setGrammarData(preloadedGrammarData);
+        setGrammarLoading(false);
+        setGrammarError(null);
+        return;
+      }
+
+      // No preloaded data - fetch from API
       setGrammarLoading(true);
       setGrammarError(null);
 
@@ -321,7 +333,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
     };
 
     fetchGrammarAnalysis();
-  }, [isGrammarMode, selectedWord?.word, selectedWord?.sentence, isOpen, bookLanguage]);
+  }, [isGrammarMode, selectedWord?.word, selectedWord?.sentence, isOpen, bookLanguage, preloadedGrammarData]);
 
   // Auto-select narrative context when meaning mode is activated
   useEffect(() => {
