@@ -46,11 +46,12 @@ export interface PdfStatusResponse {
 }
 
 // Vocabulary export types
-export type VocabularyExportType = 'words-only' | 'words-context';
+export type VocabularyExportType = 'words-only' | 'words-context' | 'short-meaning';
 
 export interface VocabularyExportEntry {
   word: string;
   sentence?: string;
+  shortDefinition?: string;
 }
 
 export interface VocabularyExportResult {

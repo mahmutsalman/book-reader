@@ -1,8 +1,9 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import type { VocabularyEntry, Book, WordType, WordTypeCounts, VocabularyExportType } from '../../shared/types';
 import { useSessionVocabulary } from '../context/SessionVocabularyContext';
 import VocabularyTabs, { type VocabularyTab } from '../components/vocabulary/VocabularyTabs';
 import BookFilter from '../components/vocabulary/BookFilter';
+import { ExportContextMenu } from '../components/vocabulary/ExportContextMenu';
 
 const VocabularyPage: React.FC = () => {
   const [vocabulary, setVocabulary] = useState<VocabularyEntry[]>([]);
@@ -13,6 +14,9 @@ const VocabularyPage: React.FC = () => {
   const [selectedBookId, setSelectedBookId] = useState<number | null>(null);
   const [counts, setCounts] = useState<WordTypeCounts>({ word: 0, phrasal_verb: 0, word_group: 0 });
   const [exporting, setExporting] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [exportMenuPosition, setExportMenuPosition] = useState({ x: 0, y: 0 });
+  const exportButtonRef = useRef<HTMLButtonElement>(null);
 
   const { getSessionEntries, getSessionCounts, totalSessionCount } = useSessionVocabulary();
 
@@ -97,14 +101,32 @@ const VocabularyPage: React.FC = () => {
     setSelectedBookId(bookId);
   };
 
+  // Show export menu
+  const handleExportButtonClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    setExportMenuPosition({
+      x: rect.left,
+      y: rect.bottom + 5, // 5px below the button
+    });
+    setShowExportMenu(true);
+  };
+
   // Export vocabulary
   const handleExport = async (exportType: VocabularyExportType) => {
     if (!window.electronAPI || exporting) return;
 
     // Get entries based on current tab
     const entriesToExport = activeTab === 'session'
-      ? sessionEntries.map(e => ({ word: e.word, sentence: e.sentence }))
-      : vocabulary.map(e => ({ word: e.word, sentence: e.original_sentence }));
+      ? sessionEntries.map(e => ({
+          word: e.word,
+          sentence: e.sentence,
+          shortDefinition: e.short_definition
+        }))
+      : vocabulary.map(e => ({
+          word: e.word,
+          sentence: e.original_sentence,
+          shortDefinition: e.short_definition
+        }));
 
     if (entriesToExport.length === 0) {
       alert('No entries to export');
@@ -172,20 +194,20 @@ const VocabularyPage: React.FC = () => {
             onBookChange={handleBookChange}
           />
           <button
-            onClick={() => handleExport('words-only')}
+            ref={exportButtonRef}
+            onClick={handleExportButtonClick}
             disabled={exporting || displayEntries.length === 0}
-            className="px-3 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            title="Export words only (one per line)"
+            className="px-3 py-2 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+            title="Export vocabulary"
           >
-            {exporting ? 'Exporting...' : 'Export Words'}
-          </button>
-          <button
-            onClick={() => handleExport('words-context')}
-            disabled={exporting || displayEntries.length === 0}
-            className="px-3 py-2 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            title="Export words with context sentences (TAB-separated)"
-          >
-            {exporting ? 'Exporting...' : '+ Context'}
+            {exporting ? 'Exporting...' : (
+              <>
+                Export Words
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </>
+            )}
           </button>
         </div>
       </div>
@@ -230,7 +252,13 @@ const VocabularyPage: React.FC = () => {
           {activeTab === 'session' ? (
             // Session entries (from context)
             sessionEntries.map((entry, index) => (
-              <div key={`session-${index}`} className="card">
+              <div key={`session-${index}`} className={`card ${
+                entry.word_type === 'phrasal_verb'
+                  ? 'bg-purple-50 dark:bg-purple-900/20 border-l-4 border-purple-400'
+                  : entry.word_type === 'word_group'
+                  ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-400'
+                  : 'bg-green-50 dark:bg-green-900/20 border-l-4 border-green-400'
+              }`}>
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
@@ -247,6 +275,13 @@ const VocabularyPage: React.FC = () => {
                         {entry.word_type === 'phrasal_verb' ? 'Phrasal Verb' : entry.word_type === 'word_group' ? 'Word Group' : 'Word'}
                       </span>
                     </div>
+                    {entry.short_definition && (
+                      <div className="mb-2 p-2 bg-blue-50 dark:bg-blue-900/30 rounded border-l-2 border-blue-500">
+                        <p className="text-base font-semibold text-blue-900 dark:text-blue-100">
+                          {entry.short_definition}
+                        </p>
+                      </div>
+                    )}
                     {entry.meaning && (
                       <p className="text-gray-600 dark:text-cream-200 mb-2">{entry.meaning}</p>
                     )}
@@ -267,7 +302,13 @@ const VocabularyPage: React.FC = () => {
           ) : (
             // Persistent entries (from database)
             vocabulary.map((entry) => (
-              <div key={entry.id} className="card">
+              <div key={entry.id} className={`card ${
+                entry.word_type === 'phrasal_verb'
+                  ? 'bg-purple-50 dark:bg-purple-900/20 border-l-4 border-purple-400'
+                  : entry.word_type === 'word_group'
+                  ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-400'
+                  : 'bg-green-50 dark:bg-green-900/20 border-l-4 border-green-400'
+              }`}>
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
@@ -280,6 +321,13 @@ const VocabularyPage: React.FC = () => {
                         </span>
                       )}
                     </div>
+                    {entry.short_definition && (
+                      <div className="mb-2 p-2 bg-blue-50 dark:bg-blue-900/30 rounded border-l-2 border-blue-500">
+                        <p className="text-base font-semibold text-blue-900 dark:text-blue-100">
+                          {entry.short_definition}
+                        </p>
+                      </div>
+                    )}
                     {entry.meaning && (
                       <p className="text-gray-600 dark:text-cream-200 mb-2">{entry.meaning}</p>
                     )}
@@ -307,6 +355,17 @@ const VocabularyPage: React.FC = () => {
             ))
           )}
         </div>
+      )}
+
+      {/* Export Context Menu */}
+      {showExportMenu && (
+        <ExportContextMenu
+          x={exportMenuPosition.x}
+          y={exportMenuPosition.y}
+          onExportSelect={handleExport}
+          onClose={() => setShowExportMenu(false)}
+          entriesCount={displayEntries.length}
+        />
       )}
     </div>
   );

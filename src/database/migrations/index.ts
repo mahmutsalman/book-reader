@@ -3,6 +3,7 @@ import { migration001 } from './001_initial_schema';
 import { migration002 } from './002_add_book_language';
 import { migration003 } from './003_add_word_type';
 import { migration004 } from './004_add_progress_percentage';
+import { migration005 } from './005_add_short_definition';
 
 interface Migration {
   version: number;
@@ -15,6 +16,7 @@ const migrations: Migration[] = [
   migration002,
   migration003,
   migration004,
+  migration005,
 ];
 
 export function runMigrations(db: Database.Database): void {

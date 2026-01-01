@@ -5,11 +5,12 @@ import { vocabularyRepository } from '../../database/repositories';
 import type { CreateVocabularyEntry, VocabularyEntry, VocabularyFilters } from '../../shared/types';
 
 // Export types
-type ExportType = 'words-only' | 'words-context';
+type ExportType = 'words-only' | 'words-context' | 'short-meaning';
 
 interface ExportEntry {
   word: string;
   sentence?: string;
+  shortDefinition?: string;
 }
 
 interface ExportRequest {
@@ -21,6 +22,12 @@ interface ExportRequest {
 function formatExport(exportType: ExportType, entries: ExportEntry[]): string {
   if (exportType === 'words-only') {
     return entries.map(e => e.word).join('\n');
+  } else if (exportType === 'short-meaning') {
+    // short-meaning: colon-separated
+    return entries.map(e => {
+      const shortDef = e.shortDefinition || '';
+      return `${e.word}: ${shortDef}`;
+    }).join('\n');
   } else {
     // words-context: TAB-separated, sanitize newlines in sentences
     return entries.map(e => {

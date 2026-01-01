@@ -7,6 +7,7 @@ export interface VocabularyEntry {
   word: string;
   word_type: WordType;
   book_id?: number;
+  short_definition?: string;
   meaning?: string;
   ipa_pronunciation?: string;
   simplified_sentence?: string;
@@ -23,6 +24,7 @@ export interface CreateVocabularyEntry {
   word: string;
   word_type?: WordType;
   book_id?: number;
+  short_definition?: string;
   meaning?: string;
   ipa_pronunciation?: string;
   simplified_sentence?: string;
@@ -46,6 +48,7 @@ export interface SessionVocabularyEntry {
   word_type: WordType;
   book_id: number;
   book_title?: string;
+  short_definition?: string;
   meaning?: string;
   sentence: string;
   timestamp: number;

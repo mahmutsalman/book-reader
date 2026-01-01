@@ -593,7 +593,8 @@ const WordPanel: React.FC<WordPanelProps> = ({
       await window.electronAPI.vocabulary.add({
         word: selectedWord.word,
         book_id: bookId,
-        meaning: wordData.definition,
+        short_definition: wordData.shortDefinition || wordData.shortMeaning,
+        meaning: wordData.definition || wordData.meaning,
         ipa_pronunciation: wordData.ipa,
         simplified_sentence: wordData.simplifiedSentence,
         original_sentence: selectedWord.sentence,
@@ -605,7 +606,8 @@ const WordPanel: React.FC<WordPanelProps> = ({
         word: selectedWord.word,
         word_type: wordType,
         book_id: bookId,
-        meaning: wordData.definition,
+        short_definition: wordData.shortDefinition || wordData.shortMeaning,
+        meaning: wordData.definition || wordData.meaning,
         sentence: selectedWord.sentence,
         timestamp: Date.now(),
       });

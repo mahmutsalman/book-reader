@@ -25,14 +25,15 @@ export class VocabularyRepository {
       return { ...existing, lookup_count: existing.lookup_count + 1 };
     }
 
-    // Insert new entry with word_type
+    // Insert new entry with word_type and short_definition
     const result = this.db.prepare(`
-      INSERT INTO vocabulary_entries (word, word_type, book_id, meaning, ipa_pronunciation, simplified_sentence, original_sentence)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO vocabulary_entries (word, word_type, book_id, short_definition, meaning, ipa_pronunciation, simplified_sentence, original_sentence)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       entry.word.toLowerCase(),
       wordType,
       entry.book_id || null,
+      entry.short_definition || null,
       entry.meaning || null,
       entry.ipa_pronunciation || null,
       entry.simplified_sentence || null,
@@ -99,6 +100,10 @@ export class VocabularyRepository {
     const updates: string[] = [];
     const values: (string | number | null)[] = [];
 
+    if (data.short_definition !== undefined) {
+      updates.push('short_definition = ?');
+      values.push(data.short_definition);
+    }
     if (data.meaning !== undefined) {
       updates.push('meaning = ?');
       values.push(data.meaning);
