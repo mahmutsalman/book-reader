@@ -16,6 +16,7 @@ import PreStudyNotesButton from './PreStudyNotesButton';
 import { FocusModeButton } from './FocusModeButton';
 import { FloatingProgressPanel } from './FloatingProgressPanel';
 import { ThemeContextMenu } from './ThemeContextMenu';
+import { ClearSelectionsMenu } from './ClearSelectionsMenu';
 import { readerThemes } from '../../config/readerThemes';
 
 const MAX_PHRASE_WORDS = 10;
@@ -104,6 +105,10 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
   // Theme context menu state
   const [showThemeMenu, setShowThemeMenu] = useState(false);
   const [themeMenuPosition, setThemeMenuPosition] = useState({ x: 0, y: 0 });
+
+  // Clear selections context menu state
+  const [showClearMenu, setShowClearMenu] = useState(false);
+  const [clearMenuPosition, setClearMenuPosition] = useState({ x: 0, y: 0 });
 
   // Focus Mode state
   const [isFocusMode, setIsFocusMode] = useState(false);
@@ -475,15 +480,33 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
 
   // Handle context menu for theme selection
   const handleContextMenu = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
-    // Only show theme menu if right-click is on the left 40% of the container
     const rect = event.currentTarget.getBoundingClientRect();
     const clickX = event.clientX - rect.left;
     const containerWidth = rect.width;
 
-    if (clickX <= containerWidth * 0.4) {
+    // Detect word clicks - suppress browser menu, don't show custom menu
+    const target = event.target as HTMLElement;
+    const isWordElement = target.classList.contains('word-clickable') ||
+                          target.closest('.word-clickable') !== null;
+
+    if (isWordElement) {
       event.preventDefault();
+      return;
+    }
+
+    // Empty space clicked - show appropriate menu
+    event.preventDefault();
+
+    if (clickX <= containerWidth * 0.4) {
+      // LEFT 40% - Theme menu
       setThemeMenuPosition({ x: event.clientX, y: event.clientY });
       setShowThemeMenu(true);
+      setShowClearMenu(false);
+    } else {
+      // RIGHT 60% - Clear selections menu
+      setClearMenuPosition({ x: event.clientX, y: event.clientY });
+      setShowClearMenu(true);
+      setShowThemeMenu(false);
     }
   }, []);
 
@@ -495,6 +518,49 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
       console.error('Failed to update reader theme:', error);
     }
   }, [updateSetting]);
+
+  // Handle clearing all selections for current page
+  const handleClearSelections = useCallback(() => {
+    console.log('[CLEAR] Clearing all selections for current page');
+
+    // Core selection state
+    setSelectedIndices([]);
+    setPhraseRanges(new Map());
+
+    // Remove from persisted page data
+    const currentPage = reflowState.currentPageIndex;
+    phraseRangesByPageRef.current.delete(currentPage);
+    loadingDataByPageRef.current.delete(currentPage);
+
+    // Loading state
+    setLoadingPositions(new Set());
+    loadingWordsMapRef.current.clear();
+    wordSentenceMapRef.current.clear();
+
+    // Panel state
+    setIsPanelOpen(false);
+    setPreloadedData(null);
+
+    // Drag state cleanup
+    setIsDragging(false);
+    setDragStartIndex(null);
+    if (dragTimeoutRef.current) {
+      clearTimeout(dragTimeoutRef.current);
+      dragTimeoutRef.current = null;
+    }
+
+    // Word mapping cleanup
+    wordIndexMapRef.current.clear();
+
+    console.log('[CLEAR] Selections cleared successfully');
+  }, [reflowState.currentPageIndex]);
+
+  // Check if current page has any selections
+  const hasSelectionsOnPage = useCallback((): boolean => {
+    return selectedIndices.length > 0 ||
+           phraseRanges.size > 0 ||
+           loadingPositions.size > 0;
+  }, [selectedIndices, phraseRanges, loadingPositions]);
 
   // Handle word click with deferred lookup behavior and phrase selection
   const handleWordClick = useCallback((word: string, wordIndex: number, event: React.MouseEvent) => {
@@ -1489,6 +1555,17 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
           currentTheme={settings.reader_theme}
           onThemeSelect={handleThemeSelect}
           onClose={() => setShowThemeMenu(false)}
+        />
+      )}
+
+      {/* Clear Selections Context Menu */}
+      {showClearMenu && (
+        <ClearSelectionsMenu
+          x={clearMenuPosition.x}
+          y={clearMenuPosition.y}
+          onClearSelections={handleClearSelections}
+          onClose={() => setShowClearMenu(false)}
+          hasSelections={hasSelectionsOnPage()}
         />
       )}
     </div>
