@@ -67,7 +67,7 @@ export const readerThemes: Record<string, ReaderTheme> = {
     },
     dark: {
       background: '#1A1A1A',
-      text: '#E8DCC8',
+      text: '#A67C52',  // Rich dark wood - golden with warm brown tones for smooth reading
       textSecondary: '#D5CBBA',
       accent: '#D4AF37',
       border: '#2C2C2C',

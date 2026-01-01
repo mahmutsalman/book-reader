@@ -96,12 +96,12 @@
 }
 
 .word-clickable:hover {
-  @apply underline decoration-yellow-400 text-gray-900;
+  @apply underline decoration-yellow-400;
 }
 
-/* Dark mode word clickable - warm cream text for comfortable reading */
+/* Dark mode word clickable - text color inherits from theme */
 :is(html.dark .word-clickable) {
-  @apply hover:bg-primary-700/50 text-cream-100;
+  @apply hover:bg-primary-700/50;
 }
 
 :is(html.dark .word-clickable:hover) {
