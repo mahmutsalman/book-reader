@@ -17,6 +17,7 @@ import { FocusModeButton } from './FocusModeButton';
 import { FloatingProgressPanel } from './FloatingProgressPanel';
 import { ThemeContextMenu } from './ThemeContextMenu';
 import { ClearSelectionsMenu } from './ClearSelectionsMenu';
+import { RemoveWordMenu } from './RemoveWordMenu';
 import { readerThemes } from '../../config/readerThemes';
 
 const MAX_PHRASE_WORDS = 10;
@@ -109,6 +110,11 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
   // Clear selections context menu state
   const [showClearMenu, setShowClearMenu] = useState(false);
   const [clearMenuPosition, setClearMenuPosition] = useState({ x: 0, y: 0 });
+
+  // Individual word/phrase removal menu state
+  const [showRemoveWordMenu, setShowRemoveWordMenu] = useState(false);
+  const [removeWordMenuPosition, setRemoveWordMenuPosition] = useState({ x: 0, y: 0 });
+  const [selectedWordIndex, setSelectedWordIndex] = useState<number | null>(null);
 
   // Focus Mode state
   const [isFocusMode, setIsFocusMode] = useState(false);
@@ -322,6 +328,16 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
     return words.filter(Boolean).join(' ');
   }, []);
 
+  // Find which phrase (if any) contains the given word index
+  const findPhraseByWordIndex = useCallback((wordIndex: number): string | null => {
+    for (const [phraseString, range] of phraseRanges) {
+      if (range.indices.includes(wordIndex)) {
+        return phraseString;
+      }
+    }
+    return null;
+  }, [phraseRanges]);
+
   // Trigger background grammar analysis (like vocabulary mode)
   const analyzeGrammarInBackground = useCallback(async (phrase: string, sentence: string) => {
     console.log('[GRAMMAR DEBUG] Starting background analysis for:', phrase);
@@ -484,13 +500,38 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
     const clickX = event.clientX - rect.left;
     const containerWidth = rect.width;
 
-    // Detect word clicks - suppress browser menu, don't show custom menu
+    // Detect word clicks
     const target = event.target as HTMLElement;
     const isWordElement = target.classList.contains('word-clickable') ||
                           target.closest('.word-clickable') !== null;
 
     if (isWordElement) {
       event.preventDefault();
+
+      // Get the clicked word element
+      const wordElement = target.classList.contains('word-clickable')
+        ? target
+        : target.closest('.word-clickable');
+
+      if (wordElement) {
+        const wordIndexStr = wordElement.getAttribute('data-word-index');
+        const wordIndex = wordIndexStr ? parseInt(wordIndexStr, 10) : -1;
+
+        if (wordIndex >= 0) {
+          // Check if this word has a selection (is in a phrase or loading)
+          const phraseString = findPhraseByWordIndex(wordIndex);
+          const isLoading = loadingPositions.has(wordIndex);
+
+          if (phraseString || isLoading) {
+            // Show remove menu for this word
+            setSelectedWordIndex(wordIndex);
+            setRemoveWordMenuPosition({ x: event.clientX, y: event.clientY });
+            setShowRemoveWordMenu(true);
+            setShowThemeMenu(false);
+            setShowClearMenu(false);
+          }
+        }
+      }
       return;
     }
 
@@ -502,13 +543,15 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
       setThemeMenuPosition({ x: event.clientX, y: event.clientY });
       setShowThemeMenu(true);
       setShowClearMenu(false);
+      setShowRemoveWordMenu(false);
     } else {
       // RIGHT 60% - Clear selections menu
       setClearMenuPosition({ x: event.clientX, y: event.clientY });
       setShowClearMenu(true);
       setShowThemeMenu(false);
+      setShowRemoveWordMenu(false);
     }
-  }, []);
+  }, [findPhraseByWordIndex, loadingPositions]);
 
   // Handle theme selection
   const handleThemeSelect = useCallback(async (themeId: string) => {
@@ -554,6 +597,73 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
 
     console.log('[CLEAR] Selections cleared successfully');
   }, [reflowState.currentPageIndex]);
+
+  // Remove a specific word/phrase selection
+  const handleRemoveWordSelection = useCallback((wordIndex: number) => {
+    console.log('[REMOVE WORD] Removing selection for word index:', wordIndex);
+
+    // Check if this word is part of a phrase
+    const phraseString = findPhraseByWordIndex(wordIndex);
+
+    if (phraseString) {
+      // Remove phrase from phraseRanges
+      setPhraseRanges(prev => {
+        const newMap = new Map(prev);
+        const phraseRange = newMap.get(phraseString);
+
+        // Also clear loading positions for this phrase's indices
+        if (phraseRange) {
+          setLoadingPositions(prevLoading => {
+            const newSet = new Set(prevLoading);
+            phraseRange.indices.forEach(idx => newSet.delete(idx));
+            return newSet;
+          });
+
+          // Clear from loading maps
+          phraseRange.indices.forEach(idx => {
+            loadingWordsMapRef.current.delete(idx);
+            wordSentenceMapRef.current.delete(idx);
+          });
+        }
+
+        newMap.delete(phraseString);
+        return newMap;
+      });
+
+      // Update persisted page data
+      const currentPage = reflowState.currentPageIndex;
+      const persistedRanges = phraseRangesByPageRef.current.get(currentPage);
+      if (persistedRanges) {
+        persistedRanges.delete(phraseString);
+        if (persistedRanges.size === 0) {
+          phraseRangesByPageRef.current.delete(currentPage);
+        }
+      }
+
+      console.log('[REMOVE WORD] Removed phrase:', phraseString);
+    } else {
+      // Remove single word from loading positions
+      setLoadingPositions(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(wordIndex);
+        return newSet;
+      });
+
+      loadingWordsMapRef.current.delete(wordIndex);
+      wordSentenceMapRef.current.delete(wordIndex);
+
+      console.log('[REMOVE WORD] Removed single word at index:', wordIndex);
+    }
+
+    // Close panel if it's showing this word/phrase
+    if (isPanelOpen) {
+      const word = wordIndexMapRef.current.get(wordIndex);
+      if (word && selectedWord?.word === word) {
+        setIsPanelOpen(false);
+        setPreloadedData(null);
+      }
+    }
+  }, [findPhraseByWordIndex, reflowState.currentPageIndex, isPanelOpen, selectedWord]);
 
   // Check if current page has any selections
   const hasSelectionsOnPage = useCallback((): boolean => {
@@ -1212,6 +1322,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
       return (
         <span
           key={index}
+          data-word-index={index}
           onClick={(e) => handleWordClick(part, index, e)}
           onMouseDown={(e) => handleWordMouseDown(index, e)}
           onMouseEnter={(e) => handleWordMouseEnter(index, e)}
@@ -1566,6 +1677,23 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
           onClearSelections={handleClearSelections}
           onClose={() => setShowClearMenu(false)}
           hasSelections={hasSelectionsOnPage()}
+        />
+      )}
+
+      {/* Remove Individual Word/Phrase Menu */}
+      {showRemoveWordMenu && selectedWordIndex !== null && (
+        <RemoveWordMenu
+          x={removeWordMenuPosition.x}
+          y={removeWordMenuPosition.y}
+          onRemove={() => {
+            handleRemoveWordSelection(selectedWordIndex);
+            setShowRemoveWordMenu(false);
+            setSelectedWordIndex(null);
+          }}
+          onClose={() => {
+            setShowRemoveWordMenu(false);
+            setSelectedWordIndex(null);
+          }}
         />
       )}
     </div>
