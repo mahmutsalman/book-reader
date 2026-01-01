@@ -1,0 +1,45 @@
+/* Focus Mode Button Styles */
+.focus-mode-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(102, 126, 234, 0.2);
+}
+
+.focus-mode-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+}
+
+.focus-mode-button:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(102, 126, 234, 0.2);
+}
+
+.focus-mode-button.active {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  box-shadow: 0 2px 4px rgba(245, 87, 108, 0.2);
+}
+
+.focus-mode-button.active:hover {
+  box-shadow: 0 4px 8px rgba(245, 87, 108, 0.3);
+}
+
+.focus-mode-button .button-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.focus-mode-button .button-text {
+  white-space: nowrap;
+}

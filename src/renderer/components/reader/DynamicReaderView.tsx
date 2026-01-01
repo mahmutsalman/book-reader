@@ -12,6 +12,7 @@ import { calculateMiddleIndex, isWithinAdjacency } from '../../../shared/types/d
 import { cleanWord, createWordBoundaryRegex } from '../../../shared/utils/text-utils';
 import WordPanel from '../word-panel/WordPanel';
 import PreStudyNotesButton from './PreStudyNotesButton';
+import { FocusModeButton } from './FocusModeButton';
 import { FloatingProgressPanel } from './FloatingProgressPanel';
 import { ThemeContextMenu } from './ThemeContextMenu';
 import { readerThemes } from '../../config/readerThemes';
@@ -98,6 +99,10 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
   // Theme context menu state
   const [showThemeMenu, setShowThemeMenu] = useState(false);
   const [themeMenuPosition, setThemeMenuPosition] = useState({ x: 0, y: 0 });
+
+  // Focus Mode state
+  const [isFocusMode, setIsFocusMode] = useState(false);
+  const [showFocusNavigation, setShowFocusNavigation] = useState(false);
 
   // Map word indices to their actual words for phrase construction
   const wordIndexMapRef = useRef<Map<number, string>>(new Map());
@@ -571,7 +576,12 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
         e.preventDefault();
         goToPrevPage();
       } else if (e.key === 'Escape') {
-        setIsPanelOpen(false);
+        // Priority: Close panel first, then exit focus mode
+        if (isPanelOpen) {
+          setIsPanelOpen(false);
+        } else if (isFocusMode) {
+          setIsFocusMode(false);
+        }
         setSelectedIndices([]);
         setIsShiftHeld(false);
         setIsGrammarMode(false); // Also exit grammar mode on Escape
@@ -620,13 +630,18 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [goToNextPage, goToPrevPage, selectedIndices, finalizePhrase, extractSentenceFromCurrentView, reflowState.originalPage, book.id, isWordReady, getWordData, getWordStatus, queueWord]);
+  }, [goToNextPage, goToPrevPage, selectedIndices, finalizePhrase, extractSentenceFromCurrentView, reflowState.originalPage, book.id, isWordReady, getWordData, getWordStatus, queueWord, isPanelOpen, isFocusMode]);
 
   // Global mouseup listener for drag selection cleanup
   useEffect(() => {
     const handleGlobalMouseUp = () => {
       if (isDragging) {
-        handleWordMouseUp({ preventDefault: () => {} } as React.MouseEvent);
+        const mockEvent = {
+          preventDefault: () => {
+            // Mock preventDefault for cleanup
+          }
+        } as React.MouseEvent;
+        handleWordMouseUp(mockEvent);
       }
     };
 
@@ -1001,14 +1016,36 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
     });
   };
 
-  const fontSize = REFLOW_SETTINGS.BASE_FONT_SIZE * zoom;
+  // Calculate font size - scale up in Focus Mode to fill available space
+  const calculateFocusModeFont = useCallback(() => {
+    if (!isFocusMode || !containerRef.current) {
+      return REFLOW_SETTINGS.BASE_FONT_SIZE * zoom;
+    }
+
+    // In focus mode, scale font size to utilize extra screen space
+    // while maintaining the same word count
+    const baseFontSize = REFLOW_SETTINGS.BASE_FONT_SIZE * zoom;
+
+    // Estimate scale factor based on available vertical space
+    // Normal mode has top bar (~50px) + bottom bar (~80px) = ~130px overhead
+    // Focus mode has minimal padding (~40px total)
+    // This gives us ~90px more vertical space to work with
+
+    // Scale font proportionally (approximately 1.3-1.5x larger)
+    const scaleFactor = 1.35;
+
+    return baseFontSize * scaleFactor;
+  }, [isFocusMode, zoom]);
+
+  const fontSize = calculateFocusModeFont();
   const progressPercent = reflowState.totalPages > 0
     ? ((reflowState.currentPageIndex + 1) / reflowState.totalPages) * 100
     : 0;
 
   return (
     <div className="h-full flex flex-col bg-gray-50 dark:bg-gray-900">
-      {/* Top bar */}
+      {/* Top bar - Hidden in Focus Mode */}
+      {!isFocusMode && (
       <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-2 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <button
@@ -1104,6 +1141,12 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
             disabled={fetchingCount + pendingCount > 0}
           />
 
+          {/* Focus Mode button */}
+          <FocusModeButton
+            onClick={() => setIsFocusMode(!isFocusMode)}
+            isFocusMode={isFocusMode}
+          />
+
           {/* Zoom control */}
           <div className="flex items-center gap-2">
             <span className="text-xs text-gray-500 dark:text-cream-300">Zoom:</span>
@@ -1122,18 +1165,21 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
           </div>
         </div>
       </div>
+      )}
 
       {/* Reading area - horizontal scroll on outer, vertical scroll inside text box */}
-      <div className="flex-1 overflow-x-auto overflow-y-hidden p-8">
+      <div
+        className={`flex-1 overflow-x-auto overflow-y-hidden ${isFocusMode ? 'p-0' : 'p-8'} relative`}
+        onMouseEnter={() => isFocusMode && setShowFocusNavigation(true)}
+        onMouseLeave={() => isFocusMode && setShowFocusNavigation(false)}
+      >
         <div
           ref={containerRef}
-          className="h-full mx-auto rounded-xl shadow-sm p-8 reader-text overflow-y-auto transition-colors duration-300"
+          className={`h-full ${isFocusMode ? 'w-full' : 'mx-auto w-[768px] min-w-[768px]'} ${isFocusMode ? '' : 'rounded-xl shadow-sm'} p-8 reader-text overflow-y-auto transition-all duration-300`}
           onContextMenu={handleContextMenu}
           style={{
             fontSize: `${fontSize}px`,
             lineHeight: REFLOW_SETTINGS.LINE_HEIGHT,
-            width: '768px',
-            minWidth: '768px',
             backgroundColor: (isDarkMode
               ? readerThemes[settings.reader_theme]?.dark?.background
               : readerThemes[settings.reader_theme]?.light?.background)
@@ -1142,7 +1188,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
               ? readerThemes[settings.reader_theme]?.dark?.text
               : readerThemes[settings.reader_theme]?.light?.text)
               || readerThemes.darkComfort.dark.text,
-            boxShadow: `0 1px 3px ${(isDarkMode
+            boxShadow: isFocusMode ? 'none' : `0 1px 3px ${(isDarkMode
               ? readerThemes[settings.reader_theme]?.dark?.shadow
               : readerThemes[settings.reader_theme]?.light?.shadow)
               || readerThemes.darkComfort.dark.shadow}`,
@@ -1150,9 +1196,51 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
         >
           {renderText(reflowState.currentText)}
         </div>
+
+        {/* Focus Mode Navigation Arrows - Shown on hover */}
+        {isFocusMode && showFocusNavigation && (
+          <>
+            <button
+              onClick={goToPrevPage}
+              disabled={reflowState.currentPageIndex <= 0}
+              className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-black/20 hover:bg-black/40 text-white flex items-center justify-center transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed backdrop-blur-sm"
+              aria-label="Previous page"
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="15 18 9 12 15 6"></polyline>
+              </svg>
+            </button>
+            <button
+              onClick={goToNextPage}
+              disabled={reflowState.currentPageIndex >= reflowState.totalPages - 1}
+              className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-black/20 hover:bg-black/40 text-white flex items-center justify-center transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed backdrop-blur-sm"
+              aria-label="Next page"
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="9 18 15 12 9 6"></polyline>
+              </svg>
+            </button>
+          </>
+        )}
+
+        {/* Focus Mode Exit Button - Top-right corner */}
+        {isFocusMode && (
+          <button
+            onClick={() => setIsFocusMode(false)}
+            className="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/20 hover:bg-black/40 text-white flex items-center justify-center transition-all duration-200 backdrop-blur-sm group"
+            aria-label="Exit Focus Mode (ESC)"
+            title="Exit Focus Mode (ESC)"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        )}
       </div>
 
-      {/* Bottom navigation */}
+      {/* Bottom navigation - Hidden in Focus Mode */}
+      {!isFocusMode && (
       <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 px-4 py-3">
         {/* Progress bar */}
         <div className="max-w-3xl mx-auto mb-3">
@@ -1192,6 +1280,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
           </button>
         </div>
       </div>
+      )}
 
       {/* Word Panel */}
       <WordPanel
