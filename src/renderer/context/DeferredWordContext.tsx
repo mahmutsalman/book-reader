@@ -29,6 +29,8 @@ interface DeferredWordContextType {
   getWordData: (word: string, sentence: string, bookId: number) => CachedWordData | null;
   // Clear all words for a specific book
   clearBookWords: (bookId: number) => void;
+  // Remove a specific word or phrase from cache
+  removeWord: (word: string, sentence: string, bookId: number) => void;
   // Get count of words currently being fetched
   fetchingCount: number;
   // Get count of words pending in queue (waiting to be fetched)
@@ -433,6 +435,25 @@ export const DeferredWordProvider: React.FC<DeferredWordProviderProps> = ({ chil
     });
   }, []);
 
+  // Remove a specific word or phrase from cache
+  const removeWord = useCallback((word: string, sentence: string, bookId: number) => {
+    const cleanText = isPhrase(word)
+      ? word.toLowerCase().trim()
+      : cleanWord(word);
+    const key = isPhrase(word)
+      ? generatePhraseKey(bookId, cleanText, sentence)
+      : generateWordKey(bookId, cleanText, sentence);
+
+    setQueuedWords(prev => {
+      if (!prev.has(key)) {
+        return prev;
+      }
+      const newMap = new Map(prev);
+      newMap.delete(key);
+      return newMap;
+    });
+  }, []);
+
   // Count pending words in the queue
   const pendingCount = useMemo(() => {
     let count = 0;
@@ -452,6 +473,7 @@ export const DeferredWordProvider: React.FC<DeferredWordProviderProps> = ({ chil
         getWordStatus,
         getWordData,
         clearBookWords,
+        removeWord,
         fetchingCount,
         pendingCount,
       }}

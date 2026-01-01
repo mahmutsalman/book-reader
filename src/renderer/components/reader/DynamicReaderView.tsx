@@ -55,7 +55,7 @@ interface Chapter {
 const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, initialProgress }) => {
   const navigate = useNavigate();
   const { updateProgress } = useBooks();
-  const { queueWord, isWordReady, getWordData, getWordStatus, fetchingCount, pendingCount } = useDeferredWords();
+  const { queueWord, isWordReady, getWordData, getWordStatus, fetchingCount, pendingCount, removeWord } = useDeferredWords();
   const { settings, updateSetting } = useSettings();
   const { isFocusMode, setIsFocusMode } = useFocusMode();
   const theme = useReaderTheme();
@@ -548,11 +548,16 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
         const wordIndex = wordIndexStr ? parseInt(wordIndexStr, 10) : -1;
 
         if (wordIndex >= 0) {
-          // Check if this word has a selection (is in a phrase or loading)
+          // Check if this word has a selection (phrase, loading, or ready)
           const phraseString = findPhraseByWordIndex(wordIndex);
           const isLoading = loadingPositions.has(wordIndex);
+          const word = wordIndexMapRef.current.get(wordIndex);
+          const sentence = wordSentences.get(wordIndex)
+            || wordSentenceMapRef.current.get(wordIndex)
+            || (word ? extractSentenceFromCurrentView(word) : '');
+          const isReady = word && sentence ? isWordReady(word, sentence, book.id) : false;
 
-          if (phraseString || isLoading) {
+          if (phraseString || isLoading || isReady) {
             // Show remove menu for this word
             setSelectedWordIndex(wordIndex);
             setRemoveWordMenuPosition({ x: event.clientX, y: event.clientY });
@@ -581,7 +586,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
       setShowThemeMenu(false);
       setShowRemoveWordMenu(false);
     }
-  }, [findPhraseByWordIndex, loadingPositions]);
+  }, [findPhraseByWordIndex, loadingPositions, wordSentences, extractSentenceFromCurrentView, isWordReady, book.id]);
 
   // Handle theme selection
   const handleThemeSelect = useCallback(async (themeId: string) => {
@@ -634,8 +639,15 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
 
     // Check if this word is part of a phrase
     const phraseString = findPhraseByWordIndex(wordIndex);
+    const sentenceForIndex = wordSentences.get(wordIndex) || wordSentenceMapRef.current.get(wordIndex);
+    const phraseRange = phraseString ? phraseRangesRef.current.get(phraseString) : null;
 
     if (phraseString) {
+      const phraseSentence = sentenceForIndex || extractSentenceFromCurrentView(phraseString);
+      if (phraseSentence) {
+        removeWord(phraseString, phraseSentence, book.id);
+      }
+
       // Remove phrase from phraseRanges
       setPhraseRanges(prev => {
         const newMap = new Map(prev);
@@ -671,7 +683,26 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
       }
 
       console.log('[REMOVE WORD] Removed phrase:', phraseString);
+      if (phraseRange) {
+        setKnownWords(prev => {
+          let hasChanges = false;
+          const newSet = new Set(prev);
+          phraseRange.indices.forEach(idx => {
+            const phraseWord = wordIndexMapRef.current.get(idx);
+            if (phraseWord && newSet.delete(phraseWord)) {
+              hasChanges = true;
+            }
+          });
+          return hasChanges ? newSet : prev;
+        });
+      }
     } else {
+      const word = wordIndexMapRef.current.get(wordIndex);
+      const sentence = sentenceForIndex || (word ? extractSentenceFromCurrentView(word) : '');
+      if (word && sentence) {
+        removeWord(word, sentence, book.id);
+      }
+
       // Remove single word from loading positions
       setLoadingPositions(prev => {
         const newSet = new Set(prev);
@@ -683,6 +714,16 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
       wordSentenceMapRef.current.delete(wordIndex);
 
       console.log('[REMOVE WORD] Removed single word at index:', wordIndex);
+      if (word) {
+        setKnownWords(prev => {
+          if (!prev.has(word)) {
+            return prev;
+          }
+          const newSet = new Set(prev);
+          newSet.delete(word);
+          return newSet;
+        });
+      }
     }
 
     // Close panel if it's showing this word/phrase
@@ -693,7 +734,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
         setPreloadedData(null);
       }
     }
-  }, [findPhraseByWordIndex, reflowState.currentPageIndex, isPanelOpen, selectedWord]);
+  }, [findPhraseByWordIndex, wordSentences, extractSentenceFromCurrentView, removeWord, book.id, reflowState.currentPageIndex, isPanelOpen, selectedWord]);
 
   // Check if current page has any selections
   const hasSelectionsOnPage = useCallback((): boolean => {
