@@ -93,7 +93,9 @@ export interface ElectronAPI {
     getContextualMeaning: (
       pageContent: string,
       analysisType: MeaningAnalysisType,
-      language?: string
+      language?: string,
+      focusWord?: string,
+      focusSentence?: string
     ) => Promise<MeaningAnalysisResponse>;
     testConnection: () => Promise<LMStudioConnectionResult>;
     testGroqConnection: () => Promise<GroqConnectionResult>;

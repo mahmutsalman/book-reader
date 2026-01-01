@@ -18,7 +18,9 @@ export interface UseMeaningAnalysisResult {
     analysisType: MeaningAnalysisType,
     bookId: number,
     pageIndex: number,
-    language?: string
+    language?: string,
+    focusWord?: string,
+    focusSentence?: string
   ) => Promise<void>;
   clearCache: (bookId: number, pageIndex?: number) => void;
 }
@@ -33,14 +35,30 @@ export function useMeaningAnalysis(): UseMeaningAnalysisResult {
     analysisType: MeaningAnalysisType,
     bookId: number,
     pageIndex: number,
-    language = 'en'
+    language = 'en',
+    focusWord?: string,
+    focusSentence?: string
   ) => {
-    // Check cache first
-    const cached = meaningCache.get(bookId, pageIndex, analysisType);
-    if (cached) {
-      setAnalysis(cached);
-      setError(null);
-      return;
+    console.log('[useMeaningAnalysis] fetchAnalysis called:', {
+      analysisType,
+      bookId,
+      pageIndex,
+      focusWord,
+      hasFocusSentence: !!focusSentence,
+      pageContentLength: pageContent?.length
+    });
+
+    // Check cache first (but skip cache when focusWord is provided - always fetch fresh word-specific analysis)
+    if (!focusWord) {
+      const cached = meaningCache.get(bookId, pageIndex, analysisType);
+      if (cached) {
+        console.log('[useMeaningAnalysis] Using cached result (page-level)');
+        setAnalysis(cached);
+        setError(null);
+        return;
+      }
+    } else {
+      console.log('[useMeaningAnalysis] Skipping cache - fetching word-specific analysis for:', focusWord);
     }
 
     // Fetch from AI
@@ -48,11 +66,19 @@ export function useMeaningAnalysis(): UseMeaningAnalysisResult {
     setError(null);
 
     try {
+      console.log('[useMeaningAnalysis] Calling AI service...');
       const result = await window.electronAPI.ai.getContextualMeaning(
         pageContent,
         analysisType,
-        language
+        language,
+        focusWord,
+        focusSentence
       );
+      console.log('[useMeaningAnalysis] AI response received:', {
+        success: result.success,
+        hasNarrative: !!result.narrative,
+        hasWordSpecific: !!(result.narrative as any)?.wordSpecific
+      });
 
       if (result.success) {
         // Extract analysis from result
@@ -63,8 +89,11 @@ export function useMeaningAnalysis(): UseMeaningAnalysisResult {
           simplified: result.simplified,
         };
 
-        // Cache successful result
-        meaningCache.set(bookId, pageIndex, analysisType, analysisData);
+        // Cache successful result (but only for page-level analysis, not word-specific)
+        // Word-specific analysis is always fetched fresh to ensure accuracy
+        if (!focusWord) {
+          meaningCache.set(bookId, pageIndex, analysisType, analysisData);
+        }
         setAnalysis(analysisData);
       } else {
         setError(result.error || 'Failed to fetch analysis');

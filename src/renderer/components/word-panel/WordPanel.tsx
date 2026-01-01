@@ -332,10 +332,28 @@ const WordPanel: React.FC<WordPanelProps> = ({
 
   // Fetch meaning analysis when type is selected
   useEffect(() => {
+    console.log('[MEANING DEBUG] useEffect triggered:', {
+      isMeaningMode,
+      selectedMeaningType,
+      hasPageContent: !!pageContent,
+      pageIndex,
+      selectedWord: selectedWord?.word,
+      selectedSentence: selectedWord?.sentence
+    });
+
     if (isMeaningMode && selectedMeaningType && pageContent && pageIndex !== undefined) {
-      fetchAnalysis(pageContent, selectedMeaningType, bookId, pageIndex, bookLanguage);
+      console.log('[MEANING DEBUG] Calling fetchAnalysis with word:', selectedWord?.word);
+      fetchAnalysis(
+        pageContent,
+        selectedMeaningType,
+        bookId,
+        pageIndex,
+        bookLanguage,
+        selectedWord?.word,      // Pass selected word for micro analysis
+        selectedWord?.sentence   // Pass sentence context
+      );
     }
-  }, [isMeaningMode, selectedMeaningType, pageContent, pageIndex, bookId, bookLanguage, fetchAnalysis]);
+  }, [isMeaningMode, selectedMeaningType, pageContent, pageIndex, bookId, bookLanguage, fetchAnalysis, selectedWord]);
 
   // Reset meaning state when meaning mode is disabled
   useEffect(() => {
@@ -809,6 +827,45 @@ const WordPanel: React.FC<WordPanelProps> = ({
                           {meaningAnalysis.narrative.narrativeFunction}
                         </p>
                       </section>
+
+                      {/* Word-Specific Analysis (Micro View) */}
+                      {meaningAnalysis.narrative.wordSpecific && (
+                        <>
+                          <div className="border-t-2 border-blue-200 dark:border-blue-800 my-4" />
+                          <div className="bg-blue-100 dark:bg-blue-900/50 p-2 rounded-lg mb-2">
+                            <h4 className="font-semibold text-blue-900 dark:text-blue-200 text-sm">
+                              🔍 Word-Level Focus: "{selectedWord?.word}"
+                            </h4>
+                          </div>
+
+                          <section>
+                            <h3 className="font-semibold text-blue-700 dark:text-blue-300 mb-2">
+                              🎬 Word's Role in Plot
+                            </h3>
+                            <p className="text-gray-600 dark:text-cream-200 bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg">
+                              {meaningAnalysis.narrative.wordSpecific.wordInPlot}
+                            </p>
+                          </section>
+
+                          <section>
+                            <h3 className="font-semibold text-blue-700 dark:text-blue-300 mb-2">
+                              👤 Character Insight
+                            </h3>
+                            <p className="text-gray-600 dark:text-cream-200 bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg">
+                              {meaningAnalysis.narrative.wordSpecific.characterInsight}
+                            </p>
+                          </section>
+
+                          <section>
+                            <h3 className="font-semibold text-blue-700 dark:text-blue-300 mb-2">
+                              🎭 Thematic Role
+                            </h3>
+                            <p className="text-gray-600 dark:text-cream-200 bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg">
+                              {meaningAnalysis.narrative.wordSpecific.thematicRole}
+                            </p>
+                          </section>
+                        </>
+                      )}
                     </div>
                   )}
 
@@ -847,6 +904,45 @@ const WordPanel: React.FC<WordPanelProps> = ({
                             ))}
                           </ul>
                         </section>
+                      )}
+
+                      {/* Word-Specific Analysis (Micro View) */}
+                      {meaningAnalysis.literary.wordSpecific && (
+                        <>
+                          <div className="border-t-2 border-green-200 dark:border-green-800 my-4" />
+                          <div className="bg-green-100 dark:bg-green-900/50 p-2 rounded-lg mb-2">
+                            <h4 className="font-semibold text-green-900 dark:text-green-200 text-sm">
+                              🔍 Word-Level Focus: "{selectedWord?.word}"
+                            </h4>
+                          </div>
+
+                          <section>
+                            <h3 className="font-semibold text-green-700 dark:text-green-300 mb-2">
+                              🎯 Rhetorical Effect
+                            </h3>
+                            <p className="text-gray-600 dark:text-cream-200 bg-green-50 dark:bg-green-900/30 p-3 rounded-lg">
+                              {meaningAnalysis.literary.wordSpecific.rhetoricalEffect}
+                            </p>
+                          </section>
+
+                          <section>
+                            <h3 className="font-semibold text-green-700 dark:text-green-300 mb-2">
+                              💫 Emotional Impact
+                            </h3>
+                            <p className="text-gray-600 dark:text-cream-200 bg-green-50 dark:bg-green-900/30 p-3 rounded-lg">
+                              {meaningAnalysis.literary.wordSpecific.emotionalImpact}
+                            </p>
+                          </section>
+
+                          <section>
+                            <h3 className="font-semibold text-green-700 dark:text-green-300 mb-2">
+                              ✨ Stylistic Purpose
+                            </h3>
+                            <p className="text-gray-600 dark:text-cream-200 bg-green-50 dark:bg-green-900/30 p-3 rounded-lg">
+                              {meaningAnalysis.literary.wordSpecific.stylisticPurpose}
+                            </p>
+                          </section>
+                        </>
                       )}
                     </div>
                   )}
@@ -887,6 +983,45 @@ const WordPanel: React.FC<WordPanelProps> = ({
                           {meaningAnalysis.semantic.culturalContext}
                         </p>
                       </section>
+
+                      {/* Word-Specific Analysis (Micro View) */}
+                      {meaningAnalysis.semantic.wordSpecific && (
+                        <>
+                          <div className="border-t-2 border-amber-200 dark:border-amber-800 my-4" />
+                          <div className="bg-amber-100 dark:bg-amber-900/50 p-2 rounded-lg mb-2">
+                            <h4 className="font-semibold text-amber-900 dark:text-amber-200 text-sm">
+                              🔍 Word-Level Focus: "{selectedWord?.word}"
+                            </h4>
+                          </div>
+
+                          <section>
+                            <h3 className="font-semibold text-amber-700 dark:text-amber-300 mb-2">
+                              📝 Contextual Meaning
+                            </h3>
+                            <p className="text-gray-600 dark:text-cream-200 bg-amber-50 dark:bg-amber-900/30 p-3 rounded-lg">
+                              {meaningAnalysis.semantic.wordSpecific.contextualMeaning}
+                            </p>
+                          </section>
+
+                          <section>
+                            <h3 className="font-semibold text-amber-700 dark:text-amber-300 mb-2">
+                              🔀 Ambiguity Analysis
+                            </h3>
+                            <p className="text-gray-600 dark:text-cream-200 bg-amber-50 dark:bg-amber-900/30 p-3 rounded-lg">
+                              {meaningAnalysis.semantic.wordSpecific.ambiguityAnalysis}
+                            </p>
+                          </section>
+
+                          <section>
+                            <h3 className="font-semibold text-amber-700 dark:text-amber-300 mb-2">
+                              🌏 Cultural Significance
+                            </h3>
+                            <p className="text-gray-600 dark:text-cream-200 bg-amber-50 dark:bg-amber-900/30 p-3 rounded-lg">
+                              {meaningAnalysis.semantic.wordSpecific.culturalSignificance}
+                            </p>
+                          </section>
+                        </>
+                      )}
                     </div>
                   )}
 
@@ -925,6 +1060,45 @@ const WordPanel: React.FC<WordPanelProps> = ({
                             ))}
                           </ul>
                         </section>
+                      )}
+
+                      {/* Word-Specific Analysis (Micro View) */}
+                      {meaningAnalysis.simplified.wordSpecific && (
+                        <>
+                          <div className="border-t-2 border-purple-200 dark:border-purple-800 my-4" />
+                          <div className="bg-purple-100 dark:bg-purple-900/50 p-2 rounded-lg mb-2">
+                            <h4 className="font-semibold text-purple-900 dark:text-purple-200 text-sm">
+                              🔍 Word-Level Focus: "{selectedWord?.word}"
+                            </h4>
+                          </div>
+
+                          <section>
+                            <h3 className="font-semibold text-purple-700 dark:text-purple-300 mb-2">
+                              📖 Simple Definition
+                            </h3>
+                            <p className="text-gray-600 dark:text-cream-200 bg-purple-50 dark:bg-purple-900/30 p-3 rounded-lg">
+                              {meaningAnalysis.simplified.wordSpecific.simpleDefinition}
+                            </p>
+                          </section>
+
+                          <section>
+                            <h3 className="font-semibold text-purple-700 dark:text-purple-300 mb-2">
+                              💬 Usage Example
+                            </h3>
+                            <p className="text-gray-600 dark:text-cream-200 bg-purple-50 dark:bg-purple-900/30 p-3 rounded-lg">
+                              {meaningAnalysis.simplified.wordSpecific.usageExample}
+                            </p>
+                          </section>
+
+                          <section>
+                            <h3 className="font-semibold text-purple-700 dark:text-purple-300 mb-2">
+                              💡 Learner Tip
+                            </h3>
+                            <p className="text-gray-600 dark:text-cream-200 bg-purple-50 dark:bg-purple-900/30 p-3 rounded-lg">
+                              {meaningAnalysis.simplified.wordSpecific.learnerTip}
+                            </p>
+                          </section>
+                        </>
                       )}
                     </div>
                   )}

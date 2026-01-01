@@ -126,11 +126,14 @@ export interface AIServiceInterface {
   /**
    * Get contextual meaning analysis for a page of text
    * Provides literary, semantic, and narrative analysis for language learners
+   * Supports both page-level (macro) and word-level (micro) analysis
    */
   getContextualMeaning(
     pageContent: string,
     analysisType: MeaningAnalysisType,
     language: string,
-    timeout?: number
+    timeout?: number,
+    focusWord?: string,      // Optional: word/phrase for word-level analysis
+    focusSentence?: string   // Optional: sentence containing the focus word
   ): Promise<MeaningAnalysis>;
 }

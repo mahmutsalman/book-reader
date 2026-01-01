@@ -166,14 +166,24 @@ export function registerAIHandlers(): void {
       _,
       pageContent: string,
       analysisType: MeaningAnalysisType,
-      language = 'en'
+      language = 'en',
+      focusWord?: string,
+      focusSentence?: string
     ) => {
       try {
         const service = await getAIService();
-        const result = await service.getContextualMeaning(pageContent, analysisType, language, 15000);
+        const result = await service.getContextualMeaning(
+          pageContent,
+          analysisType,
+          language,
+          15000,
+          focusWord,
+          focusSentence
+        );
         return {
           success: true,
           analysisType,
+          focusWord,
           ...result,
         };
       } catch (error) {

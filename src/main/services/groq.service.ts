@@ -977,7 +977,9 @@ IMPORTANT:
     pageContent: string,
     analysisType: MeaningAnalysisType,
     language = 'en',
-    timeout = 15000 // 15 second timeout
+    timeout = 15000, // 15 second timeout
+    focusWord?: string,      // Optional: The selected word/phrase for micro analysis
+    focusSentence?: string   // Optional: The sentence containing the focus word
   ): Promise<MeaningAnalysis> {
     const languageName = this.getLanguageName(language);
     const isEnglish = language === 'en';
@@ -990,19 +992,29 @@ Analyze this passage for narrative context:
 """
 ${pageContent}
 """
+${focusWord ? `
+SPECIAL FOCUS: Analyze the word/phrase "${focusWord}"
+(Context sentence: "${focusSentence}")
 
+In addition to the page-level analysis, provide word-specific insights.
+` : ''}
 Provide narrative analysis in valid JSON only (no markdown, no extra text).
 
 {
   "plotContext": "What is happening in the story? Summarize events and their significance. 2-3 sentences.",
   "characterDynamics": "What are the character relationships and motivations? What do we learn about them? 2-3 sentences.",
-  "narrativeFunction": "Why does this passage exist? What role does it play in the overall story? 1-2 sentences."
+  "narrativeFunction": "Why does this passage exist? What role does it play in the overall story? 1-2 sentences."${focusWord ? `,
+  "wordSpecific": {
+    "wordInPlot": "How does '${focusWord}' specifically impact the plot? What does it reveal or foreshadow? 2-3 sentences.",
+    "characterInsight": "What does this word tell us about characters? Motivations, traits, relationships? 2-3 sentences.",
+    "thematicRole": "How does '${focusWord}' connect to broader themes or symbols in the narrative? 1-2 sentences."
+  }` : ''}
 }
 
 IMPORTANT:
 - Be specific to this passage, not generic
 - Focus on what a reader needs to understand the story
-- Keep explanations clear and concise`,
+- Keep explanations clear and concise${focusWord ? '\n- For word-specific fields, focus ONLY on the selected word/phrase' : ''}`,
 
       literary: `You are a literary analyst helping a B2-level reader appreciate ${languageName} literature.
 
@@ -1010,7 +1022,12 @@ Analyze this passage for literary techniques:
 """
 ${pageContent}
 """
+${focusWord ? `
+SPECIAL FOCUS: Analyze the word/phrase "${focusWord}"
+(Context sentence: "${focusSentence}")
 
+In addition to the page-level analysis, provide word-specific insights.
+` : ''}
 Provide literary analysis in valid JSON only (no markdown, no extra text).
 
 {
@@ -1020,7 +1037,12 @@ Provide literary analysis in valid JSON only (no markdown, no extra text).
     "Device 1: Brief explanation with example from text",
     "Device 2: Brief explanation with example from text",
     "Device 3: Brief explanation with example from text"
-  ]
+  ]${focusWord ? `,
+  "wordSpecific": {
+    "rhetoricalEffect": "Why was '${focusWord}' chosen instead of alternatives? What rhetorical purpose does it serve? 2-3 sentences.",
+    "emotionalImpact": "What emotional weight or connotations does '${focusWord}' carry in this context? 1-2 sentences.",
+    "stylisticPurpose": "How does '${focusWord}' contribute to the author's unique style or voice? 1-2 sentences."
+  }` : ''}
 }
 
 Literary devices can include: metaphor, simile, personification, imagery, symbolism, alliteration, repetition, irony, foreshadowing, etc.
@@ -1028,7 +1050,7 @@ Literary devices can include: metaphor, simile, personification, imagery, symbol
 IMPORTANT:
 - Only mention devices actually present in THIS passage
 - Include specific examples from the text
-- Explain the effect of each device`,
+- Explain the effect of each device${focusWord ? '\n- For word-specific fields, focus ONLY on the selected word/phrase' : ''}`,
 
       semantic: `You are a language expert helping a B2-level reader understand ${languageName} nuances.
 
@@ -1036,7 +1058,12 @@ Analyze this passage for semantic depth:
 """
 ${pageContent}
 """
+${focusWord ? `
+SPECIAL FOCUS: Analyze the word/phrase "${focusWord}"
+(Context sentence: "${focusSentence}")
 
+In addition to the page-level analysis, provide word-specific insights.
+` : ''}
 Provide semantic analysis in valid JSON only (no markdown, no extra text).
 
 {
@@ -1046,13 +1073,18 @@ Provide semantic analysis in valid JSON only (no markdown, no extra text).
     "Subtle implication: [explain]"
   ],
   "nuances": "What subtle meanings or connotations exist? What might a native speaker notice that a learner might miss? 2-3 sentences.",
-  "culturalContext": "Are there cultural, historical, or idiomatic references? What background knowledge helps understand this passage? 2-3 sentences."
+  "culturalContext": "Are there cultural, historical, or idiomatic references? What background knowledge helps understand this passage? 2-3 sentences."${focusWord ? `,
+  "wordSpecific": {
+    "contextualMeaning": "What does '${focusWord}' specifically mean in THIS context? How does context shape its interpretation? 2-3 sentences.",
+    "ambiguityAnalysis": "Are there multiple possible interpretations of '${focusWord}' here? What nuances or double meanings exist? 2-3 sentences.",
+    "culturalSignificance": "Does '${focusWord}' carry cultural, idiomatic, or symbolic weight in this context? 1-2 sentences."
+  }` : ''}
 }
 
 IMPORTANT:
 - Focus on what's NOT obvious to a language learner
 - Explain idioms, cultural references, and subtle implications
-- If no cultural context is relevant, say so briefly`,
+- If no cultural context is relevant, say so briefly${focusWord ? '\n- For word-specific fields, focus ONLY on the selected word/phrase' : ''}`,
 
       simplified: `You are a language teacher explaining ${languageName} text to a B2-level learner.
 
@@ -1060,7 +1092,12 @@ Break down this passage for a language learner:
 """
 ${pageContent}
 """
+${focusWord ? `
+SPECIAL FOCUS: Analyze the word/phrase "${focusWord}"
+(Context sentence: "${focusSentence}")
 
+In addition to the page-level analysis, provide word-specific insights.
+` : ''}
 Provide simplified explanation in valid JSON only (no markdown, no extra text).
 
 {
@@ -1072,13 +1109,18 @@ Provide simplified explanation in valid JSON only (no markdown, no extra text).
     "word3: definition and usage",
     "word4: definition and usage",
     "word5: definition and usage"
-  ]
+  ]${focusWord ? `,
+  "wordSpecific": {
+    "simpleDefinition": "What does '${focusWord}' mean in simple terms for a B2 learner? 1-2 sentences.",
+    "usageExample": "How is '${focusWord}' used in this specific sentence compared to how it's typically used? 1-2 sentences.",
+    "learnerTip": "What's a helpful tip or memory trick for remembering or using '${focusWord}'? 1 sentence."
+  }` : ''}
 }
 
 IMPORTANT:
 - Choose 3-5 most important words for learners
 - Explain words in context of this passage
-- Make breakdown detailed enough to be useful but not overwhelming`
+- Make breakdown detailed enough to be useful but not overwhelming${focusWord ? '\n- For word-specific fields, focus ONLY on the selected word/phrase' : ''}`
     };
 
     const prompt = prompts[analysisType];
@@ -1096,6 +1138,12 @@ IMPORTANT:
 
       const parsed = JSON.parse(jsonMatch[0]);
 
+      // Debug logging
+      console.log('[Groq] Parsed response for', analysisType, '- has wordSpecific:', !!parsed.wordSpecific);
+      if (parsed.wordSpecific) {
+        console.log('[Groq] wordSpecific keys:', Object.keys(parsed.wordSpecific));
+      }
+
       // Build result based on analysis type
       const result: MeaningAnalysis = {};
 
@@ -1104,6 +1152,14 @@ IMPORTANT:
           plotContext: parsed.plotContext || 'Analysis not available',
           characterDynamics: parsed.characterDynamics || 'Analysis not available',
           narrativeFunction: parsed.narrativeFunction || 'Analysis not available',
+          // Include word-specific analysis if present
+          ...(parsed.wordSpecific && {
+            wordSpecific: {
+              wordInPlot: parsed.wordSpecific.wordInPlot || '',
+              characterInsight: parsed.wordSpecific.characterInsight || '',
+              thematicRole: parsed.wordSpecific.thematicRole || '',
+            }
+          })
         };
       } else if (analysisType === 'literary') {
         result.literary = {
@@ -1112,6 +1168,14 @@ IMPORTANT:
           literaryDevices: Array.isArray(parsed.literaryDevices)
             ? parsed.literaryDevices
             : ['Analysis not available'],
+          // Include word-specific analysis if present
+          ...(parsed.wordSpecific && {
+            wordSpecific: {
+              rhetoricalEffect: parsed.wordSpecific.rhetoricalEffect || '',
+              emotionalImpact: parsed.wordSpecific.emotionalImpact || '',
+              stylisticPurpose: parsed.wordSpecific.stylisticPurpose || '',
+            }
+          })
         };
       } else if (analysisType === 'semantic') {
         result.semantic = {
@@ -1120,6 +1184,14 @@ IMPORTANT:
             : ['Analysis not available'],
           nuances: parsed.nuances || 'Analysis not available',
           culturalContext: parsed.culturalContext || 'No specific cultural context identified',
+          // Include word-specific analysis if present
+          ...(parsed.wordSpecific && {
+            wordSpecific: {
+              contextualMeaning: parsed.wordSpecific.contextualMeaning || '',
+              ambiguityAnalysis: parsed.wordSpecific.ambiguityAnalysis || '',
+              culturalSignificance: parsed.wordSpecific.culturalSignificance || '',
+            }
+          })
         };
       } else if (analysisType === 'simplified') {
         result.simplified = {
@@ -1128,6 +1200,14 @@ IMPORTANT:
           keyVocabulary: Array.isArray(parsed.keyVocabulary)
             ? parsed.keyVocabulary
             : ['Analysis not available'],
+          // Include word-specific analysis if present
+          ...(parsed.wordSpecific && {
+            wordSpecific: {
+              simpleDefinition: parsed.wordSpecific.simpleDefinition || '',
+              usageExample: parsed.wordSpecific.usageExample || '',
+              learnerTip: parsed.wordSpecific.learnerTip || '',
+            }
+          })
         };
       }
 
