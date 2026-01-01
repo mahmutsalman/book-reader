@@ -97,6 +97,11 @@ const WordPanel: React.FC<WordPanelProps> = ({
   const { preloadAudio, getAudio, setAudio } = useAudioCache();
   const { playAudio, stop: stopAudio, isLoading: isLoadingAudio, setIsLoading } = useAudioPlayer();
   const theme = useReaderTheme();
+  const readerScrollbarStyles = {
+    '--reader-scrollbar-track': theme.panel,
+    '--reader-scrollbar-thumb': theme.panelBorder,
+    '--reader-scrollbar-thumb-hover': theme.accent,
+  } as React.CSSProperties;
   const [wordData, setWordData] = useState<WordData>({ loading: false });
   const isNonEnglish = bookLanguage !== 'en';
   const [saved, setSaved] = useState(false);
@@ -645,7 +650,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
       {/* Panel */}
       <div
         className="fixed top-0 right-0 h-full w-96 shadow-2xl z-[10000] overflow-hidden flex flex-col"
-        style={{ backgroundColor: theme.background, color: theme.text }}
+        style={{ backgroundColor: theme.background, color: theme.text, ...readerScrollbarStyles }}
       >
         {/* Header - entire area clickable for word pronunciation */}
         <div
@@ -768,7 +773,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-auto p-3 space-y-3">
+        <div className="flex-1 overflow-auto p-3 space-y-3 reader-scrollbar">
           {/* Meaning Mode Content */}
           {isMeaningMode ? (
             <>
@@ -1667,7 +1672,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
                   <h3 className="font-semibold mb-2" style={{ color: theme.text }}>
                     📍 Other Occurrences ({wordData.occurrences.length})
                   </h3>
-                  <div className="space-y-2 max-h-48 overflow-auto custom-scrollbar">
+                  <div className="space-y-2 max-h-48 overflow-auto reader-scrollbar">
                     {wordData.occurrences.slice(0, 10).map((occ, idx) => (
                       <button
                         key={idx}
@@ -1700,7 +1705,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
                   <h3 className="font-semibold mb-2" style={{ color: theme.text }}>
                     🌐 Example Sentences (Tatoeba)
                   </h3>
-                  <div className="space-y-2 max-h-48 overflow-auto">
+                  <div className="space-y-2 max-h-48 overflow-auto reader-scrollbar">
                     {wordData.tatoebaExamples.slice(0, 5).map((ex, idx) => (
                       <div key={idx} className="text-sm p-2 rounded" style={{ backgroundColor: theme.panel }}>
                         <p style={{ color: theme.text }}>{ex.sentence}</p>
