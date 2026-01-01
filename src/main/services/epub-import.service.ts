@@ -5,7 +5,7 @@
 import fs from 'fs';
 import path from 'path';
 import { app } from 'electron';
-import EPub from 'epub';
+import EPub from 'epub2';
 import { bookRepository } from '../../database/repositories';
 import type { Book, BookData, BookPage, BookLanguage } from '../../shared/types';
 

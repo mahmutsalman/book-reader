@@ -43,7 +43,6 @@
     "@tailwindcss/postcss": "^4.1.17",
     "@types/better-sqlite3": "^7.6.13",
     "@types/electron-squirrel-startup": "^1.0.2",
-    "@types/epub": "^0.0.11",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "@typescript-eslint/eslint-plugin": "^5.62.0",
@@ -61,7 +60,7 @@
   "dependencies": {
     "better-sqlite3": "^12.5.0",
     "electron-squirrel-startup": "^1.0.1",
-    "epub": "^1.3.0",
+    "epub2": "^3.0.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.10.0"
