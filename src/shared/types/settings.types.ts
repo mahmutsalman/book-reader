@@ -29,6 +29,9 @@ export interface AppSettings {
   google_api_key: string;            // Google AI Studio API key
   google_model: string;              // Google model (default: 'gemini-2.0-flash-exp')
   contextualMeaningMaxTokens: number; // Max tokens for contextual meaning analysis (default: 1000)
+  // Reader mode persistence
+  is_grammar_mode: boolean;          // Persist grammar analysis mode toggle
+  is_meaning_mode: boolean;          // Persist meaning analysis mode toggle
 }
 
 // Settings update

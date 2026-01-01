@@ -1,7 +1,9 @@
 import React from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
+import { useFocusMode } from '../../context/FocusModeContext';
 
 const MainLayout: React.FC = () => {
+  const { isFocusMode } = useFocusMode();
   const navLinkClass = ({ isActive }: { isActive: boolean }) =>
     `px-4 py-2 rounded-lg transition-colors no-underline ${
       isActive
@@ -14,10 +16,14 @@ const MainLayout: React.FC = () => {
       {/* Header - pl-20 accounts for macOS traffic light buttons, app-drag enables window dragging */}
       <header className="app-drag bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 pl-20 pr-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-2xl">📚</span>
-          <h1 className="text-xl font-semibold text-gray-800 dark:text-cream-100">
-            Smart Book
-          </h1>
+          {!isFocusMode && (
+            <>
+              <span className="text-2xl">📚</span>
+              <h1 className="text-xl font-semibold text-gray-800 dark:text-cream-100">
+                Smart Book
+              </h1>
+            </>
+          )}
         </div>
 
         <nav className="app-no-drag flex items-center gap-2">

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useBooks } from '../../context/BookContext';
 import { useDeferredWords } from '../../context/DeferredWordContext';
 import { useSettings } from '../../context/SettingsContext';
+import { useFocusMode } from '../../context/FocusModeContext';
 import { useTextReflow } from '../../hooks/useTextReflow';
 import { ZOOM_LEVELS, REFLOW_SETTINGS } from '../../../shared/constants';
 import type { Book, BookData, ReadingProgress } from '../../../shared/types';
@@ -14,6 +15,7 @@ import { cleanWord, createWordBoundaryRegex } from '../../../shared/utils/text-u
 import WordPanel from '../word-panel/WordPanel';
 import PreStudyNotesButton from './PreStudyNotesButton';
 import { FocusModeButton } from './FocusModeButton';
+import FocusModeHeader from './FocusModeHeader';
 import { FloatingProgressPanel } from './FloatingProgressPanel';
 import { ThemeContextMenu } from './ThemeContextMenu';
 import { ClearSelectionsMenu } from './ClearSelectionsMenu';
@@ -53,6 +55,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
   const { updateProgress } = useBooks();
   const { queueWord, isWordReady, getWordData, getWordStatus, fetchingCount, pendingCount } = useDeferredWords();
   const { settings, updateSetting } = useSettings();
+  const { isFocusMode, setIsFocusMode } = useFocusMode();
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Determine if system is in dark mode
@@ -91,9 +94,9 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
   const [dragStartIndex, setDragStartIndex] = useState<number | null>(null);
   const dragTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Grammar perspective mode state
-  const [isGrammarMode, setIsGrammarMode] = useState(false);
-  const [isMeaningMode, setIsMeaningMode] = useState(false);
+  // Grammar perspective mode state - loaded from settings
+  const isGrammarMode = settings.is_grammar_mode;
+  const isMeaningMode = settings.is_meaning_mode;
 
   // Track words that have been looked up before (across all pages in this book)
   // Used to show gray dots for known words that haven't been fetched for current page
@@ -116,8 +119,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
   const [removeWordMenuPosition, setRemoveWordMenuPosition] = useState({ x: 0, y: 0 });
   const [selectedWordIndex, setSelectedWordIndex] = useState<number | null>(null);
 
-  // Focus Mode state
-  const [isFocusMode, setIsFocusMode] = useState(false);
+  // Focus Mode state - isFocusMode now from context
   const [showFocusNavigation, setShowFocusNavigation] = useState(false);
 
   // Map word indices to their actual words for phrase construction
@@ -867,8 +869,8 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
         }
         setSelectedIndices([]);
         setIsShiftHeld(false);
-        setIsGrammarMode(false); // Also exit grammar mode on Escape
-        setIsMeaningMode(false); // Also exit meaning mode on Escape
+        updateSetting('is_grammar_mode', false); // Also exit grammar mode on Escape
+        updateSetting('is_meaning_mode', false); // Also exit meaning mode on Escape
       }
     };
 
@@ -1021,9 +1023,6 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
       clearTimeout(dragTimeoutRef.current);
       dragTimeoutRef.current = null;
     }
-
-    // Reset meaning mode on page change
-    setIsMeaningMode(false);
 
     // Update previous page ref
     prevPageIndexRef.current = currentPageIndex;
@@ -1431,10 +1430,11 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
           {/* Grammar mode toggle button */}
           <button
             onClick={() => {
-              setIsGrammarMode(prev => !prev);
+              const newValue = !isGrammarMode;
+              updateSetting('is_grammar_mode', newValue);
               // Grammar mode is mutually exclusive with meaning mode
-              if (!isGrammarMode) {
-                setIsMeaningMode(false);
+              if (newValue) {
+                updateSetting('is_meaning_mode', false);
               }
             }}
             className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200 ${
@@ -1452,10 +1452,11 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
           {/* Meaning mode toggle button */}
           <button
             onClick={() => {
-              setIsMeaningMode(prev => !prev);
+              const newValue = !isMeaningMode;
+              updateSetting('is_meaning_mode', newValue);
               // Meaning mode is mutually exclusive with grammar mode
-              if (!isMeaningMode) {
-                setIsGrammarMode(false);
+              if (newValue) {
+                updateSetting('is_grammar_mode', false);
               }
             }}
             className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200 ${
@@ -1515,6 +1516,28 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
           </div>
         </div>
       </div>
+      )}
+
+      {/* Focus Mode Header - Simplified toggles */}
+      {isFocusMode && (
+        <FocusModeHeader
+          isGrammarMode={isGrammarMode}
+          isMeaningMode={isMeaningMode}
+          onToggleGrammar={() => {
+            const newValue = !isGrammarMode;
+            updateSetting('is_grammar_mode', newValue);
+            if (newValue) {
+              updateSetting('is_meaning_mode', false);
+            }
+          }}
+          onToggleMeaning={() => {
+            const newValue = !isMeaningMode;
+            updateSetting('is_meaning_mode', newValue);
+            if (newValue) {
+              updateSetting('is_grammar_mode', false);
+            }
+          }}
+        />
       )}
 
       {/* Reading area - horizontal scroll on outer, vertical scroll inside text box */}

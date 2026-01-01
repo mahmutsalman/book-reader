@@ -1,6 +1,7 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { SettingsProvider } from './context/SettingsContext';
+import { FocusModeProvider } from './context/FocusModeContext';
 import { BookProvider } from './context/BookContext';
 import { DeferredWordProvider } from './context/DeferredWordContext';
 import { SessionVocabularyProvider } from './context/SessionVocabularyContext';
@@ -17,21 +18,23 @@ const AppContent: React.FC = () => {
   useTheme();
 
   return (
-    <BookProvider>
-      <DeferredWordProvider>
-        <SessionVocabularyProvider>
-          <Routes>
-            <Route path="/" element={<MainLayout />}>
-              <Route index element={<Navigate to="/library" replace />} />
-              <Route path="library" element={<LibraryPage />} />
-              <Route path="reader/:bookId" element={<ReaderPage />} />
-              <Route path="vocabulary" element={<VocabularyPage />} />
-              <Route path="settings" element={<SettingsPage />} />
-            </Route>
-          </Routes>
-        </SessionVocabularyProvider>
-      </DeferredWordProvider>
-    </BookProvider>
+    <FocusModeProvider>
+      <BookProvider>
+        <DeferredWordProvider>
+          <SessionVocabularyProvider>
+            <Routes>
+              <Route path="/" element={<MainLayout />}>
+                <Route index element={<Navigate to="/library" replace />} />
+                <Route path="library" element={<LibraryPage />} />
+                <Route path="reader/:bookId" element={<ReaderPage />} />
+                <Route path="vocabulary" element={<VocabularyPage />} />
+                <Route path="settings" element={<SettingsPage />} />
+              </Route>
+            </Routes>
+          </SessionVocabularyProvider>
+        </DeferredWordProvider>
+      </BookProvider>
+    </FocusModeProvider>
   );
 };
 
