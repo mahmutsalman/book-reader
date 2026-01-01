@@ -131,6 +131,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
 
   // Focus Mode state - isFocusMode now from context
   const [showFocusNavigation, setShowFocusNavigation] = useState(false);
+  const [showFocusExit, setShowFocusExit] = useState(false);
 
   // Map word indices to their actual words for phrase construction
   const wordIndexMapRef = useRef<Map<number, string>>(new Map());
@@ -1760,8 +1761,17 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
           </>
         )}
 
-        {/* Focus Mode Exit Button - Top-right corner */}
+        {/* Focus Mode - Invisible hover zone for exit button */}
         {isFocusMode && (
+          <div
+            className="absolute top-0 right-0 w-24 h-24 pointer-events-auto"
+            onMouseEnter={() => setShowFocusExit(true)}
+            onMouseLeave={() => setShowFocusExit(false)}
+          />
+        )}
+
+        {/* Focus Mode Exit Button - Top-right corner */}
+        {isFocusMode && showFocusExit && (
           <button
             onClick={() => setIsFocusMode(false)}
             className="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/20 hover:bg-black/40 text-white flex items-center justify-center transition-all duration-200 backdrop-blur-sm group"
