@@ -15,10 +15,10 @@ const SHUTDOWN_TIMEOUT = 5000; // 5 seconds
 class PythonManager {
   private process: ChildProcess | null = null;
   private port: number = DEFAULT_PORT;
-  private isReady: boolean = false;
+  private isReady = false;
   private healthCheckInterval: NodeJS.Timeout | null = null;
   private startupPromise: Promise<void> | null = null;
-  private isRestarting: boolean = false;
+  private isRestarting = false;
 
   /**
    * Get the base URL of the Python server.

@@ -815,7 +815,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
   }, [reflowState.currentText, knownWords, book.id, isWordReady, getWordStatus, queueWord, extractSentenceFromCurrentView]);
 
   // Pre-study notes: Extract text from next N views
-  const extractNextViewsText = useCallback((viewCount: number = 10): string => {
+  const extractNextViewsText = useCallback((viewCount = 10): string => {
     const fullText = bookData.pages.map(p => p.text || '').join('\n\n');
     const currentText = reflowState.currentText?.trim();
 

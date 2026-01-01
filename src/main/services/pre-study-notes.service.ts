@@ -160,7 +160,7 @@ export class PreStudyNotesService {
    * @param text - The text to extract words from
    * @param sentenceLimit - Maximum number of sentences to process (0 = all)
    */
-  private extractWordsAndSentences(text: string, sentenceLimit: number = 0): {
+  private extractWordsAndSentences(text: string, sentenceLimit = 0): {
     uniqueWords: string[];
     wordToSentence: Map<string, string>;
     debugInfo: {

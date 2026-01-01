@@ -39,6 +39,9 @@ export const IPC_CHANNELS = {
   AI_GET_CONTEXTUAL_MEANING: 'ai:get-contextual-meaning',
   AI_TEST_CONNECTION: 'ai:test-connection',
   AI_TEST_GROQ_CONNECTION: 'ai:test-groq-connection',
+  AI_TEST_OPENROUTER_CONNECTION: 'ai:test-openrouter-connection',
+  AI_TEST_MISTRAL_CONNECTION: 'ai:test-mistral-connection',
+  AI_TEST_GOOGLE_CONNECTION: 'ai:test-google-connection',
   AI_GET_NEXT_MODEL: 'ai:get-next-model',
 
   // Tatoeba

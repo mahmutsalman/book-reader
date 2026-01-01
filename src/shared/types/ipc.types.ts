@@ -14,6 +14,13 @@ import type {
   SimplifiedAnalysis
 } from './meaning-analysis.types';
 
+// Generic AI provider connection test result
+export interface ConnectionResult {
+  success: boolean;
+  models?: string[];
+  error?: string;
+}
+
 // Grammar Analysis Result with success/error handling
 export interface GrammarAnalysisResponse extends Partial<GrammarAnalysis> {
   success: boolean;
@@ -99,6 +106,9 @@ export interface ElectronAPI {
     ) => Promise<MeaningAnalysisResponse>;
     testConnection: () => Promise<LMStudioConnectionResult>;
     testGroqConnection: () => Promise<GroqConnectionResult>;
+    testOpenRouterConnection: () => Promise<ConnectionResult>;
+    testMistralConnection: () => Promise<ConnectionResult>;
+    testGoogleConnection: () => Promise<ConnectionResult>;
     getNextModel: () => Promise<string | null>;
   };
   tatoeba: {

@@ -12,6 +12,27 @@ const GROQ_MODELS = [
   { value: 'qwen/qwen3-32b', label: 'Qwen3 32B (Best for Russian)' },
 ];
 
+const OPENROUTER_MODELS = [
+  // ONLY WORKING MODELS - Gemma 3 family (100% CONFIRMED ✓✓✓)
+  { value: 'google/gemma-3-27b-it:free', label: '⚡ Gemma 3 27B (RECOMMENDED - Fast, 140+ languages)' },
+  { value: 'google/gemma-3-12b-it:free', label: '⚡ Gemma 3 12B (Super fast, multimodal)' },
+  { value: 'google/gemma-3-4b-it:free', label: '⚡ Gemma 3 4B (Ultra fast, lightweight)' },
+];
+
+const MISTRAL_MODELS = [
+  { value: 'mistral-small-latest', label: 'Mistral Small (Recommended)' },
+  { value: 'ministral-8b-latest', label: 'Ministral 8B (Faster)' },
+  { value: 'mistral-medium-latest', label: 'Mistral Medium (Complex Explanations)' },
+  { value: 'mistral-large-latest', label: 'Mistral Large (Best Quality)' },
+];
+
+const GOOGLE_MODELS = [
+  { value: 'gemini-2.5-flash-lite', label: 'Gemini 2.5 Flash Lite (Recommended - 15 RPM, 1000/day)' },
+  { value: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (10 RPM, 250/day)' },
+  { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash (Good Balance)' },
+  { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro (Best Quality - 5 RPM, 25/day)' },
+];
+
 const SettingsPage: React.FC = () => {
   const { settings, updateSetting, loading } = useSettings();
   const [testingConnection, setTestingConnection] = useState(false);
@@ -34,6 +55,12 @@ const SettingsPage: React.FC = () => {
   const [groqConnectionResult, setGroqConnectionResult] = useState<{ success: boolean; message: string } | null>(null);
   const [showGroqSetupModal, setShowGroqSetupModal] = useState(false);
   const [groqSetupStep, setGroqSetupStep] = useState(1);
+  const [testingOpenRouterConnection, setTestingOpenRouterConnection] = useState(false);
+  const [openRouterConnectionResult, setOpenRouterConnectionResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [testingMistralConnection, setTestingMistralConnection] = useState(false);
+  const [mistralConnectionResult, setMistralConnectionResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [testingGoogleConnection, setTestingGoogleConnection] = useState(false);
+  const [googleConnectionResult, setGoogleConnectionResult] = useState<{ success: boolean; message: string } | null>(null);
 
   const handleTestConnection = async () => {
     if (!window.electronAPI) return;
@@ -87,6 +114,78 @@ const SettingsPage: React.FC = () => {
       });
     } finally {
       setTestingGroqConnection(false);
+    }
+  };
+
+  const handleTestOpenRouterConnection = async () => {
+    if (!window.electronAPI) return;
+
+    setTestingOpenRouterConnection(true);
+    setOpenRouterConnectionResult(null);
+
+    try {
+      const result = await window.electronAPI.ai.testOpenRouterConnection();
+      setOpenRouterConnectionResult({
+        success: result.success,
+        message: result.success
+          ? `Connected! OpenRouter API is working.`
+          : `Failed: ${result.error || 'Unknown error'}`,
+      });
+    } catch (error) {
+      setOpenRouterConnectionResult({
+        success: false,
+        message: error instanceof Error ? error.message : 'Connection failed',
+      });
+    } finally {
+      setTestingOpenRouterConnection(false);
+    }
+  };
+
+  const handleTestMistralConnection = async () => {
+    if (!window.electronAPI) return;
+
+    setTestingMistralConnection(true);
+    setMistralConnectionResult(null);
+
+    try {
+      const result = await window.electronAPI.ai.testMistralConnection();
+      setMistralConnectionResult({
+        success: result.success,
+        message: result.success
+          ? `Connected! Mistral API is working.`
+          : `Failed: ${result.error || 'Unknown error'}`,
+      });
+    } catch (error) {
+      setMistralConnectionResult({
+        success: false,
+        message: error instanceof Error ? error.message : 'Connection failed',
+      });
+    } finally {
+      setTestingMistralConnection(false);
+    }
+  };
+
+  const handleTestGoogleConnection = async () => {
+    if (!window.electronAPI) return;
+
+    setTestingGoogleConnection(true);
+    setGoogleConnectionResult(null);
+
+    try {
+      const result = await window.electronAPI.ai.testGoogleConnection();
+      setGoogleConnectionResult({
+        success: result.success,
+        message: result.success
+          ? `Connected! Google AI API is working.`
+          : `Failed: ${result.error || 'Unknown error'}`,
+      });
+    } catch (error) {
+      setGoogleConnectionResult({
+        success: false,
+        message: error instanceof Error ? error.message : 'Connection failed',
+      });
+    } finally {
+      setTestingGoogleConnection(false);
     }
   };
 
@@ -320,7 +419,7 @@ const SettingsPage: React.FC = () => {
             <label className="block text-sm font-medium text-gray-700 dark:text-cream-200 mb-2">
               Select AI Provider
             </label>
-            <div className="inline-flex rounded-lg border border-gray-300 dark:border-gray-600 p-1 bg-gray-100 dark:bg-gray-700">
+            <div className="inline-flex rounded-lg border border-gray-300 dark:border-gray-600 p-1 bg-gray-100 dark:bg-gray-700 flex-wrap">
               <button
                 onClick={() => updateSetting('ai_provider', 'local')}
                 className={`px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center gap-2 ${
@@ -341,13 +440,52 @@ const SettingsPage: React.FC = () => {
                 }`}
               >
                 <span>☁️</span>
-                <span>Cloud AI (Groq)</span>
+                <span>Groq</span>
+              </button>
+              <button
+                onClick={() => updateSetting('ai_provider', 'openrouter')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center gap-2 ${
+                  settings.ai_provider === 'openrouter'
+                    ? 'bg-primary-600 text-white shadow-sm'
+                    : 'text-gray-700 dark:text-cream-200 hover:bg-gray-200 dark:hover:bg-gray-600'
+                }`}
+              >
+                <span>🌐</span>
+                <span>OpenRouter</span>
+              </button>
+              <button
+                onClick={() => updateSetting('ai_provider', 'mistral')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center gap-2 ${
+                  settings.ai_provider === 'mistral'
+                    ? 'bg-primary-600 text-white shadow-sm'
+                    : 'text-gray-700 dark:text-cream-200 hover:bg-gray-200 dark:hover:bg-gray-600'
+                }`}
+              >
+                <span>🔮</span>
+                <span>Mistral AI</span>
+              </button>
+              <button
+                onClick={() => updateSetting('ai_provider', 'google-ai')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center gap-2 ${
+                  settings.ai_provider === 'google-ai'
+                    ? 'bg-primary-600 text-white shadow-sm'
+                    : 'text-gray-700 dark:text-cream-200 hover:bg-gray-200 dark:hover:bg-gray-600'
+                }`}
+              >
+                <span>✨</span>
+                <span>Google AI</span>
               </button>
             </div>
             <p className="text-xs text-gray-500 dark:text-cream-300 mt-2">
               {settings.ai_provider === 'local'
                 ? 'Uses LM Studio running locally on your computer'
-                : 'Uses Groq\'s free cloud API for enhanced AI features with example sentences and grammar explanations'}
+                : settings.ai_provider === 'groq'
+                ? 'Uses Groq\'s free cloud API for enhanced AI features'
+                : settings.ai_provider === 'openrouter'
+                ? 'Uses OpenRouter with 30+ free AI models'
+                : settings.ai_provider === 'mistral'
+                ? 'Uses Mistral AI with 1 billion tokens/month free'
+                : 'Uses Google AI Studio with 1M tokens/minute free'}
             </p>
           </div>
 
@@ -468,7 +606,7 @@ const SettingsPage: React.FC = () => {
                     className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-cream-100"
                   />
                   <p className="text-xs text-gray-500 dark:text-cream-300 mt-1">
-                    Your API key is stored locally and never shared
+                    Your API key is stored securely using OS encryption
                   </p>
                 </div>
 
@@ -519,6 +657,298 @@ const SettingsPage: React.FC = () => {
                   <ul className="text-xs text-green-600 dark:text-green-400 list-disc list-inside space-y-1">
                     <li>Example sentences for each word showing different grammar contexts</li>
                     <li>Grammar explanations to help understand sentence structures</li>
+                    <li>Works for all AI features: definitions, IPA, simplification, pre-study notes</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* OpenRouter Settings */}
+          {settings.ai_provider === 'openrouter' && (
+            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
+              <h4 className="text-sm font-medium text-gray-700 dark:text-cream-200 mb-3">
+                OpenRouter Settings
+              </h4>
+
+              <div className="space-y-4">
+                {/* Setup Instructions */}
+                {!settings.openrouter_api_key && (
+                  <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <p className="text-sm text-blue-700 dark:text-blue-300 mb-2">
+                      Get free access to 30+ AI models with OpenRouter:
+                    </p>
+                    <ol className="text-xs text-blue-600 dark:text-blue-400 list-decimal list-inside space-y-1 mb-3">
+                      <li>Visit <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer" className="underline">openrouter.ai/keys</a></li>
+                      <li>Sign up with Google or email (free)</li>
+                      <li>Create a new API key</li>
+                      <li>Paste your API key below</li>
+                    </ol>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-cream-200 mb-1">
+                    API Key
+                  </label>
+                  <input
+                    type="password"
+                    value={settings.openrouter_api_key}
+                    onChange={(e) => updateSetting('openrouter_api_key', e.target.value)}
+                    placeholder="sk-or-..."
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-cream-100"
+                  />
+                  <p className="text-xs text-gray-500 dark:text-cream-300 mt-1">
+                    Your API key is stored securely using OS encryption
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-cream-200 mb-1">
+                    Model
+                  </label>
+                  <select
+                    value={settings.openrouter_model}
+                    onChange={(e) => updateSetting('openrouter_model', e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-cream-100"
+                  >
+                    {OPENROUTER_MODELS.map((model) => (
+                      <option key={model.value} value={model.value}>
+                        {model.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-500 dark:text-cream-300 mt-1">
+                    Gemma 3 27B recommended - fast responses, 140+ languages, automatic fallback
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={handleTestOpenRouterConnection}
+                    disabled={testingOpenRouterConnection || !settings.openrouter_api_key}
+                    className="btn-secondary"
+                  >
+                    {testingOpenRouterConnection ? 'Testing...' : 'Test Connection'}
+                  </button>
+                  {openRouterConnectionResult && (
+                    <span
+                      className={`text-sm ${
+                        openRouterConnectionResult.success ? 'text-green-600' : 'text-red-600'
+                      }`}
+                    >
+                      {openRouterConnectionResult.message}
+                    </span>
+                  )}
+                </div>
+
+                {/* Features Info */}
+                <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                  <p className="text-sm font-medium text-green-700 dark:text-green-300 mb-1">
+                    OpenRouter - ONLY Gemma 3 Models Work
+                  </p>
+                  <ul className="text-xs text-green-600 dark:text-green-400 list-disc list-inside space-y-1">
+                    <li>✓✓✓ Gemma 3 family (27B, 12B, 4B) - 100% verified working</li>
+                    <li>⚡ Ultra-fast responses perfect for language learning</li>
+                    <li>🌍 Supports 140+ languages including Russian, German, Spanish, Arabic</li>
+                    <li>🔄 Automatic fallback between 3 confirmed working models</li>
+                    <li>❌ Other :free models cause 404 errors - DO NOT USE</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Mistral AI Settings */}
+          {settings.ai_provider === 'mistral' && (
+            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
+              <h4 className="text-sm font-medium text-gray-700 dark:text-cream-200 mb-3">
+                Mistral AI Settings
+              </h4>
+
+              <div className="space-y-4">
+                {/* Setup Instructions */}
+                {!settings.mistral_api_key && (
+                  <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <p className="text-sm text-blue-700 dark:text-blue-300 mb-2">
+                      Get 1 billion free tokens per month with Mistral AI:
+                    </p>
+                    <ol className="text-xs text-blue-600 dark:text-blue-400 list-decimal list-inside space-y-1 mb-3">
+                      <li>Visit <a href="https://console.mistral.ai/api-keys/" target="_blank" rel="noopener noreferrer" className="underline">console.mistral.ai</a></li>
+                      <li>Sign up with Google or email (free)</li>
+                      <li>Create a new API key</li>
+                      <li>Paste your API key below</li>
+                    </ol>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-cream-200 mb-1">
+                    API Key
+                  </label>
+                  <input
+                    type="password"
+                    value={settings.mistral_api_key}
+                    onChange={(e) => updateSetting('mistral_api_key', e.target.value)}
+                    placeholder="..."
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-cream-100"
+                  />
+                  <p className="text-xs text-gray-500 dark:text-cream-300 mt-1">
+                    Your API key is stored securely using OS encryption
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-cream-200 mb-1">
+                    Model
+                  </label>
+                  <select
+                    value={settings.mistral_model}
+                    onChange={(e) => updateSetting('mistral_model', e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-cream-100"
+                  >
+                    {MISTRAL_MODELS.map((model) => (
+                      <option key={model.value} value={model.value}>
+                        {model.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-500 dark:text-cream-300 mt-1">
+                    Mistral Small provides the best balance of quality and speed
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={handleTestMistralConnection}
+                    disabled={testingMistralConnection || !settings.mistral_api_key}
+                    className="btn-secondary"
+                  >
+                    {testingMistralConnection ? 'Testing...' : 'Test Connection'}
+                  </button>
+                  {mistralConnectionResult && (
+                    <span
+                      className={`text-sm ${
+                        mistralConnectionResult.success ? 'text-green-600' : 'text-red-600'
+                      }`}
+                    >
+                      {mistralConnectionResult.message}
+                    </span>
+                  )}
+                </div>
+
+                {/* Features Info */}
+                <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                  <p className="text-sm font-medium text-green-700 dark:text-green-300 mb-1">
+                    Mistral AI Features
+                  </p>
+                  <ul className="text-xs text-green-600 dark:text-green-400 list-disc list-inside space-y-1">
+                    <li>1 billion tokens per month free tier (enough for extensive language learning)</li>
+                    <li>High-quality models with automatic fallback</li>
+                    <li>Works for all AI features: definitions, IPA, simplification, pre-study notes</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Google AI Settings */}
+          {settings.ai_provider === 'google-ai' && (
+            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
+              <h4 className="text-sm font-medium text-gray-700 dark:text-cream-200 mb-3">
+                Google AI Settings
+              </h4>
+
+              <div className="space-y-4">
+                {/* Setup Instructions */}
+                {!settings.google_api_key && (
+                  <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <p className="text-sm text-blue-700 dark:text-blue-300 mb-2">
+                      Get 1 million tokens per minute free with Google AI Studio:
+                    </p>
+                    <ol className="text-xs text-blue-600 dark:text-blue-400 list-decimal list-inside space-y-1 mb-3">
+                      <li>
+                        Visit{' '}
+                        <a
+                          href="https://aistudio.google.com/apikey"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="underline hover:text-blue-800 dark:hover:text-blue-200"
+                        >
+                          aistudio.google.com/apikey
+                        </a>
+                      </li>
+                      <li>Sign in with your Google account</li>
+                      <li>Create a new API key</li>
+                      <li>Paste your API key below</li>
+                    </ol>
+                  </div>
+                )}
+
+                {/* API Key Input */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-cream-200 mb-1">
+                    API Key
+                  </label>
+                  <input
+                    type="password"
+                    value={settings.google_api_key || ''}
+                    onChange={(e) => updateSetting('google_api_key', e.target.value)}
+                    placeholder="AIza..."
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-cream-100"
+                  />
+                  <p className="text-xs text-gray-500 dark:text-cream-300 mt-1">
+                    Your API key is stored securely using OS encryption
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-cream-200 mb-1">
+                    Model
+                  </label>
+                  <select
+                    value={settings.google_model}
+                    onChange={(e) => updateSetting('google_model', e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-cream-100"
+                  >
+                    {GOOGLE_MODELS.map((model) => (
+                      <option key={model.value} value={model.value}>
+                        {model.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-500 dark:text-cream-300 mt-1">
+                    Gemini 2.5 Flash Lite has the highest free tier limits (15 RPM, 1000/day)
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <button
+                    onClick={handleTestGoogleConnection}
+                    disabled={testingGoogleConnection || !settings.google_api_key}
+                    className="btn-secondary"
+                  >
+                    {testingGoogleConnection ? 'Testing...' : 'Test Connection'}
+                  </button>
+                  {googleConnectionResult && (
+                    <span
+                      className={`text-sm ${
+                        googleConnectionResult.success ? 'text-green-600' : 'text-red-600'
+                      }`}
+                    >
+                      {googleConnectionResult.message}
+                    </span>
+                  )}
+                </div>
+
+                {/* Features Info */}
+                <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                  <p className="text-sm font-medium text-green-700 dark:text-green-300 mb-1">
+                    Google AI Features
+                  </p>
+                  <ul className="text-xs text-green-600 dark:text-green-400 list-disc list-inside space-y-1">
+                    <li>Gemini 2.5 Flash Lite: 15 RPM, 1000 requests/day (best free tier)</li>
+                    <li>Automatic fallback to other models if rate-limited</li>
                     <li>Works for all AI features: definitions, IPA, simplification, pre-study notes</li>
                   </ul>
                 </div>

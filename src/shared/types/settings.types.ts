@@ -1,5 +1,5 @@
 // AI Provider type
-export type AIProvider = 'local' | 'groq';
+export type AIProvider = 'local' | 'groq' | 'openrouter' | 'mistral' | 'google-ai';
 
 // App settings
 export interface AppSettings {
@@ -19,9 +19,15 @@ export interface AppSettings {
   // Audio settings
   slow_playback_speed: number;       // Slow audio playback speed (0.25 to 2.0, default: 0.6)
   // AI Provider settings
-  ai_provider: AIProvider;           // 'local' (LM Studio) or 'groq' (Cloud AI)
+  ai_provider: AIProvider;           // 'local' (LM Studio), 'groq', 'openrouter', 'mistral', or 'google-ai'
   groq_api_key: string;              // Groq API key
   groq_model: string;                // Groq model (default: 'llama-3.3-70b-versatile')
+  openrouter_api_key: string;        // OpenRouter API key
+  openrouter_model: string;          // OpenRouter model (default: 'meta-llama/llama-3.1-8b-instruct:free')
+  mistral_api_key: string;           // Mistral AI API key
+  mistral_model: string;             // Mistral model (default: 'mistral-small-latest')
+  google_api_key: string;            // Google AI Studio API key
+  google_model: string;              // Google model (default: 'gemini-2.0-flash-exp')
   contextualMeaningMaxTokens: number; // Max tokens for contextual meaning analysis (default: 1000)
 }
 

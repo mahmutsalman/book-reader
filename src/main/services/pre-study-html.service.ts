@@ -10,7 +10,7 @@ export class PreStudyHtmlService {
    * @param slowPlaybackSpeed - Speed for slow audio playback (0.25 to 2.0)
    * @param theme - App theme setting ('light', 'dark', or 'system')
    */
-  generateHtml(result: PreStudyNotesResult, slowPlaybackSpeed: number = 0.6, theme: string = 'light'): string {
+  generateHtml(result: PreStudyNotesResult, slowPlaybackSpeed = 0.6, theme = 'light'): string {
     const languageNames: Record<string, string> = {
       en: 'English',
       de: 'German',

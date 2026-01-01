@@ -96,6 +96,12 @@ const electronAPI: ElectronAPI = {
       ipcRenderer.invoke(IPC_CHANNELS.AI_TEST_CONNECTION),
     testGroqConnection: () =>
       ipcRenderer.invoke(IPC_CHANNELS.AI_TEST_GROQ_CONNECTION),
+    testOpenRouterConnection: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.AI_TEST_OPENROUTER_CONNECTION),
+    testMistralConnection: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.AI_TEST_MISTRAL_CONNECTION),
+    testGoogleConnection: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.AI_TEST_GOOGLE_CONNECTION),
     getNextModel: () =>
       ipcRenderer.invoke(IPC_CHANNELS.AI_GET_NEXT_MODEL),
   },

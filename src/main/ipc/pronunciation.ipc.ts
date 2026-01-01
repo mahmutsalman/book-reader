@@ -10,7 +10,7 @@ export function registerPronunciationHandlers(): void {
   // Get TTS audio
   ipcMain.handle(
     IPC_CHANNELS.PRONUNCIATION_GET_TTS,
-    async (_, text: string, language: string = 'en') => {
+    async (_, text: string, language = 'en') => {
       return pronunciationService.getTTS(text, language);
     }
   );
@@ -18,7 +18,7 @@ export function registerPronunciationHandlers(): void {
   // Get IPA transcription
   ipcMain.handle(
     IPC_CHANNELS.PRONUNCIATION_GET_IPA,
-    async (_, text: string, language: string = 'en') => {
+    async (_, text: string, language = 'en') => {
       return pronunciationService.getIPA(text, language);
     }
   );

@@ -1,6 +1,6 @@
 import { ipcMain } from 'electron';
 import { IPC_CHANNELS } from '../../shared/constants';
-import { getAIService, getLMStudioService, getGroqService } from '../services/ai-provider.factory';
+import { getAIService, getLMStudioService, getGroqService, getOpenRouterService, getMistralService, getGoogleAIService } from '../services/ai-provider.factory';
 import { GroqService } from '../services/groq.service';
 import type { MeaningAnalysisType } from '../../shared/types/meaning-analysis.types';
 
@@ -214,6 +214,45 @@ export function registerAIHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.AI_TEST_GROQ_CONNECTION, async () => {
     try {
       const service = await getGroqService();
+      return service.testConnection();
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Connection failed',
+      };
+    }
+  });
+
+  // Test OpenRouter connection (always tests OpenRouter, regardless of selected provider)
+  ipcMain.handle(IPC_CHANNELS.AI_TEST_OPENROUTER_CONNECTION, async () => {
+    try {
+      const service = await getOpenRouterService();
+      return service.testConnection();
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Connection failed',
+      };
+    }
+  });
+
+  // Test Mistral connection (always tests Mistral, regardless of selected provider)
+  ipcMain.handle(IPC_CHANNELS.AI_TEST_MISTRAL_CONNECTION, async () => {
+    try {
+      const service = await getMistralService();
+      return service.testConnection();
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Connection failed',
+      };
+    }
+  });
+
+  // Test Google AI connection (always tests Google AI, regardless of selected provider)
+  ipcMain.handle(IPC_CHANNELS.AI_TEST_GOOGLE_CONNECTION, async () => {
+    try {
+      const service = await getGoogleAIService();
       return service.testConnection();
     } catch (error) {
       return {

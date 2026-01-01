@@ -21,7 +21,7 @@ class PronunciationService {
   /**
    * Generate audio from text using TTS.
    */
-  async getTTS(text: string, language: string = 'en'): Promise<TTSResponse> {
+  async getTTS(text: string, language = 'en'): Promise<TTSResponse> {
     if (!pythonManager.ready) {
       console.error('[PronunciationService] Server not ready');
       return {
@@ -74,7 +74,7 @@ class PronunciationService {
   /**
    * Generate IPA transcription for text.
    */
-  async getIPA(text: string, language: string = 'en'): Promise<IPAResponse> {
+  async getIPA(text: string, language = 'en'): Promise<IPAResponse> {
     if (!pythonManager.ready) {
       return {
         success: false,

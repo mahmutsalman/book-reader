@@ -4,6 +4,7 @@ import started from 'electron-squirrel-startup';
 import { registerAllIpcHandlers } from './main/ipc';
 import { initializeDatabase } from './database';
 import { pythonManager } from './main/services/python-manager.service';
+import { migrateAPIKeysToSecureStorage } from './database/migrations/001-encrypt-api-keys';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
@@ -76,6 +77,9 @@ app.on('ready', async () => {
     // Initialize database
     await initializeDatabase();
     console.log('Database initialized');
+
+    // Migrate API keys to secure storage
+    await migrateAPIKeysToSecureStorage();
 
     // Start Python pronunciation server
     try {

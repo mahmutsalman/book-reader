@@ -21,6 +21,12 @@ export const DEFAULT_SETTINGS: AppSettings = {
   ai_provider: 'local',          // Default: local LM Studio
   groq_api_key: '',              // Empty by default - user must set up
   groq_model: 'llama-3.1-8b-instant', // Default Groq model (faster, with automatic fallback)
+  openrouter_api_key: '',        // Empty by default - user must set up
+  openrouter_model: 'google/gemma-3-27b-it:free', // Default OpenRouter model (27B, fast, 140+ languages)
+  mistral_api_key: '',           // Empty by default - user must set up
+  mistral_model: 'mistral-small-latest', // Default Mistral model
+  google_api_key: '',            // Empty by default - user must set up
+  google_model: 'gemini-2.5-flash-lite', // Default Google model (best free tier: 15 RPM, 1000/day)
   contextualMeaningMaxTokens: 1000, // Default: 1000 tokens for contextual meaning analysis
 };
 
