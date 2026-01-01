@@ -22,6 +22,7 @@ export interface AppSettings {
   ai_provider: AIProvider;           // 'local' (LM Studio) or 'groq' (Cloud AI)
   groq_api_key: string;              // Groq API key
   groq_model: string;                // Groq model (default: 'llama-3.3-70b-versatile')
+  contextualMeaningMaxTokens: number; // Max tokens for contextual meaning analysis (default: 1000)
 }
 
 // Settings update

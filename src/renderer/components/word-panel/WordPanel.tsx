@@ -5,6 +5,8 @@ import type { CachedWordData } from '../../../shared/types/deferred-word.types';
 import { getWordBoundaryPattern } from '../../../shared/utils/text-utils';
 import type { BookLanguage, WordType } from '../../../shared/types';
 import type { GrammarAnalysis } from '../../../shared/types/grammar.types';
+import type { MeaningAnalysisType } from '../../../shared/types/meaning-analysis.types';
+import { useMeaningAnalysis } from '../../hooks/useMeaningAnalysis';
 import PronunciationButton from './PronunciationButton';
 import LoopPlayButton from './LoopPlayButton';
 import SlowLoopPlayButton from './SlowLoopPlayButton';
@@ -28,6 +30,9 @@ interface WordPanelProps {
   onNavigateToPage?: (page: number) => void;
   preloadedData?: CachedWordData | null;
   isGrammarMode?: boolean;
+  isMeaningMode?: boolean;
+  pageContent?: string;
+  pageIndex?: number;
 }
 
 interface WordData {
@@ -71,7 +76,19 @@ const normalizeForTTS = (text: string): string => {
     .trim();
 };
 
-const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bookId, bookLanguage = 'en', onNavigateToPage, preloadedData, isGrammarMode = false }) => {
+const WordPanel: React.FC<WordPanelProps> = ({
+  isOpen,
+  onClose,
+  selectedWord,
+  bookId,
+  bookLanguage = 'en',
+  onNavigateToPage,
+  preloadedData,
+  isGrammarMode = false,
+  isMeaningMode = false,
+  pageContent,
+  pageIndex,
+}) => {
   const { settings } = useSettings();
   const { addSessionEntry } = useSessionVocabulary();
   const { preloadAudio, getAudio, setAudio } = useAudioCache();
@@ -84,6 +101,10 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
   const [grammarData, setGrammarData] = useState<GrammarAnalysis | null>(null);
   const [grammarLoading, setGrammarLoading] = useState(false);
   const [grammarError, setGrammarError] = useState<string | null>(null);
+
+  // Meaning mode state
+  const [selectedMeaningType, setSelectedMeaningType] = useState<MeaningAnalysisType | null>(null);
+  const { analysis: meaningAnalysis, loading: meaningLoading, error: meaningError, fetchAnalysis } = useMeaningAnalysis();
 
   // Syllable mode state
   const [syllableModeEnabled, setSyllableModeEnabled] = useState(false);
@@ -301,6 +322,27 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
 
     fetchGrammarAnalysis();
   }, [isGrammarMode, selectedWord?.word, selectedWord?.sentence, isOpen, bookLanguage]);
+
+  // Auto-select narrative context when meaning mode is activated
+  useEffect(() => {
+    if (isMeaningMode && !selectedMeaningType) {
+      setSelectedMeaningType('narrative');
+    }
+  }, [isMeaningMode, selectedMeaningType]);
+
+  // Fetch meaning analysis when type is selected
+  useEffect(() => {
+    if (isMeaningMode && selectedMeaningType && pageContent && pageIndex !== undefined) {
+      fetchAnalysis(pageContent, selectedMeaningType, bookId, pageIndex, bookLanguage);
+    }
+  }, [isMeaningMode, selectedMeaningType, pageContent, pageIndex, bookId, bookLanguage, fetchAnalysis]);
+
+  // Reset meaning state when meaning mode is disabled
+  useEffect(() => {
+    if (!isMeaningMode) {
+      setSelectedMeaningType(null);
+    }
+  }, [isMeaningMode]);
 
   // Fetch word data when word changes (or use preloaded data)
   useEffect(() => {
@@ -666,8 +708,234 @@ const WordPanel: React.FC<WordPanelProps> = ({ isOpen, onClose, selectedWord, bo
 
         {/* Content */}
         <div className="flex-1 overflow-auto p-4 space-y-4">
-          {/* Grammar Mode Content */}
-          {isGrammarMode ? (
+          {/* Meaning Mode Content */}
+          {isMeaningMode ? (
+            <>
+              {/* Analysis Type Buttons */}
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                {/* Narrative Analysis Button */}
+                <button
+                  onClick={() => setSelectedMeaningType('narrative')}
+                  className={`p-4 rounded-lg border-2 transition-all ${
+                    selectedMeaningType === 'narrative'
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-lg'
+                      : 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/50'
+                  }`}
+                >
+                  <div className="text-2xl mb-1">📖</div>
+                  <div className="font-semibold text-sm">Narrative Context</div>
+                </button>
+
+                {/* Literary Analysis Button */}
+                <button
+                  onClick={() => setSelectedMeaningType('literary')}
+                  className={`p-4 rounded-lg border-2 transition-all ${
+                    selectedMeaningType === 'literary'
+                      ? 'bg-green-600 text-white border-green-600 shadow-lg'
+                      : 'bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800 hover:bg-green-100 dark:hover:bg-green-900/50'
+                  }`}
+                >
+                  <div className="text-2xl mb-1">✨</div>
+                  <div className="font-semibold text-sm">Literary Analysis</div>
+                </button>
+
+                {/* Semantic Analysis Button */}
+                <button
+                  onClick={() => setSelectedMeaningType('semantic')}
+                  className={`p-4 rounded-lg border-2 transition-all ${
+                    selectedMeaningType === 'semantic'
+                      ? 'bg-amber-600 text-white border-amber-600 shadow-lg'
+                      : 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/50'
+                  }`}
+                >
+                  <div className="text-2xl mb-1">🔍</div>
+                  <div className="font-semibold text-sm">Semantic Analysis</div>
+                </button>
+
+                {/* Simplified Explanation Button */}
+                <button
+                  onClick={() => setSelectedMeaningType('simplified')}
+                  className={`p-4 rounded-lg border-2 transition-all ${
+                    selectedMeaningType === 'simplified'
+                      ? 'bg-purple-600 text-white border-purple-600 shadow-lg'
+                      : 'bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900/50'
+                  }`}
+                >
+                  <div className="text-2xl mb-1">📝</div>
+                  <div className="font-semibold text-sm">Simplified</div>
+                </button>
+              </div>
+
+              {/* Analysis Content */}
+              {meaningLoading ? (
+                <div className="text-center py-8">
+                  <div className="text-4xl animate-pulse mb-2">🔍</div>
+                  <div className="text-gray-500 dark:text-cream-300">
+                    Analyzing context...
+                  </div>
+                </div>
+              ) : meaningError ? (
+                <div className="bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 p-4 rounded-lg">
+                  <p>{meaningError}</p>
+                </div>
+              ) : meaningAnalysis && selectedMeaningType ? (
+                <>
+                  {/* Narrative Analysis Content */}
+                  {selectedMeaningType === 'narrative' && meaningAnalysis.narrative && (
+                    <div className="space-y-4">
+                      <section>
+                        <h3 className="font-semibold text-blue-700 dark:text-blue-300 mb-2">
+                          📖 Plot Context
+                        </h3>
+                        <p className="text-gray-600 dark:text-cream-200 bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg">
+                          {meaningAnalysis.narrative.plotContext}
+                        </p>
+                      </section>
+
+                      <section>
+                        <h3 className="font-semibold text-blue-700 dark:text-blue-300 mb-2">
+                          👥 Character Dynamics
+                        </h3>
+                        <p className="text-gray-600 dark:text-cream-200 bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg">
+                          {meaningAnalysis.narrative.characterDynamics}
+                        </p>
+                      </section>
+
+                      <section>
+                        <h3 className="font-semibold text-blue-700 dark:text-blue-300 mb-2">
+                          🎯 Narrative Function
+                        </h3>
+                        <p className="text-gray-600 dark:text-cream-200 bg-blue-50 dark:bg-blue-900/30 p-3 rounded-lg">
+                          {meaningAnalysis.narrative.narrativeFunction}
+                        </p>
+                      </section>
+                    </div>
+                  )}
+
+                  {/* Literary Analysis Content */}
+                  {selectedMeaningType === 'literary' && meaningAnalysis.literary && (
+                    <div className="space-y-4">
+                      <section>
+                        <h3 className="font-semibold text-green-700 dark:text-green-300 mb-2">
+                          ✍️ Word Choice
+                        </h3>
+                        <p className="text-gray-600 dark:text-cream-200 bg-green-50 dark:bg-green-900/30 p-3 rounded-lg">
+                          {meaningAnalysis.literary.wordChoice}
+                        </p>
+                      </section>
+
+                      <section>
+                        <h3 className="font-semibold text-green-700 dark:text-green-300 mb-2">
+                          🎭 Tone & Atmosphere
+                        </h3>
+                        <p className="text-gray-600 dark:text-cream-200 bg-green-50 dark:bg-green-900/30 p-3 rounded-lg">
+                          {meaningAnalysis.literary.tone}
+                        </p>
+                      </section>
+
+                      {meaningAnalysis.literary.literaryDevices.length > 0 && (
+                        <section>
+                          <h3 className="font-semibold text-green-700 dark:text-green-300 mb-2">
+                            ✨ Literary Devices
+                          </h3>
+                          <ul className="space-y-2 bg-green-50 dark:bg-green-900/30 p-3 rounded-lg">
+                            {meaningAnalysis.literary.literaryDevices.map((device, idx) => (
+                              <li key={idx} className="flex items-start gap-2 text-gray-600 dark:text-cream-200">
+                                <span className="text-green-500">•</span>
+                                <span>{device}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </section>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Semantic Analysis Content */}
+                  {selectedMeaningType === 'semantic' && meaningAnalysis.semantic && (
+                    <div className="space-y-4">
+                      {meaningAnalysis.semantic.multipleMeanings.length > 0 && (
+                        <section>
+                          <h3 className="font-semibold text-amber-700 dark:text-amber-300 mb-2">
+                            🔄 Multiple Interpretations
+                          </h3>
+                          <ul className="space-y-2 bg-amber-50 dark:bg-amber-900/30 p-3 rounded-lg">
+                            {meaningAnalysis.semantic.multipleMeanings.map((meaning, idx) => (
+                              <li key={idx} className="flex items-start gap-2 text-gray-600 dark:text-cream-200">
+                                <span className="text-amber-500">{idx + 1}.</span>
+                                <span>{meaning}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </section>
+                      )}
+
+                      <section>
+                        <h3 className="font-semibold text-amber-700 dark:text-amber-300 mb-2">
+                          💭 Nuances
+                        </h3>
+                        <p className="text-gray-600 dark:text-cream-200 bg-amber-50 dark:bg-amber-900/30 p-3 rounded-lg">
+                          {meaningAnalysis.semantic.nuances}
+                        </p>
+                      </section>
+
+                      <section>
+                        <h3 className="font-semibold text-amber-700 dark:text-amber-300 mb-2">
+                          🌍 Cultural Context
+                        </h3>
+                        <p className="text-gray-600 dark:text-cream-200 bg-amber-50 dark:bg-amber-900/30 p-3 rounded-lg">
+                          {meaningAnalysis.semantic.culturalContext}
+                        </p>
+                      </section>
+                    </div>
+                  )}
+
+                  {/* Simplified Analysis Content */}
+                  {selectedMeaningType === 'simplified' && meaningAnalysis.simplified && (
+                    <div className="space-y-4">
+                      <section>
+                        <h3 className="font-semibold text-purple-700 dark:text-purple-300 mb-2">
+                          💡 Main Idea
+                        </h3>
+                        <p className="text-gray-600 dark:text-cream-200 bg-purple-50 dark:bg-purple-900/30 p-3 rounded-lg">
+                          {meaningAnalysis.simplified.mainIdea}
+                        </p>
+                      </section>
+
+                      <section>
+                        <h3 className="font-semibold text-purple-700 dark:text-purple-300 mb-2">
+                          📝 Breakdown
+                        </h3>
+                        <p className="text-gray-600 dark:text-cream-200 bg-purple-50 dark:bg-purple-900/30 p-3 rounded-lg whitespace-pre-wrap">
+                          {meaningAnalysis.simplified.breakdown}
+                        </p>
+                      </section>
+
+                      {meaningAnalysis.simplified.keyVocabulary.length > 0 && (
+                        <section>
+                          <h3 className="font-semibold text-purple-700 dark:text-purple-300 mb-2">
+                            📚 Key Vocabulary
+                          </h3>
+                          <ul className="space-y-2 bg-purple-50 dark:bg-purple-900/30 p-3 rounded-lg">
+                            {meaningAnalysis.simplified.keyVocabulary.map((vocab, idx) => (
+                              <li key={idx} className="flex items-start gap-2 text-gray-600 dark:text-cream-200">
+                                <span className="text-purple-500">•</span>
+                                <span>{vocab}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </section>
+                      )}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-center py-8 text-gray-500 dark:text-cream-300">
+                  Select an analysis type to explore the context
+                </div>
+              )}
+            </>
+          ) : isGrammarMode ? (
             grammarLoading ? (
               <div className="text-center py-8">
                 <div className="text-4xl animate-pulse mb-2">📚</div>

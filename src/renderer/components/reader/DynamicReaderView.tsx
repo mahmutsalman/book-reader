@@ -87,6 +87,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
 
   // Grammar perspective mode state
   const [isGrammarMode, setIsGrammarMode] = useState(false);
+  const [isMeaningMode, setIsMeaningMode] = useState(false);
 
   // Track words that have been looked up before (across all pages in this book)
   // Used to show gray dots for known words that haven't been fetched for current page
@@ -585,6 +586,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
         setSelectedIndices([]);
         setIsShiftHeld(false);
         setIsGrammarMode(false); // Also exit grammar mode on Escape
+        setIsMeaningMode(false); // Also exit meaning mode on Escape
       }
     };
 
@@ -737,6 +739,9 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
       clearTimeout(dragTimeoutRef.current);
       dragTimeoutRef.current = null;
     }
+
+    // Reset meaning mode on page change
+    setIsMeaningMode(false);
 
     // Update previous page ref
     prevPageIndexRef.current = currentPageIndex;
@@ -1108,7 +1113,13 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
 
           {/* Grammar mode toggle button */}
           <button
-            onClick={() => setIsGrammarMode(prev => !prev)}
+            onClick={() => {
+              setIsGrammarMode(prev => !prev);
+              // Grammar mode is mutually exclusive with meaning mode
+              if (!isGrammarMode) {
+                setIsMeaningMode(false);
+              }
+            }}
             className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200 ${
               isGrammarMode
                 ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30 ring-2 ring-indigo-400'
@@ -1118,6 +1129,28 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
           >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
               <path d="M11.25 4.533A9.707 9.707 0 006 3a9.735 9.735 0 00-3.25.555.75.75 0 00-.5.707v14.25a.75.75 0 001 .707A8.237 8.237 0 016 18.75c1.995 0 3.823.707 5.25 1.886V4.533zM12.75 20.636A8.214 8.214 0 0118 18.75c.966 0 1.89.166 2.75.47a.75.75 0 001-.708V4.262a.75.75 0 00-.5-.707A9.735 9.735 0 0018 3a9.707 9.707 0 00-5.25 1.533v16.103z" />
+            </svg>
+          </button>
+
+          {/* Meaning mode toggle button */}
+          <button
+            onClick={() => {
+              setIsMeaningMode(prev => !prev);
+              // Meaning mode is mutually exclusive with grammar mode
+              if (!isMeaningMode) {
+                setIsGrammarMode(false);
+              }
+            }}
+            className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200 ${
+              isMeaningMode
+                ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/30 ring-2 ring-purple-400'
+                : 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-cream-300 hover:bg-purple-100 dark:hover:bg-purple-900/30'
+            }`}
+            title={isMeaningMode ? 'Meaning Mode ON - Click to disable' : 'Enable Meaning Mode'}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+              <path d="M11.25 4.533A9.707 9.707 0 006 3a9.735 9.735 0 00-3.25.555.75.75 0 00-.5.707v14.25a.75.75 0 001 .707A8.237 8.237 0 016 18.75c1.995 0 3.823.707 5.25 1.886V4.533zM12.75 20.636A8.214 8.214 0 0118 18.75c.966 0 1.89.166 2.75.47a.75.75 0 001-.708V4.262a.75.75 0 00-.5-.707A9.735 9.735 0 0018 3a9.707 9.707 0 00-5.25 1.533v16.103z" />
+              <path d="M12 2.25a.75.75 0 01.75.75v18a.75.75 0 01-1.5 0V3a.75.75 0 01.75-.75z" />
             </svg>
           </button>
 
@@ -1295,6 +1328,9 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
         onNavigateToPage={goToOriginalPage}
         preloadedData={preloadedData}
         isGrammarMode={isGrammarMode}
+        isMeaningMode={isMeaningMode}
+        pageContent={reflowState.currentText}
+        pageIndex={reflowState.currentPageIndex}
       />
 
       {/* Floating Progress Panel for Pre-Study Notes */}

@@ -21,6 +21,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   ai_provider: 'local',          // Default: local LM Studio
   groq_api_key: '',              // Empty by default - user must set up
   groq_model: 'llama-3.1-8b-instant', // Default Groq model (faster, with automatic fallback)
+  contextualMeaningMaxTokens: 1000, // Default: 1000 tokens for contextual meaning analysis
 };
 
 // Zoom level constraints

@@ -7,6 +7,11 @@
 import type { AIServiceInterface } from './ai-service.interface';
 import type { PreStudyWordEntry, ExampleSentence } from '../../shared/types/pre-study-notes.types';
 import type { GrammarAnalysis, PartOfSpeech, WordPOS, GrammarExample } from '../../shared/types/grammar.types';
+import type {
+  MeaningAnalysis,
+  MeaningAnalysisType
+} from '../../shared/types/meaning-analysis.types';
+import { settingsRepository } from '../../database/repositories';
 
 /**
  * Fallback model chain ordered by priority.
@@ -458,9 +463,9 @@ SIMPLIFIED_ENGLISH: [English translation of simplified]`;
     let cleaned = simpMatch ? simpMatch[1].trim() : response.trim();
 
     cleaned = cleaned
-      .replace(/^(?:the\s+)?simplified\s+(?:answer|version|sentence)\s*(?:would be|is)?[:\-]\s*/i, '')
-      .replace(/^here(?:'s| is)\s+the\s+(?:simplified|rewritten)\s+(?:version|sentence)[:\-]\s*/i, '')
-      .replace(/^simplified[:\-]\s*/i, '')
+      .replace(/^(?:the\s+)?simplified\s+(?:answer|version|sentence)\s*(?:would be|is)?[:-]\s*/i, '')
+      .replace(/^here(?:'s| is)\s+the\s+(?:simplified|rewritten)\s+(?:version|sentence)[:-]\s*/i, '')
+      .replace(/^simplified[:-]\s*/i, '')
       .trim();
 
     const quotedMatch = cleaned.match(/"([\s\S]+?)"/);
@@ -490,7 +495,7 @@ SIMPLIFIED_ENGLISH: [English translation of simplified]`;
       || /^the sentence structure\b/i.test(line)
       || /^no concepts?\s+or\s+meanings?\b/i.test(line)
       || /^this (?:keeps|retains|preserves|maintains)\b/i.test(line)
-      || /^(?:explanation|note|reason)[:\-]/i.test(line);
+      || /^(?:explanation|note|reason)[:-]/i.test(line);
   }
 
   async getWordEquivalent(
@@ -966,6 +971,209 @@ IMPORTANT:
         template: `Write a sentence using "${text}".`,
       },
     };
+  }
+
+  async getContextualMeaning(
+    pageContent: string,
+    analysisType: MeaningAnalysisType,
+    language = 'en',
+    timeout = 15000 // 15 second timeout
+  ): Promise<MeaningAnalysis> {
+    const languageName = this.getLanguageName(language);
+    const isEnglish = language === 'en';
+
+    // Build prompt based on analysis type
+    const prompts: Record<MeaningAnalysisType, string> = {
+      narrative: `You are analyzing ${languageName} literature for a B2-level reader.
+
+Analyze this passage for narrative context:
+"""
+${pageContent}
+"""
+
+Provide narrative analysis in valid JSON only (no markdown, no extra text).
+
+{
+  "plotContext": "What is happening in the story? Summarize events and their significance. 2-3 sentences.",
+  "characterDynamics": "What are the character relationships and motivations? What do we learn about them? 2-3 sentences.",
+  "narrativeFunction": "Why does this passage exist? What role does it play in the overall story? 1-2 sentences."
+}
+
+IMPORTANT:
+- Be specific to this passage, not generic
+- Focus on what a reader needs to understand the story
+- Keep explanations clear and concise`,
+
+      literary: `You are a literary analyst helping a B2-level reader appreciate ${languageName} literature.
+
+Analyze this passage for literary techniques:
+"""
+${pageContent}
+"""
+
+Provide literary analysis in valid JSON only (no markdown, no extra text).
+
+{
+  "wordChoice": "What specific word choices stand out? How do they create meaning or emotion? 2-3 sentences with examples.",
+  "tone": "What is the emotional tone or atmosphere? How is it created? 1-2 sentences.",
+  "literaryDevices": [
+    "Device 1: Brief explanation with example from text",
+    "Device 2: Brief explanation with example from text",
+    "Device 3: Brief explanation with example from text"
+  ]
+}
+
+Literary devices can include: metaphor, simile, personification, imagery, symbolism, alliteration, repetition, irony, foreshadowing, etc.
+
+IMPORTANT:
+- Only mention devices actually present in THIS passage
+- Include specific examples from the text
+- Explain the effect of each device`,
+
+      semantic: `You are a language expert helping a B2-level reader understand ${languageName} nuances.
+
+Analyze this passage for semantic depth:
+"""
+${pageContent}
+"""
+
+Provide semantic analysis in valid JSON only (no markdown, no extra text).
+
+{
+  "multipleMeanings": [
+    "Primary interpretation: [explain]",
+    "Alternative interpretation: [explain]",
+    "Subtle implication: [explain]"
+  ],
+  "nuances": "What subtle meanings or connotations exist? What might a native speaker notice that a learner might miss? 2-3 sentences.",
+  "culturalContext": "Are there cultural, historical, or idiomatic references? What background knowledge helps understand this passage? 2-3 sentences."
+}
+
+IMPORTANT:
+- Focus on what's NOT obvious to a language learner
+- Explain idioms, cultural references, and subtle implications
+- If no cultural context is relevant, say so briefly`,
+
+      simplified: `You are a language teacher explaining ${languageName} text to a B2-level learner.
+
+Break down this passage for a language learner:
+"""
+${pageContent}
+"""
+
+Provide simplified explanation in valid JSON only (no markdown, no extra text).
+
+{
+  "mainIdea": "What is the core message of this passage in simple terms? 1-2 sentences.",
+  "breakdown": "Explain the passage sentence by sentence or section by section. Use simpler ${languageName === 'en' ? 'English' : languageName + ' (with English translation if needed)'}. Be thorough but clear.",
+  "keyVocabulary": [
+    "word1: definition and usage",
+    "word2: definition and usage",
+    "word3: definition and usage",
+    "word4: definition and usage",
+    "word5: definition and usage"
+  ]
+}
+
+IMPORTANT:
+- Choose 3-5 most important words for learners
+- Explain words in context of this passage
+- Make breakdown detailed enough to be useful but not overwhelming`
+    };
+
+    const prompt = prompts[analysisType];
+
+    // Get max_tokens from settings (default: 1000)
+    const maxTokens = await settingsRepository.get('contextualMeaningMaxTokens');
+    const response = await this.chat(prompt, maxTokens);
+
+    try {
+      // Extract JSON from response
+      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('No valid JSON found in response');
+      }
+
+      const parsed = JSON.parse(jsonMatch[0]);
+
+      // Build result based on analysis type
+      const result: MeaningAnalysis = {};
+
+      if (analysisType === 'narrative') {
+        result.narrative = {
+          plotContext: parsed.plotContext || 'Analysis not available',
+          characterDynamics: parsed.characterDynamics || 'Analysis not available',
+          narrativeFunction: parsed.narrativeFunction || 'Analysis not available',
+        };
+      } else if (analysisType === 'literary') {
+        result.literary = {
+          wordChoice: parsed.wordChoice || 'Analysis not available',
+          tone: parsed.tone || 'Analysis not available',
+          literaryDevices: Array.isArray(parsed.literaryDevices)
+            ? parsed.literaryDevices
+            : ['Analysis not available'],
+        };
+      } else if (analysisType === 'semantic') {
+        result.semantic = {
+          multipleMeanings: Array.isArray(parsed.multipleMeanings)
+            ? parsed.multipleMeanings
+            : ['Analysis not available'],
+          nuances: parsed.nuances || 'Analysis not available',
+          culturalContext: parsed.culturalContext || 'No specific cultural context identified',
+        };
+      } else if (analysisType === 'simplified') {
+        result.simplified = {
+          mainIdea: parsed.mainIdea || 'Analysis not available',
+          breakdown: parsed.breakdown || 'Analysis not available',
+          keyVocabulary: Array.isArray(parsed.keyVocabulary)
+            ? parsed.keyVocabulary
+            : ['Analysis not available'],
+        };
+      }
+
+      return result;
+    } catch (error) {
+      console.error('[Groq] Failed to parse meaning analysis:', error);
+      // Return partial result with error indication
+      return this.getDefaultMeaningAnalysis(analysisType);
+    }
+  }
+
+  /**
+   * Provide default meaning analysis when parsing fails
+   */
+  private getDefaultMeaningAnalysis(analysisType: MeaningAnalysisType): MeaningAnalysis {
+    const errorMsg = 'Unable to generate analysis. Please try again.';
+
+    const result: MeaningAnalysis = {};
+
+    if (analysisType === 'narrative') {
+      result.narrative = {
+        plotContext: errorMsg,
+        characterDynamics: errorMsg,
+        narrativeFunction: errorMsg,
+      };
+    } else if (analysisType === 'literary') {
+      result.literary = {
+        wordChoice: errorMsg,
+        tone: errorMsg,
+        literaryDevices: [errorMsg],
+      };
+    } else if (analysisType === 'semantic') {
+      result.semantic = {
+        multipleMeanings: [errorMsg],
+        nuances: errorMsg,
+        culturalContext: errorMsg,
+      };
+    } else if (analysisType === 'simplified') {
+      result.simplified = {
+        mainIdea: errorMsg,
+        breakdown: errorMsg,
+        keyVocabulary: [errorMsg],
+      };
+    }
+
+    return result;
   }
 
   // ===== Private helper methods =====

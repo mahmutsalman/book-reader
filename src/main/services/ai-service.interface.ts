@@ -6,6 +6,7 @@
 
 import type { PreStudyWordEntry } from '../../shared/types/pre-study-notes.types';
 import type { GrammarAnalysis } from '../../shared/types/grammar.types';
+import type { MeaningAnalysis, MeaningAnalysisType } from '../../shared/types/meaning-analysis.types';
 
 export interface AIServiceInterface {
   /**
@@ -121,4 +122,15 @@ export interface AIServiceInterface {
     sentence: string,
     language: string
   ): Promise<GrammarAnalysis>;
+
+  /**
+   * Get contextual meaning analysis for a page of text
+   * Provides literary, semantic, and narrative analysis for language learners
+   */
+  getContextualMeaning(
+    pageContent: string,
+    analysisType: MeaningAnalysisType,
+    language: string,
+    timeout?: number
+  ): Promise<MeaningAnalysis>;
 }

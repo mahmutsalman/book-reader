@@ -2,6 +2,7 @@ import { ipcMain } from 'electron';
 import { IPC_CHANNELS } from '../../shared/constants';
 import { getAIService, getLMStudioService, getGroqService } from '../services/ai-provider.factory';
 import { GroqService } from '../services/groq.service';
+import type { MeaningAnalysisType } from '../../shared/types/meaning-analysis.types';
 
 export function registerAIHandlers(): void {
   // Get word definition - uses selected AI provider
@@ -153,6 +154,34 @@ export function registerAIHandlers(): void {
           text,
           sentence,
           error: error instanceof Error ? error.message : 'Unable to get grammar analysis. Please check your AI connection.',
+        };
+      }
+    }
+  );
+
+  // Get contextual meaning analysis - uses selected AI provider
+  ipcMain.handle(
+    IPC_CHANNELS.AI_GET_CONTEXTUAL_MEANING,
+    async (
+      _,
+      pageContent: string,
+      analysisType: MeaningAnalysisType,
+      language = 'en'
+    ) => {
+      try {
+        const service = await getAIService();
+        const result = await service.getContextualMeaning(pageContent, analysisType, language, 15000);
+        return {
+          success: true,
+          analysisType,
+          ...result,
+        };
+      } catch (error) {
+        console.error('Failed to get contextual meaning:', error);
+        return {
+          success: false,
+          analysisType,
+          error: error instanceof Error ? error.message : 'Unable to generate meaning analysis. Please check your AI connection.',
         };
       }
     }
