@@ -206,6 +206,8 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
     root.style.setProperty('--theme-background', theme.background);
     root.style.setProperty('--theme-border', theme.border);
     root.style.setProperty('--theme-panel-border', theme.panelBorder);
+    root.style.setProperty('--theme-word-hover-bg', theme.wordHover);
+    root.style.setProperty('--theme-word-hover-underline', theme.accent);
   }, [theme]);
 
   // Debounced reflow when zoom changes

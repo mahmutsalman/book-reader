@@ -90,22 +90,15 @@
 }
 
 .word-clickable {
-  @apply cursor-pointer hover:bg-yellow-100 rounded px-0.5 transition-colors duration-150;
+  @apply cursor-pointer rounded px-0.5 transition-colors duration-150;
   position: relative;
   display: inline;
 }
 
 .word-clickable:hover {
-  @apply underline decoration-yellow-400;
-}
-
-/* Dark mode word clickable - text color inherits from theme */
-:is(html.dark .word-clickable) {
-  @apply hover:bg-primary-700/50;
-}
-
-:is(html.dark .word-clickable:hover) {
-  @apply decoration-primary-400;
+  background-color: var(--theme-word-hover-bg, rgba(0, 0, 0, 0.05));
+  text-decoration: underline;
+  text-decoration-color: var(--theme-word-hover-underline, currentColor);
 }
 
 /* Word ready indicator - red dot */
