@@ -1865,13 +1865,13 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
           <>
             {/* Left edge hover zone */}
             <div
-              className="absolute left-0 top-0 bottom-0 w-24 pointer-events-auto"
+              className="absolute left-0 top-1/2 -translate-y-1/2 w-24 h-48 pointer-events-auto"
               onMouseEnter={() => setShowFocusNavigation(true)}
               onMouseLeave={() => setShowFocusNavigation(false)}
             />
             {/* Right edge hover zone */}
             <div
-              className="absolute right-0 top-0 bottom-0 w-24 pointer-events-auto"
+              className="absolute right-0 top-1/2 -translate-y-1/2 w-24 h-48 pointer-events-auto"
               onMouseEnter={() => setShowFocusNavigation(true)}
               onMouseLeave={() => setShowFocusNavigation(false)}
             />
@@ -1884,6 +1884,8 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
             <button
               onClick={goToPrevPage}
               disabled={reflowState.currentPageIndex <= 0}
+              onMouseEnter={() => setShowFocusNavigation(true)}
+              onMouseLeave={() => setShowFocusNavigation(false)}
               className="absolute left-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-black/20 hover:bg-black/40 text-white flex items-center justify-center transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed backdrop-blur-sm"
               aria-label="Previous page"
             >
@@ -1894,6 +1896,8 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
             <button
               onClick={goToNextPage}
               disabled={reflowState.currentPageIndex >= reflowState.totalPages - 1}
+              onMouseEnter={() => setShowFocusNavigation(true)}
+              onMouseLeave={() => setShowFocusNavigation(false)}
               className="absolute right-4 top-1/2 -translate-y-1/2 w-12 h-12 rounded-full bg-black/20 hover:bg-black/40 text-white flex items-center justify-center transition-all duration-200 disabled:opacity-30 disabled:cursor-not-allowed backdrop-blur-sm"
               aria-label="Next page"
             >
@@ -1917,6 +1921,8 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
         {isFocusMode && showFocusExit && (
           <button
             onClick={() => setIsFocusMode(false)}
+            onMouseEnter={() => setShowFocusExit(true)}
+            onMouseLeave={() => setShowFocusExit(false)}
             className="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/20 hover:bg-black/40 text-white flex items-center justify-center transition-all duration-200 backdrop-blur-sm group"
             aria-label="Exit Focus Mode (ESC)"
             title="Exit Focus Mode (ESC)"
