@@ -28,7 +28,7 @@ interface Chapter {
 
 const ReaderView: React.FC<ReaderViewProps> = ({ book, bookData, initialProgress }) => {
   const navigate = useNavigate();
-  const { updateProgress } = useBooks();
+  const { updateProgress, clearReadingSession } = useBooks();
   const theme = useReaderTheme();
   const hoverFill = theme.wordHover || addAlpha(theme.panel, 0.5);
   const readerScrollbarStyles = {
@@ -58,6 +58,11 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, bookData, initialProgress
       startPage,
     }));
   }, [bookData.pages]);
+
+  const handleExitReading = useCallback(() => {
+    clearReadingSession();
+    navigate('/library');
+  }, [clearReadingSession, navigate]);
 
   // Save progress when page or zoom changes
   useEffect(() => {
@@ -149,7 +154,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, bookData, initialProgress
       >
         <div className="flex items-center gap-4">
           <button
-            onClick={() => navigate('/library')}
+            onClick={handleExitReading}
             className="transition-colors"
             style={{ color: theme.textSecondary }}
             onMouseEnter={(event) => {

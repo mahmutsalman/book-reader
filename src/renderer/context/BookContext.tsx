@@ -6,6 +6,7 @@ interface BookContextType {
   currentBook: Book | null;
   currentBookData: BookData | null;
   currentProgress: ReadingProgress | null;
+  activeReadingBookId: number | null;
   loading: boolean;
   error: string | null;
   loadBooks: () => Promise<void>;
@@ -13,6 +14,8 @@ interface BookContextType {
   importBook: (filePath: string, language?: BookLanguage) => Promise<Book>;
   deleteBook: (bookId: number) => Promise<void>;
   updateProgress: (data: Partial<ReadingProgress>) => Promise<void>;
+  startReadingSession: (bookId: number) => void;
+  clearReadingSession: () => void;
 }
 
 const BookContext = createContext<BookContextType | null>(null);
@@ -34,8 +37,17 @@ export const BookProvider: React.FC<BookProviderProps> = ({ children }) => {
   const [currentBook, setCurrentBook] = useState<Book | null>(null);
   const [currentBookData, setCurrentBookData] = useState<BookData | null>(null);
   const [currentProgress, setCurrentProgress] = useState<ReadingProgress | null>(null);
+  const [activeReadingBookId, setActiveReadingBookId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const startReadingSession = useCallback((bookId: number) => {
+    setActiveReadingBookId(bookId);
+  }, []);
+
+  const clearReadingSession = useCallback(() => {
+    setActiveReadingBookId(null);
+  }, []);
 
   const loadBooks = useCallback(async () => {
     setLoading(true);
@@ -68,13 +80,14 @@ export const BookProvider: React.FC<BookProviderProps> = ({ children }) => {
 
         const progress = await window.electronAPI.progress.get(bookId);
         setCurrentProgress(progress);
+        startReadingSession(book.id);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load book');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [startReadingSession]);
 
   const importBook = useCallback(async (filePath: string, language: BookLanguage = 'en'): Promise<Book> => {
     setLoading(true);
@@ -107,6 +120,9 @@ export const BookProvider: React.FC<BookProviderProps> = ({ children }) => {
           setCurrentBookData(null);
           setCurrentProgress(null);
         }
+        if (activeReadingBookId === bookId) {
+          clearReadingSession();
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete book');
@@ -114,7 +130,7 @@ export const BookProvider: React.FC<BookProviderProps> = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  }, [currentBook]);
+  }, [activeReadingBookId, clearReadingSession, currentBook]);
 
   const updateProgress = useCallback(async (data: Partial<ReadingProgress>) => {
     if (!currentBook) return;
@@ -135,6 +151,7 @@ export const BookProvider: React.FC<BookProviderProps> = ({ children }) => {
         currentBook,
         currentBookData,
         currentProgress,
+        activeReadingBookId,
         loading,
         error,
         loadBooks,
@@ -142,6 +159,8 @@ export const BookProvider: React.FC<BookProviderProps> = ({ children }) => {
         importBook,
         deleteBook,
         updateProgress,
+        startReadingSession,
+        clearReadingSession,
       }}
     >
       {children}

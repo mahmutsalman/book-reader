@@ -57,7 +57,7 @@ interface Chapter {
 
 const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, initialProgress }) => {
   const navigate = useNavigate();
-  const { updateProgress } = useBooks();
+  const { updateProgress, clearReadingSession } = useBooks();
   const { queueWord, isWordReady, getWordData, getWordStatus, fetchingCount, pendingCount, removeWord } = useDeferredWords();
   const { settings, updateSetting } = useSettings();
   const { isFocusMode, setIsFocusMode } = useFocusMode();
@@ -172,6 +172,11 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
     initialCharacterOffset: initialProgress?.character_offset || 0,
     initialProgressPercentage: initialProgress?.progress_percentage,
   });
+
+  const handleExitReading = useCallback(() => {
+    clearReadingSession();
+    navigate('/library');
+  }, [clearReadingSession, navigate]);
 
   const handleViewChange = useCallback((viewIndex: number) => {
     goToPageIndex(viewIndex - 1);
@@ -1551,7 +1556,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
       >
         <div className="flex items-center gap-4">
           <button
-            onClick={() => navigate('/library')}
+            onClick={handleExitReading}
             className="transition-colors"
             style={{ color: theme.textSecondary }}
             onMouseEnter={(event) => {

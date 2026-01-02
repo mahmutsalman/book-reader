@@ -1,14 +1,27 @@
 import React from 'react';
-import { Outlet, NavLink } from 'react-router-dom';
+import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { useBooks } from '../../context/BookContext';
 import { useFocusMode } from '../../context/FocusModeContext';
 import { useReaderTheme } from '../../hooks/useReaderTheme';
 import { addAlpha, getContrastColor } from '../../utils/colorUtils';
 
 const MainLayout: React.FC = () => {
   const { isFocusMode } = useFocusMode();
+  const { activeReadingBookId } = useBooks();
+  const navigate = useNavigate();
+  const location = useLocation();
   const theme = useReaderTheme();
   const navLinkBaseClass = 'px-4 py-2 rounded-lg transition-colors no-underline';
   const navHoverColor = theme.wordHover || addAlpha(theme.panel, 0.4);
+
+  const handleLibraryClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
+    if (!activeReadingBookId) return;
+    const isReaderRoute = location.pathname.startsWith('/reader/');
+    const isLibraryRoute = location.pathname === '/library';
+    if (isReaderRoute || isLibraryRoute) return;
+    event.preventDefault();
+    navigate(`/reader/${activeReadingBookId}`);
+  };
 
   return (
     <div className="h-full flex flex-col">
@@ -40,6 +53,7 @@ const MainLayout: React.FC = () => {
               backgroundColor: isActive ? theme.accent : 'transparent',
               color: isActive ? getContrastColor(theme.accent) : theme.textSecondary,
             })}
+            onClick={handleLibraryClick}
             onMouseEnter={(event) => {
               const target = event.currentTarget;
               if (target.getAttribute('aria-current') !== 'page') {

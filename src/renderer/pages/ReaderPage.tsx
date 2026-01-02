@@ -8,10 +8,15 @@ import { getContrastColor } from '../utils/colorUtils';
 const ReaderPage: React.FC = () => {
   const { bookId } = useParams<{ bookId: string }>();
   const navigate = useNavigate();
-  const { currentBook, currentBookData, currentProgress, loading, error, loadBook } = useBooks();
+  const { currentBook, currentBookData, currentProgress, loading, error, loadBook, clearReadingSession } = useBooks();
   const [initialLoad, setInitialLoad] = useState(true);
   const theme = useReaderTheme();
   const accentTextColor = getContrastColor(theme.accent);
+
+  const handleBackToLibrary = () => {
+    clearReadingSession();
+    navigate('/library');
+  };
 
   useEffect(() => {
     if (bookId) {
@@ -41,7 +46,7 @@ const ReaderPage: React.FC = () => {
             {error}
           </div>
           <button
-            onClick={() => navigate('/library')}
+            onClick={handleBackToLibrary}
             className="px-4 py-2 rounded-lg font-medium transition-opacity"
             style={{ backgroundColor: theme.accent, color: accentTextColor }}
           >
@@ -61,7 +66,7 @@ const ReaderPage: React.FC = () => {
             Book not found
           </div>
           <button
-            onClick={() => navigate('/library')}
+            onClick={handleBackToLibrary}
             className="px-4 py-2 rounded-lg font-medium transition-opacity"
             style={{ backgroundColor: theme.accent, color: accentTextColor }}
           >
