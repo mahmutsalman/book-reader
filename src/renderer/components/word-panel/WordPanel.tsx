@@ -80,6 +80,30 @@ const normalizeForTTS = (text: string): string => {
     .trim();
 };
 
+// Safely render AI responses even when fields come back structured.
+const formatMeaningValue = (value: unknown): string => {
+  if (value == null) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (Array.isArray(value)) {
+    return value
+      .map(item => formatMeaningValue(item))
+      .filter(Boolean)
+      .join(' | ');
+  }
+  if (typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>);
+    if (entries.length === 0) return '';
+    return entries
+      .map(([key, entryValue]) => {
+        const formatted = formatMeaningValue(entryValue);
+        return formatted ? `${key}: ${formatted}` : key;
+      })
+      .join(' | ');
+  }
+  return String(value);
+};
+
 const WordPanel: React.FC<WordPanelProps> = ({
   isOpen,
   onClose,
@@ -628,7 +652,6 @@ const WordPanel: React.FC<WordPanelProps> = ({
         short_definition: wordData.shortDefinition || wordData.shortMeaning,
         meaning: wordData.definition || wordData.meaning,
         sentence: selectedWord.sentence,
-        timestamp: Date.now(),
       });
 
       setSaved(true);
@@ -1040,7 +1063,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
                           📖 Plot Context
                         </h3>
                         <p className="p-3 rounded-lg" style={{ backgroundColor: theme.panel, color: theme.text }}>
-                          {meaningAnalysis.narrative.plotContext}
+                          {formatMeaningValue(meaningAnalysis.narrative.plotContext)}
                         </p>
                       </section>
 
@@ -1049,7 +1072,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
                           👥 Character Dynamics
                         </h3>
                         <p className="p-3 rounded-lg" style={{ backgroundColor: theme.panel, color: theme.text }}>
-                          {meaningAnalysis.narrative.characterDynamics}
+                          {formatMeaningValue(meaningAnalysis.narrative.characterDynamics)}
                         </p>
                       </section>
 
@@ -1058,7 +1081,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
                           🎯 Narrative Function
                         </h3>
                         <p className="p-3 rounded-lg" style={{ backgroundColor: theme.panel, color: theme.text }}>
-                          {meaningAnalysis.narrative.narrativeFunction}
+                          {formatMeaningValue(meaningAnalysis.narrative.narrativeFunction)}
                         </p>
                       </section>
 
@@ -1084,7 +1107,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
                               🎬 Word's Role in Plot
                             </h3>
                             <p className="p-3 rounded-lg" style={{ backgroundColor: theme.panel, color: theme.text }}>
-                              {meaningAnalysis.narrative.wordSpecific.wordInPlot}
+                              {formatMeaningValue(meaningAnalysis.narrative.wordSpecific.wordInPlot)}
                             </p>
                           </section>
 
@@ -1093,7 +1116,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
                               👤 Character Insight
                             </h3>
                             <p className="p-3 rounded-lg" style={{ backgroundColor: theme.panel, color: theme.text }}>
-                              {meaningAnalysis.narrative.wordSpecific.characterInsight}
+                              {formatMeaningValue(meaningAnalysis.narrative.wordSpecific.characterInsight)}
                             </p>
                           </section>
 
@@ -1102,7 +1125,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
                               🎭 Thematic Role
                             </h3>
                             <p className="p-3 rounded-lg" style={{ backgroundColor: theme.panel, color: theme.text }}>
-                              {meaningAnalysis.narrative.wordSpecific.thematicRole}
+                              {formatMeaningValue(meaningAnalysis.narrative.wordSpecific.thematicRole)}
                             </p>
                           </section>
                         </>
@@ -1118,7 +1141,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
                           ✍️ Word Choice
                         </h3>
                         <p className="bg-green-50 dark:bg-green-900/30 p-3 rounded-lg" style={{ color: theme.text }}>
-                          {meaningAnalysis.literary.wordChoice}
+                          {formatMeaningValue(meaningAnalysis.literary.wordChoice)}
                         </p>
                       </section>
 
@@ -1127,7 +1150,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
                           🎭 Tone & Atmosphere
                         </h3>
                         <p className="bg-green-50 dark:bg-green-900/30 p-3 rounded-lg" style={{ color: theme.text }}>
-                          {meaningAnalysis.literary.tone}
+                          {formatMeaningValue(meaningAnalysis.literary.tone)}
                         </p>
                       </section>
 
@@ -1140,7 +1163,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
                             {meaningAnalysis.literary.literaryDevices.map((device, idx) => (
                               <li key={idx} className="flex items-start gap-2">
                                 <span className="text-green-500">•</span>
-                                <span>{device}</span>
+                                <span>{formatMeaningValue(device)}</span>
                               </li>
                             ))}
                           </ul>
@@ -1162,7 +1185,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
                               🎯 Rhetorical Effect
                             </h3>
                             <p className="bg-green-50 dark:bg-green-900/30 p-3 rounded-lg" style={{ color: theme.text }}>
-                              {meaningAnalysis.literary.wordSpecific.rhetoricalEffect}
+                              {formatMeaningValue(meaningAnalysis.literary.wordSpecific.rhetoricalEffect)}
                             </p>
                           </section>
 
@@ -1171,7 +1194,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
                               💫 Emotional Impact
                             </h3>
                             <p className="bg-green-50 dark:bg-green-900/30 p-3 rounded-lg" style={{ color: theme.text }}>
-                              {meaningAnalysis.literary.wordSpecific.emotionalImpact}
+                              {formatMeaningValue(meaningAnalysis.literary.wordSpecific.emotionalImpact)}
                             </p>
                           </section>
 
@@ -1180,7 +1203,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
                               ✨ Stylistic Purpose
                             </h3>
                             <p className="bg-green-50 dark:bg-green-900/30 p-3 rounded-lg" style={{ color: theme.text }}>
-                              {meaningAnalysis.literary.wordSpecific.stylisticPurpose}
+                              {formatMeaningValue(meaningAnalysis.literary.wordSpecific.stylisticPurpose)}
                             </p>
                           </section>
                         </>
@@ -1200,7 +1223,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
                             {meaningAnalysis.semantic.multipleMeanings.map((meaning, idx) => (
                               <li key={idx} className="flex items-start gap-2">
                                 <span className="text-amber-500">{idx + 1}.</span>
-                                <span>{meaning}</span>
+                                <span>{formatMeaningValue(meaning)}</span>
                               </li>
                             ))}
                           </ul>
@@ -1212,7 +1235,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
                           💭 Nuances
                         </h3>
                         <p className="bg-amber-50 dark:bg-amber-900/30 p-3 rounded-lg" style={{ color: theme.text }}>
-                          {meaningAnalysis.semantic.nuances}
+                          {formatMeaningValue(meaningAnalysis.semantic.nuances)}
                         </p>
                       </section>
 
@@ -1221,7 +1244,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
                           🌍 Cultural Context
                         </h3>
                         <p className="bg-amber-50 dark:bg-amber-900/30 p-3 rounded-lg" style={{ color: theme.text }}>
-                          {meaningAnalysis.semantic.culturalContext}
+                          {formatMeaningValue(meaningAnalysis.semantic.culturalContext)}
                         </p>
                       </section>
 
@@ -1240,7 +1263,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
                               📝 Contextual Meaning
                             </h3>
                             <p className="bg-amber-50 dark:bg-amber-900/30 p-3 rounded-lg" style={{ color: theme.text }}>
-                              {meaningAnalysis.semantic.wordSpecific.contextualMeaning}
+                              {formatMeaningValue(meaningAnalysis.semantic.wordSpecific.contextualMeaning)}
                             </p>
                           </section>
 
@@ -1249,7 +1272,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
                               🔀 Ambiguity Analysis
                             </h3>
                             <p className="bg-amber-50 dark:bg-amber-900/30 p-3 rounded-lg" style={{ color: theme.text }}>
-                              {meaningAnalysis.semantic.wordSpecific.ambiguityAnalysis}
+                              {formatMeaningValue(meaningAnalysis.semantic.wordSpecific.ambiguityAnalysis)}
                             </p>
                           </section>
 
@@ -1258,7 +1281,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
                               🌏 Cultural Significance
                             </h3>
                             <p className="bg-amber-50 dark:bg-amber-900/30 p-3 rounded-lg" style={{ color: theme.text }}>
-                              {meaningAnalysis.semantic.wordSpecific.culturalSignificance}
+                              {formatMeaningValue(meaningAnalysis.semantic.wordSpecific.culturalSignificance)}
                             </p>
                           </section>
                         </>
@@ -1274,7 +1297,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
                           💡 Main Idea
                         </h3>
                         <p className="bg-purple-50 dark:bg-purple-900/30 p-3 rounded-lg" style={{ color: theme.text }}>
-                          {meaningAnalysis.simplified.mainIdea}
+                          {formatMeaningValue(meaningAnalysis.simplified.mainIdea)}
                         </p>
                       </section>
 
@@ -1283,7 +1306,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
                           📝 Breakdown
                         </h3>
                         <p className="bg-purple-50 dark:bg-purple-900/30 p-3 rounded-lg whitespace-pre-wrap" style={{ color: theme.text }}>
-                          {meaningAnalysis.simplified.breakdown}
+                          {formatMeaningValue(meaningAnalysis.simplified.breakdown)}
                         </p>
                       </section>
 
@@ -1296,7 +1319,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
                             {meaningAnalysis.simplified.keyVocabulary.map((vocab, idx) => (
                               <li key={idx} className="flex items-start gap-2">
                                 <span className="text-purple-500">•</span>
-                                <span>{vocab}</span>
+                                <span>{formatMeaningValue(vocab)}</span>
                               </li>
                             ))}
                           </ul>
@@ -1318,7 +1341,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
                               📖 Simple Definition
                             </h3>
                             <p className="bg-purple-50 dark:bg-purple-900/30 p-3 rounded-lg" style={{ color: theme.text }}>
-                              {meaningAnalysis.simplified.wordSpecific.simpleDefinition}
+                              {formatMeaningValue(meaningAnalysis.simplified.wordSpecific.simpleDefinition)}
                             </p>
                           </section>
 
@@ -1327,7 +1350,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
                               💬 Usage Example
                             </h3>
                             <p className="bg-purple-50 dark:bg-purple-900/30 p-3 rounded-lg" style={{ color: theme.text }}>
-                              {meaningAnalysis.simplified.wordSpecific.usageExample}
+                              {formatMeaningValue(meaningAnalysis.simplified.wordSpecific.usageExample)}
                             </p>
                           </section>
 
@@ -1336,7 +1359,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
                               💡 Learner Tip
                             </h3>
                             <p className="bg-purple-50 dark:bg-purple-900/30 p-3 rounded-lg" style={{ color: theme.text }}>
-                              {meaningAnalysis.simplified.wordSpecific.learnerTip}
+                              {formatMeaningValue(meaningAnalysis.simplified.wordSpecific.learnerTip)}
                             </p>
                           </section>
                         </>

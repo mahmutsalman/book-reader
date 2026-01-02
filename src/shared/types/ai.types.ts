@@ -2,6 +2,7 @@
 
 export interface WordDefinitionResult {
   word: string;
+  shortDefinition?: string;
   definition: string;
   context: string;
   wordTranslation?: string; // English translation of the word (for non-English books)
