@@ -1062,37 +1062,9 @@ const WordPanel: React.FC<WordPanelProps> = ({
                   {/* Narrative Analysis Content */}
                   {selectedMeaningType === 'narrative' && meaningAnalysis.narrative && (
                     <div className="space-y-3">
-                      <section>
-                        <h3 className="font-semibold mb-2" style={{ color: theme.accent }}>
-                          📖 Plot Context
-                        </h3>
-                        <p className="p-3 rounded-lg" style={{ backgroundColor: theme.panel, color: theme.text }}>
-                          {formatMeaningValue(meaningAnalysis.narrative.plotContext)}
-                        </p>
-                      </section>
-
-                      <section>
-                        <h3 className="font-semibold mb-2" style={{ color: theme.accent }}>
-                          👥 Character Dynamics
-                        </h3>
-                        <p className="p-3 rounded-lg" style={{ backgroundColor: theme.panel, color: theme.text }}>
-                          {formatMeaningValue(meaningAnalysis.narrative.characterDynamics)}
-                        </p>
-                      </section>
-
-                      <section>
-                        <h3 className="font-semibold mb-2" style={{ color: theme.accent }}>
-                          🎯 Narrative Function
-                        </h3>
-                        <p className="p-3 rounded-lg" style={{ backgroundColor: theme.panel, color: theme.text }}>
-                          {formatMeaningValue(meaningAnalysis.narrative.narrativeFunction)}
-                        </p>
-                      </section>
-
                       {/* Word-Specific Analysis (Micro View) */}
                       {meaningAnalysis.narrative.wordSpecific && (
                         <>
-                          <div className="border-t-2 my-3" style={{ borderColor: theme.panelBorder }} />
                           <div
                             className="p-2 rounded-lg mb-2 border-l-4"
                             style={{
@@ -1132,14 +1104,102 @@ const WordPanel: React.FC<WordPanelProps> = ({
                               {formatMeaningValue(meaningAnalysis.narrative.wordSpecific.thematicRole)}
                             </p>
                           </section>
+
+                          <div className="border-b-2 my-3" style={{ borderColor: theme.panelBorder }} />
                         </>
                       )}
+
+                      <div
+                        className="p-2 rounded-lg mb-2 border-l-4"
+                        style={{
+                          backgroundColor: theme.panel,
+                          borderLeftColor: theme.panelBorder,
+                          color: theme.text
+                        }}
+                      >
+                        <h4 className="font-semibold text-sm" style={{ color: theme.textSecondary }}>
+                          🧭 Page-Level Context (Macro View)
+                        </h4>
+                      </div>
+
+                      <section>
+                        <h3 className="font-semibold mb-2" style={{ color: theme.accent }}>
+                          📖 Plot Context
+                        </h3>
+                        <p className="p-3 rounded-lg" style={{ backgroundColor: theme.panel, color: theme.text }}>
+                          {formatMeaningValue(meaningAnalysis.narrative.plotContext)}
+                        </p>
+                      </section>
+
+                      <section>
+                        <h3 className="font-semibold mb-2" style={{ color: theme.accent }}>
+                          👥 Character Dynamics
+                        </h3>
+                        <p className="p-3 rounded-lg" style={{ backgroundColor: theme.panel, color: theme.text }}>
+                          {formatMeaningValue(meaningAnalysis.narrative.characterDynamics)}
+                        </p>
+                      </section>
+
+                      <section>
+                        <h3 className="font-semibold mb-2" style={{ color: theme.accent }}>
+                          🎯 Narrative Function
+                        </h3>
+                        <p className="p-3 rounded-lg" style={{ backgroundColor: theme.panel, color: theme.text }}>
+                          {formatMeaningValue(meaningAnalysis.narrative.narrativeFunction)}
+                        </p>
+                      </section>
                     </div>
                   )}
 
                   {/* Literary Analysis Content */}
                   {selectedMeaningType === 'literary' && meaningAnalysis.literary && (
                     <div className="space-y-3">
+                      {/* Word-Specific Analysis (Micro View) */}
+                      {meaningAnalysis.literary.wordSpecific && (
+                        <>
+                          <div className="bg-green-100 dark:bg-green-900/50 p-2 rounded-lg mb-2">
+                            <h4 className="font-semibold text-green-900 dark:text-green-200 text-sm">
+                              🔍 Word-Level Focus: "{selectedWord?.word}"
+                            </h4>
+                          </div>
+
+                          <section>
+                            <h3 className="font-semibold text-green-700 dark:text-green-300 mb-2">
+                              🎯 Rhetorical Effect
+                            </h3>
+                            <p className="bg-green-50 dark:bg-green-900/30 p-3 rounded-lg" style={{ color: theme.text }}>
+                              {formatMeaningValue(meaningAnalysis.literary.wordSpecific.rhetoricalEffect)}
+                            </p>
+                          </section>
+
+                          <section>
+                            <h3 className="font-semibold text-green-700 dark:text-green-300 mb-2">
+                              💫 Emotional Impact
+                            </h3>
+                            <p className="bg-green-50 dark:bg-green-900/30 p-3 rounded-lg" style={{ color: theme.text }}>
+                              {formatMeaningValue(meaningAnalysis.literary.wordSpecific.emotionalImpact)}
+                            </p>
+                          </section>
+
+                          <section>
+                            <h3 className="font-semibold text-green-700 dark:text-green-300 mb-2">
+                              ✨ Stylistic Purpose
+                            </h3>
+                            <p className="bg-green-50 dark:bg-green-900/30 p-3 rounded-lg" style={{ color: theme.text }}>
+                              {formatMeaningValue(meaningAnalysis.literary.wordSpecific.stylisticPurpose)}
+                            </p>
+                          </section>
+
+                          <div className="border-b-2 border-green-200 dark:border-green-800 my-3" />
+                        </>
+                      )}
+
+                      <div className="bg-green-100 dark:bg-green-900/50 p-2 rounded-lg mb-2">
+                        <h4 className="font-semibold text-green-900 dark:text-green-200 text-sm">
+                          🧭 Page-Level Context (Macro View)
+                        </h4>
+                      </div>
+
                       <section>
                         <h3 className="font-semibold text-green-700 dark:text-green-300 mb-2">
                           ✍️ Word Choice
@@ -1173,51 +1233,58 @@ const WordPanel: React.FC<WordPanelProps> = ({
                           </ul>
                         </section>
                       )}
-
-                      {/* Word-Specific Analysis (Micro View) */}
-                      {meaningAnalysis.literary.wordSpecific && (
-                        <>
-                          <div className="border-t-2 border-green-200 dark:border-green-800 my-3" />
-                          <div className="bg-green-100 dark:bg-green-900/50 p-2 rounded-lg mb-2">
-                            <h4 className="font-semibold text-green-900 dark:text-green-200 text-sm">
-                              🔍 Word-Level Focus: "{selectedWord?.word}"
-                            </h4>
-                          </div>
-
-                          <section>
-                            <h3 className="font-semibold text-green-700 dark:text-green-300 mb-2">
-                              🎯 Rhetorical Effect
-                            </h3>
-                            <p className="bg-green-50 dark:bg-green-900/30 p-3 rounded-lg" style={{ color: theme.text }}>
-                              {formatMeaningValue(meaningAnalysis.literary.wordSpecific.rhetoricalEffect)}
-                            </p>
-                          </section>
-
-                          <section>
-                            <h3 className="font-semibold text-green-700 dark:text-green-300 mb-2">
-                              💫 Emotional Impact
-                            </h3>
-                            <p className="bg-green-50 dark:bg-green-900/30 p-3 rounded-lg" style={{ color: theme.text }}>
-                              {formatMeaningValue(meaningAnalysis.literary.wordSpecific.emotionalImpact)}
-                            </p>
-                          </section>
-
-                          <section>
-                            <h3 className="font-semibold text-green-700 dark:text-green-300 mb-2">
-                              ✨ Stylistic Purpose
-                            </h3>
-                            <p className="bg-green-50 dark:bg-green-900/30 p-3 rounded-lg" style={{ color: theme.text }}>
-                              {formatMeaningValue(meaningAnalysis.literary.wordSpecific.stylisticPurpose)}
-                            </p>
-                          </section>
-                        </>
-                      )}
                     </div>
                   )}
 
                   {/* Semantic Analysis Content */}
                   {selectedMeaningType === 'semantic' && meaningAnalysis.semantic && (
                     <div className="space-y-3">
+                      {/* Word-Specific Analysis (Micro View) */}
+                      {meaningAnalysis.semantic.wordSpecific && (
+                        <>
+                          <div className="bg-amber-100 dark:bg-amber-900/50 p-2 rounded-lg mb-2">
+                            <h4 className="font-semibold text-amber-900 dark:text-amber-200 text-sm">
+                              🔍 Word-Level Focus: "{selectedWord?.word}"
+                            </h4>
+                          </div>
+
+                          <section>
+                            <h3 className="font-semibold text-amber-700 dark:text-amber-300 mb-2">
+                              📝 Contextual Meaning
+                            </h3>
+                            <p className="bg-amber-50 dark:bg-amber-900/30 p-3 rounded-lg" style={{ color: theme.text }}>
+                              {formatMeaningValue(meaningAnalysis.semantic.wordSpecific.contextualMeaning)}
+                            </p>
+                          </section>
+
+                          <section>
+                            <h3 className="font-semibold text-amber-700 dark:text-amber-300 mb-2">
+                              🔀 Ambiguity Analysis
+                            </h3>
+                            <p className="bg-amber-50 dark:bg-amber-900/30 p-3 rounded-lg" style={{ color: theme.text }}>
+                              {formatMeaningValue(meaningAnalysis.semantic.wordSpecific.ambiguityAnalysis)}
+                            </p>
+                          </section>
+
+                          <section>
+                            <h3 className="font-semibold text-amber-700 dark:text-amber-300 mb-2">
+                              🌏 Cultural Significance
+                            </h3>
+                            <p className="bg-amber-50 dark:bg-amber-900/30 p-3 rounded-lg" style={{ color: theme.text }}>
+                              {formatMeaningValue(meaningAnalysis.semantic.wordSpecific.culturalSignificance)}
+                            </p>
+                          </section>
+
+                          <div className="border-b-2 border-amber-200 dark:border-amber-800 my-3" />
+                        </>
+                      )}
+
+                      <div className="bg-amber-100 dark:bg-amber-900/50 p-2 rounded-lg mb-2">
+                        <h4 className="font-semibold text-amber-900 dark:text-amber-200 text-sm">
+                          🧭 Page-Level Context (Macro View)
+                        </h4>
+                      </div>
+
                       {meaningAnalysis.semantic.multipleMeanings.length > 0 && (
                         <section>
                           <h3 className="font-semibold text-amber-700 dark:text-amber-300 mb-2">
@@ -1251,89 +1318,15 @@ const WordPanel: React.FC<WordPanelProps> = ({
                           {formatMeaningValue(meaningAnalysis.semantic.culturalContext)}
                         </p>
                       </section>
-
-                      {/* Word-Specific Analysis (Micro View) */}
-                      {meaningAnalysis.semantic.wordSpecific && (
-                        <>
-                          <div className="border-t-2 border-amber-200 dark:border-amber-800 my-3" />
-                          <div className="bg-amber-100 dark:bg-amber-900/50 p-2 rounded-lg mb-2">
-                            <h4 className="font-semibold text-amber-900 dark:text-amber-200 text-sm">
-                              🔍 Word-Level Focus: "{selectedWord?.word}"
-                            </h4>
-                          </div>
-
-                          <section>
-                            <h3 className="font-semibold text-amber-700 dark:text-amber-300 mb-2">
-                              📝 Contextual Meaning
-                            </h3>
-                            <p className="bg-amber-50 dark:bg-amber-900/30 p-3 rounded-lg" style={{ color: theme.text }}>
-                              {formatMeaningValue(meaningAnalysis.semantic.wordSpecific.contextualMeaning)}
-                            </p>
-                          </section>
-
-                          <section>
-                            <h3 className="font-semibold text-amber-700 dark:text-amber-300 mb-2">
-                              🔀 Ambiguity Analysis
-                            </h3>
-                            <p className="bg-amber-50 dark:bg-amber-900/30 p-3 rounded-lg" style={{ color: theme.text }}>
-                              {formatMeaningValue(meaningAnalysis.semantic.wordSpecific.ambiguityAnalysis)}
-                            </p>
-                          </section>
-
-                          <section>
-                            <h3 className="font-semibold text-amber-700 dark:text-amber-300 mb-2">
-                              🌏 Cultural Significance
-                            </h3>
-                            <p className="bg-amber-50 dark:bg-amber-900/30 p-3 rounded-lg" style={{ color: theme.text }}>
-                              {formatMeaningValue(meaningAnalysis.semantic.wordSpecific.culturalSignificance)}
-                            </p>
-                          </section>
-                        </>
-                      )}
                     </div>
                   )}
 
                   {/* Simplified Analysis Content */}
                   {selectedMeaningType === 'simplified' && meaningAnalysis.simplified && (
                     <div className="space-y-3">
-                      <section>
-                        <h3 className="font-semibold text-purple-700 dark:text-purple-300 mb-2">
-                          💡 Main Idea
-                        </h3>
-                        <p className="bg-purple-50 dark:bg-purple-900/30 p-3 rounded-lg" style={{ color: theme.text }}>
-                          {formatMeaningValue(meaningAnalysis.simplified.mainIdea)}
-                        </p>
-                      </section>
-
-                      <section>
-                        <h3 className="font-semibold text-purple-700 dark:text-purple-300 mb-2">
-                          📝 Breakdown
-                        </h3>
-                        <p className="bg-purple-50 dark:bg-purple-900/30 p-3 rounded-lg whitespace-pre-wrap" style={{ color: theme.text }}>
-                          {formatMeaningValue(meaningAnalysis.simplified.breakdown)}
-                        </p>
-                      </section>
-
-                      {meaningAnalysis.simplified.keyVocabulary.length > 0 && (
-                        <section>
-                          <h3 className="font-semibold text-purple-700 dark:text-purple-300 mb-2">
-                            📚 Key Vocabulary
-                          </h3>
-                          <ul className="space-y-2 bg-purple-50 dark:bg-purple-900/30 p-3 rounded-lg" style={{ color: theme.text }}>
-                            {meaningAnalysis.simplified.keyVocabulary.map((vocab, idx) => (
-                              <li key={idx} className="flex items-start gap-2">
-                                <span className="text-purple-500">•</span>
-                                <span>{formatMeaningValue(vocab)}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </section>
-                      )}
-
                       {/* Word-Specific Analysis (Micro View) */}
                       {meaningAnalysis.simplified.wordSpecific && (
                         <>
-                          <div className="border-t-2 border-purple-200 dark:border-purple-800 my-3" />
                           <div className="bg-purple-100 dark:bg-purple-900/50 p-2 rounded-lg mb-2">
                             <h4 className="font-semibold text-purple-900 dark:text-purple-200 text-sm">
                               🔍 Word-Level Focus: "{selectedWord?.word}"
@@ -1366,7 +1359,49 @@ const WordPanel: React.FC<WordPanelProps> = ({
                               {formatMeaningValue(meaningAnalysis.simplified.wordSpecific.learnerTip)}
                             </p>
                           </section>
+
+                          <div className="border-b-2 border-purple-200 dark:border-purple-800 my-3" />
                         </>
+                      )}
+
+                      <div className="bg-purple-100 dark:bg-purple-900/50 p-2 rounded-lg mb-2">
+                        <h4 className="font-semibold text-purple-900 dark:text-purple-200 text-sm">
+                          🧭 Page-Level Context (Macro View)
+                        </h4>
+                      </div>
+
+                      <section>
+                        <h3 className="font-semibold text-purple-700 dark:text-purple-300 mb-2">
+                          💡 Main Idea
+                        </h3>
+                        <p className="bg-purple-50 dark:bg-purple-900/30 p-3 rounded-lg" style={{ color: theme.text }}>
+                          {formatMeaningValue(meaningAnalysis.simplified.mainIdea)}
+                        </p>
+                      </section>
+
+                      <section>
+                        <h3 className="font-semibold text-purple-700 dark:text-purple-300 mb-2">
+                          📝 Breakdown
+                        </h3>
+                        <p className="bg-purple-50 dark:bg-purple-900/30 p-3 rounded-lg whitespace-pre-wrap" style={{ color: theme.text }}>
+                          {formatMeaningValue(meaningAnalysis.simplified.breakdown)}
+                        </p>
+                      </section>
+
+                      {meaningAnalysis.simplified.keyVocabulary.length > 0 && (
+                        <section>
+                          <h3 className="font-semibold text-purple-700 dark:text-purple-300 mb-2">
+                            📚 Key Vocabulary
+                          </h3>
+                          <ul className="space-y-2 bg-purple-50 dark:bg-purple-900/30 p-3 rounded-lg" style={{ color: theme.text }}>
+                            {meaningAnalysis.simplified.keyVocabulary.map((vocab, idx) => (
+                              <li key={idx} className="flex items-start gap-2">
+                                <span className="text-purple-500">•</span>
+                                <span>{formatMeaningValue(vocab)}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </section>
                       )}
                     </div>
                   )}
