@@ -75,6 +75,10 @@ export interface ElectronAPI {
     import: (filePath: string, language?: BookLanguage) => Promise<Book>;
     importPdf: (pdfPath: string, language?: BookLanguage, useOcr?: boolean) => Promise<Book>;
     importTxt: (txtPath: string, language?: BookLanguage) => Promise<Book>;
+    importEpub: (epubPath: string, language?: BookLanguage) => Promise<Book>;
+    importManga: (mangaPath: string, language?: BookLanguage) => Promise<Book>;
+    importPng: (pngPath: string, language?: BookLanguage) => Promise<Book>;
+    getMangaImagePath: (relativePath: string) => Promise<string>;
     getPdfStatus: () => Promise<PdfStatusResponse>;
     getAll: () => Promise<Book[]>;
     getById: (id: number) => Promise<Book | null>;

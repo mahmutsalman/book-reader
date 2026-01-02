@@ -6,7 +6,7 @@ import { useSettings } from '../../context/SettingsContext';
 import { useFocusMode } from '../../context/FocusModeContext';
 import { useTextReflow } from '../../hooks/useTextReflow';
 import { ZOOM_LEVELS, REFLOW_SETTINGS } from '../../../shared/constants';
-import type { Book, BookData, ReadingProgress } from '../../../shared/types';
+import type { Book, BookData, ReadingProgress, MangaPage } from '../../../shared/types';
 import type { CachedWordData } from '../../../shared/types/deferred-word.types';
 import type { PreStudyProgress } from '../../../shared/types/pre-study-notes.types';
 import type { GrammarAnalysis } from '../../../shared/types/grammar.types';
@@ -22,6 +22,7 @@ import { ThemeContextMenu } from './ThemeContextMenu';
 import { ClearSelectionsMenu } from './ClearSelectionsMenu';
 import { RemoveWordMenu } from './RemoveWordMenu';
 import InlineEditablePageNumber from './InlineEditablePageNumber';
+import { MangaImageView } from './MangaImageView';
 import { readerThemes } from '../../config/readerThemes';
 import { useReaderTheme } from '../../hooks/useReaderTheme';
 import { addAlpha, getContrastColor } from '../../utils/colorUtils';
@@ -1868,7 +1869,23 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
             ...readerScrollbarStyles,
           }}
         >
-          {renderText(reflowState.currentText)}
+          {/* Conditional rendering: manga vs text */}
+          {bookData.type === 'manga' ? (
+            <MangaImageView
+              page={bookData.pages[reflowState.currentPageIndex] as MangaPage}
+              zoom={zoom}
+              onWordClick={(word, sentence, regionIndex) => {
+                // Reuse existing word click handler
+                handleWordClick(word, regionIndex, null as any, sentence);
+              }}
+              onPhraseSelect={(phrase, sentence) => {
+                // Handle phrase selection for manga
+                handleWordClick(phrase, -1, null as any, sentence);
+              }}
+            />
+          ) : (
+            renderText(reflowState.currentText)
+          )}
         </div>
 
         {/* Focus Mode - Invisible hover zones on edges */}

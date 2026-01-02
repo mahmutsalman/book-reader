@@ -34,12 +34,14 @@ except ImportError:
 
 try:
     import pytesseract
-    from PIL import Image
+    from PIL import Image, ImageEnhance, ImageFilter
     OCR_AVAILABLE = True
 except ImportError:
     OCR_AVAILABLE = False
     pytesseract = None
     Image = None
+    ImageEnhance = None
+    ImageFilter = None
 
 # Server configuration
 VERSION = "1.0.0"
@@ -148,6 +150,24 @@ class TesseractStatusResponse(BaseModel):
     pdf_available: bool
     ocr_available: bool
     tesseract_path: Optional[str] = None
+    error: Optional[str] = None
+
+
+# Manga OCR Models
+class OCRTextRegion(BaseModel):
+    text: str
+    bbox: List[float]  # [x, y, width, height] in pixels
+    confidence: float  # 0-1
+
+
+class MangaOCRRequest(BaseModel):
+    image_path: str
+    language: str = "en"
+
+
+class MangaOCRResponse(BaseModel):
+    success: bool
+    regions: List[OCRTextRegion] = []
     error: Optional[str] = None
 
 
@@ -899,6 +919,126 @@ async def extract_pdf(request: PdfExtractRequest):
         return PdfExtractResponse(
             success=False,
             error=f"Failed to extract PDF: {str(e)}"
+        )
+
+
+def preprocess_comic_image(img):
+    """
+    Preprocess comic image for better OCR accuracy.
+    Optimized for English comics with speech bubbles.
+    """
+    # Convert to grayscale to reduce color noise.
+    img = img.convert('L')
+
+    # Boost contrast to make text stand out.
+    enhancer = ImageEnhance.Contrast(img)
+    img = enhancer.enhance(2.0)
+
+    # Sharpen text edges.
+    img = img.filter(ImageFilter.SHARPEN)
+
+    # Binary threshold for darker text on light backgrounds.
+    threshold = 180
+    img = img.point(lambda p: 255 if p > threshold else 0)
+
+    # Denoise small artifacts.
+    img = img.filter(ImageFilter.MedianFilter(size=3))
+
+    return img
+
+
+@app.post("/api/manga/extract-text", response_model=MangaOCRResponse)
+async def extract_manga_text(request: MangaOCRRequest):
+    """
+    Extract text with bounding boxes from a manga/comic page image using OCR.
+
+    Args:
+        request: MangaOCRRequest with image_path and language
+
+    Returns:
+        MangaOCRResponse with OCRTextRegion array containing text and bounding boxes
+    """
+    if not OCR_AVAILABLE:
+        return MangaOCRResponse(
+            success=False,
+            error="OCR not available. pytesseract is not installed."
+        )
+
+    image_path = request.image_path
+
+    # Validate file exists
+    if not os.path.exists(image_path):
+        return MangaOCRResponse(
+            success=False,
+            error=f"Image file not found: {image_path}"
+        )
+
+    try:
+        print(f"[Manga OCR] Processing: {os.path.basename(image_path)}")
+
+        # Load image with PIL
+        img = Image.open(image_path)
+
+        # Get Tesseract language code
+        tess_lang = TESSERACT_LANGS.get(request.language, "eng")
+
+        # Preprocess image to improve OCR accuracy.
+        preprocessed = preprocess_comic_image(img)
+
+        # Run OCR with bounding box data optimized for sparse comic text.
+        ocr_data = pytesseract.image_to_data(
+            preprocessed,
+            lang=tess_lang,
+            output_type=pytesseract.Output.DICT,
+            config='--psm 11 --oem 3'
+        )
+
+        # Parse OCR results into regions
+        regions: List[OCRTextRegion] = []
+
+        MIN_CONFIDENCE = 30
+        total_extracted = len(ocr_data["text"])
+
+        for i in range(total_extracted):
+            text = ocr_data["text"][i].strip()
+            try:
+                conf = float(ocr_data["conf"][i])
+            except (TypeError, ValueError):
+                conf = -1
+
+            # Skip empty text or low confidence.
+            if not text or conf < MIN_CONFIDENCE:
+                continue
+
+            # Extract bounding box coordinates
+            x = float(ocr_data["left"][i])
+            y = float(ocr_data["top"][i])
+            w = float(ocr_data["width"][i])
+            h = float(ocr_data["height"][i])
+
+            # Normalize confidence to 0-1 range
+            confidence = conf / 100.0
+
+            regions.append(OCRTextRegion(
+                text=text,
+                bbox=[x, y, w, h],
+                confidence=confidence
+            ))
+
+        filtered_count = len(regions)
+        filtered_out = total_extracted - filtered_count
+        print(f"[Manga OCR] Extracted {total_extracted} regions, kept {filtered_count} (filtered {filtered_out} low-confidence)")
+
+        return MangaOCRResponse(
+            success=True,
+            regions=regions
+        )
+
+    except Exception as e:
+        print(f"[Manga OCR] Failed: {e}")
+        return MangaOCRResponse(
+            success=False,
+            error=f"OCR extraction failed: {str(e)}"
         )
 
 

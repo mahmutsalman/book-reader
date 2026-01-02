@@ -7,11 +7,26 @@ export interface BookPage {
   word_count: number;
 }
 
+// OCR text region with bounding box for manga/comics
+export interface OCRTextRegion {
+  text: string;                              // Extracted text
+  bbox: [number, number, number, number];    // [x, y, width, height] in pixels
+  confidence: number;                        // OCR confidence (0-1)
+}
+
+// Manga page extends BookPage with image and OCR data
+export interface MangaPage extends BookPage {
+  image_path: string;           // Relative path to comic page image
+  ocr_regions: OCRTextRegion[]; // Clickable text regions with bounding boxes
+  has_text: boolean;            // Whether OCR completed successfully
+}
+
 export interface BookData {
+  type?: 'text' | 'manga';  // Discriminator for book type (default 'text' for backward compatibility)
   title: string;
   source_file: string;
   total_pages: number;
-  pages: BookPage[];
+  pages: BookPage[] | MangaPage[];
   chapters?: string[];
   total_words?: number;
   total_chars?: number;
@@ -42,6 +57,7 @@ export interface Book {
   total_words?: number;
   total_chars?: number;
   cover_image?: string;
+  type?: 'text' | 'manga';  // Book type (default 'text')
   language: BookLanguage;
   created_at: string;
   updated_at?: string;

@@ -5,6 +5,7 @@ import { migration003 } from './003_add_word_type';
 import { migration004 } from './004_add_progress_percentage';
 import { migration005 } from './005_add_short_definition';
 import { migration006 } from './006_add_side_panel_font_family';
+import { migration007 } from './007_add_manga_support';
 
 interface Migration {
   version: number;
@@ -19,6 +20,7 @@ const migrations: Migration[] = [
   migration004,
   migration005,
   migration006,
+  migration007,
 ];
 
 export function runMigrations(db: Database.Database): void {

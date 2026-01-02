@@ -19,16 +19,20 @@ export class BookRepository {
     const totalChars = bookData.total_chars ||
       bookData.pages.reduce((sum, p) => sum + p.char_count, 0);
 
+    // Get book type (default to 'text' for backward compatibility)
+    const bookType = bookData.type || 'text';
+
     // Insert book into database
     const result = this.db.prepare(`
-      INSERT INTO books (title, json_path, total_pages, total_words, total_chars, language)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO books (title, json_path, total_pages, total_words, total_chars, type, language)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `).run(
       bookData.title,
       jsonPath,
       bookData.total_pages,
       totalWords,
       totalChars,
+      bookType,
       language
     );
 

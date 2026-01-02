@@ -417,3 +417,51 @@
 .app-no-drag {
   -webkit-app-region: no-drag;
 }
+
+/* Manga/Comic Reader Styles */
+.manga-page-container {
+  @apply relative w-full mx-auto;
+  max-width: 100%;
+}
+
+.manga-image-wrapper {
+  @apply relative inline-block;
+  width: 100%;
+}
+
+.manga-image {
+  @apply w-full h-auto block;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+}
+
+/* OCR overlay regions */
+.ocr-region {
+  @apply transition-all duration-150;
+  background-color: transparent;
+  border: 1px solid transparent;
+}
+
+.ocr-region:hover,
+.ocr-region-hover {
+  background-color: rgba(59, 130, 246, 0.15) !important;
+  border: 1px solid rgba(59, 130, 246, 0.5);
+}
+
+/* Selected regions for phrase selection */
+.ocr-region.word-phrase-selected {
+  background-color: rgba(251, 191, 36, 0.3) !important;
+  border: 1px solid rgba(251, 191, 36, 0.7);
+}
+
+/* Dark mode manga styles */
+:is(html.dark .ocr-region:hover),
+:is(html.dark .ocr-region-hover) {
+  background-color: rgba(96, 165, 250, 0.2) !important;
+  border: 1px solid rgba(96, 165, 250, 0.6);
+}
+
+:is(html.dark .ocr-region.word-phrase-selected) {
+  background-color: rgba(251, 191, 36, 0.25) !important;
+  border: 1px solid rgba(251, 191, 36, 0.6);
+}
