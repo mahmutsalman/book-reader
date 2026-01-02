@@ -3,6 +3,7 @@
  * Manages the lifecycle of the Python pronunciation server.
  */
 import { spawn, ChildProcess, exec } from 'child_process';
+import { createServer } from 'net';
 import path from 'path';
 import { app } from 'electron';
 import type { HealthResponse, PronunciationServerStatus } from '../../shared/types/pronunciation.types';
@@ -11,6 +12,9 @@ const DEFAULT_PORT = 8766;
 const HEALTH_CHECK_INTERVAL = 10000; // 10 seconds
 const STARTUP_TIMEOUT = 30000; // 30 seconds
 const SHUTDOWN_TIMEOUT = 5000; // 5 seconds
+const STARTUP_RETRY_ATTEMPTS = 3;
+const STARTUP_RETRY_BASE_DELAY = 500;
+const PORT_RELEASE_TIMEOUT = 3000;
 
 class PythonManager {
   private process: ChildProcess | null = null;
@@ -48,74 +52,99 @@ class PythonManager {
 
   private async _start(): Promise<void> {
     try {
-      // Kill any existing process on the port
-      await this.killExistingProcess();
+      let lastError: unknown = null;
 
-      // Check if we're in development or production
-      const isDev = !app.isPackaged;
+      for (let attempt = 1; attempt <= STARTUP_RETRY_ATTEMPTS; attempt++) {
+        try {
+          // Kill any existing process on the port
+          await this.killExistingProcess();
+          await this.ensurePortAvailable(PORT_RELEASE_TIMEOUT);
 
-      if (isDev) {
-        // Development: Use venv Python to run the script
-        const scriptPath = this.getScriptPath();
-        const serverDir = path.dirname(scriptPath);
-        const pythonPath = this.getVenvPythonPath(serverDir);
+          this.spawnServerProcess();
 
-        console.log(`[PythonManager] Development mode - using venv Python`);
-        console.log(`[PythonManager] Python: ${pythonPath}`);
-        console.log(`[PythonManager] Script: ${scriptPath}`);
+          // Wait for server to be ready
+          await this.waitForReady();
 
-        this.process = spawn(pythonPath, [scriptPath], {
-          cwd: serverDir,
-          env: { ...process.env, PORT: String(this.port), PYTHONUNBUFFERED: '1' },
-          stdio: ['ignore', 'pipe', 'pipe'],
-        });
-      } else {
-        // Production: Run bundled PyInstaller binary
-        const binaryPath = this.getBinaryPath();
-        console.log(`[PythonManager] Production mode - using bundled binary`);
-        console.log(`[PythonManager] Binary: ${binaryPath}`);
+          // Start health checks
+          this.startHealthChecks();
 
-        this.process = spawn(binaryPath, [], {
-          cwd: path.dirname(binaryPath),
-          env: { ...process.env, PORT: String(this.port), PYTHONUNBUFFERED: '1' },
-          stdio: ['ignore', 'pipe', 'pipe'],
-        });
+          console.log('[PythonManager] Server started successfully');
+          return;
+        } catch (error) {
+          lastError = error;
+          console.warn(`[PythonManager] Start attempt ${attempt}/${STARTUP_RETRY_ATTEMPTS} failed:`, error);
+
+          await this.cleanupFailedStart();
+
+          if (attempt < STARTUP_RETRY_ATTEMPTS) {
+            const delayMs = STARTUP_RETRY_BASE_DELAY * attempt;
+            console.log(`[PythonManager] Retrying start in ${delayMs}ms...`);
+            await this.sleep(delayMs);
+          }
+        }
       }
 
-      // Handle process output
-      this.process.stdout?.on('data', (data) => {
-        const msg = data.toString().trim();
-        console.log(`[Python:${new Date().toISOString()}] ${msg}`);
-      });
-
-      this.process.stderr?.on('data', (data) => {
-        const msg = data.toString().trim();
-        console.error(`[Python:ERROR:${new Date().toISOString()}] ${msg}`);
-      });
-
-      this.process.on('error', (err) => {
-        console.error('[PythonManager] Process error:', err);
-        this.isReady = false;
-      });
-
-      this.process.on('exit', (code) => {
-        console.log(`[PythonManager] Process exited with code ${code}`);
-        this.isReady = false;
-        this.process = null;
-      });
-
-      // Wait for server to be ready
-      await this.waitForReady();
-
-      // Start health checks
-      this.startHealthChecks();
-
-      console.log('[PythonManager] Server started successfully');
+      throw lastError ?? new Error('Failed to start server');
     } catch (error) {
       console.error('[PythonManager] Failed to start server:', error);
       this.startupPromise = null;
       throw error;
     }
+  }
+
+  private spawnServerProcess(): void {
+    // Check if we're in development or production
+    const isDev = !app.isPackaged;
+
+    if (isDev) {
+      // Development: Use venv Python to run the script
+      const scriptPath = this.getScriptPath();
+      const serverDir = path.dirname(scriptPath);
+      const pythonPath = this.getVenvPythonPath(serverDir);
+
+      console.log(`[PythonManager] Development mode - using venv Python`);
+      console.log(`[PythonManager] Python: ${pythonPath}`);
+      console.log(`[PythonManager] Script: ${scriptPath}`);
+
+      this.process = spawn(pythonPath, [scriptPath], {
+        cwd: serverDir,
+        env: { ...process.env, PORT: String(this.port), PYTHONUNBUFFERED: '1' },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+    } else {
+      // Production: Run bundled PyInstaller binary
+      const binaryPath = this.getBinaryPath();
+      console.log(`[PythonManager] Production mode - using bundled binary`);
+      console.log(`[PythonManager] Binary: ${binaryPath}`);
+
+      this.process = spawn(binaryPath, [], {
+        cwd: path.dirname(binaryPath),
+        env: { ...process.env, PORT: String(this.port), PYTHONUNBUFFERED: '1' },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+    }
+
+    // Handle process output
+    this.process.stdout?.on('data', (data) => {
+      const msg = data.toString().trim();
+      console.log(`[Python:${new Date().toISOString()}] ${msg}`);
+    });
+
+    this.process.stderr?.on('data', (data) => {
+      const msg = data.toString().trim();
+      console.error(`[Python:ERROR:${new Date().toISOString()}] ${msg}`);
+    });
+
+    this.process.on('error', (err) => {
+      console.error('[PythonManager] Process error:', err);
+      this.isReady = false;
+    });
+
+    this.process.on('exit', (code) => {
+      console.log(`[PythonManager] Process exited with code ${code}`);
+      this.isReady = false;
+      this.process = null;
+    });
   }
 
   /**
@@ -300,6 +329,10 @@ class PythonManager {
       attemptCount++;
       const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
 
+      if (!this.process) {
+        throw new Error('Server process exited before becoming ready');
+      }
+
       if (await this.checkHealth()) {
         console.log(`[PythonManager] Server ready after ${elapsed}s (${attemptCount} attempts)`);
         this.isReady = true;
@@ -363,26 +396,116 @@ class PythonManager {
   }
 
   /**
-   * Kill process on Windows by port number using netstat + taskkill.
+   * Ensure the port is available before starting the server.
+   */
+  private async ensurePortAvailable(timeoutMs: number): Promise<void> {
+    const startTime = Date.now();
+
+    while (Date.now() - startTime < timeoutMs) {
+      if (await this.isPortAvailable()) {
+        return;
+      }
+      await this.sleep(200);
+    }
+
+    throw new Error(`Port ${this.port} is still in use after ${timeoutMs}ms`);
+  }
+
+  private async isPortAvailable(): Promise<boolean> {
+    return new Promise((resolve) => {
+      const server = createServer();
+
+      server.once('error', () => {
+        resolve(false);
+      });
+
+      server.once('listening', () => {
+        server.close(() => resolve(true));
+      });
+
+      server.listen(this.port, '127.0.0.1');
+    });
+  }
+
+  private async cleanupFailedStart(): Promise<void> {
+    if (!this.process) {
+      return;
+    }
+
+    const failedProcess = this.process;
+    this.process = null;
+    this.isReady = false;
+
+    try {
+      if (process.platform === 'win32' && failedProcess.pid) {
+        exec(`taskkill /F /PID ${failedProcess.pid} /T`, () => {
+          // Best-effort cleanup
+        });
+      } else {
+        failedProcess.kill('SIGKILL');
+      }
+    } catch (error) {
+      console.warn('[PythonManager] Cleanup after failed start encountered an error:', error);
+    }
+  }
+
+  private execCommand(command: string): Promise<boolean> {
+    return new Promise((resolve) => {
+      exec(command, (error) => {
+        resolve(!error);
+      });
+    });
+  }
+
+  /**
+   * Kill process on Windows by port number using PowerShell with netstat fallback.
    */
   private async killProcessOnPortWindows(): Promise<void> {
+    const powershellCommand = `powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort ${this.port} -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess | Sort-Object -Unique | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }"`;
+    const powerShellOk = await this.execCommand(powershellCommand);
+
+    if (powerShellOk) {
+      await this.sleep(500);
+      return;
+    }
+
+    return this.killProcessOnPortWindowsNetstat();
+  }
+
+  private async killProcessOnPortWindowsNetstat(): Promise<void> {
     return new Promise((resolve) => {
-      // Find PID using port 8766
-      exec(`netstat -ano | findstr :${this.port}`, (error, stdout) => {
+      exec('netstat -ano', (error, stdout) => {
         if (error || !stdout) {
           resolve();
           return;
         }
 
-        // Extract PIDs from netstat output
         const lines = stdout.split('\n');
         const pids = new Set<string>();
 
         for (const line of lines) {
-          const match = line.match(/\s+(\d+)\s*$/);
-          if (match && match[1]) {
-            pids.add(match[1]);
+          const trimmed = line.trim();
+          if (!trimmed) {
+            continue;
           }
+
+          const parts = trimmed.split(/\s+/);
+          if (parts.length < 4) {
+            continue;
+          }
+
+          const localAddress = parts[1];
+          const pid = parts[parts.length - 1];
+
+          if (!localAddress.endsWith(`:${this.port}`)) {
+            continue;
+          }
+
+          if (!/^\d+$/.test(pid)) {
+            continue;
+          }
+
+          pids.add(pid);
         }
 
         if (pids.size === 0) {
@@ -390,9 +513,8 @@ class PythonManager {
           return;
         }
 
-        // Kill all PIDs forcefully
         const pidList = Array.from(pids).join(' /PID ');
-        exec(`taskkill /F /PID ${pidList}`, () => {
+        exec(`taskkill /F /T /PID ${pidList}`, () => {
           setTimeout(resolve, 500);
         });
       });
