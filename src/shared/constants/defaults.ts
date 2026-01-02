@@ -31,6 +31,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   // Reader mode persistence
   is_grammar_mode: false,        // Default: grammar mode off
   is_meaning_mode: false,        // Default: meaning mode off
+  is_simpler_mode: false,        // Default: simpler mode off
 };
 
 // Zoom level constraints

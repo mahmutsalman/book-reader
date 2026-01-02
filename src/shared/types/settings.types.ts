@@ -32,6 +32,7 @@ export interface AppSettings {
   // Reader mode persistence
   is_grammar_mode: boolean;          // Persist grammar analysis mode toggle
   is_meaning_mode: boolean;          // Persist meaning analysis mode toggle
+  is_simpler_mode: boolean;          // Persist simpler mode toggle
 }
 
 // Settings update

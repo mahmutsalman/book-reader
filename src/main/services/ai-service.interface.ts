@@ -7,6 +7,7 @@
 import type { PreStudyWordEntry } from '../../shared/types/pre-study-notes.types';
 import type { GrammarAnalysis } from '../../shared/types/grammar.types';
 import type { MeaningAnalysis, MeaningAnalysisType } from '../../shared/types/meaning-analysis.types';
+import type { SimplerAnalysis } from '../../shared/types/simpler-analysis.types';
 
 export interface AIServiceInterface {
   /**
@@ -136,4 +137,15 @@ export interface AIServiceInterface {
     focusWord?: string,      // Optional: word/phrase for word-level analysis
     focusSentence?: string   // Optional: sentence containing the focus word
   ): Promise<MeaningAnalysis>;
+
+  /**
+   * Get simpler language alternatives for a word/phrase
+   * Provides simplified version, role explanation, paraphrases, and full view simplification
+   */
+  getSimplerAnalysis(
+    word: string,
+    sentence: string,
+    viewContent: string,
+    language: string
+  ): Promise<SimplerAnalysis>;
 }

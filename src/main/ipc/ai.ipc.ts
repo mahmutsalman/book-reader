@@ -3,6 +3,7 @@ import { IPC_CHANNELS } from '../../shared/constants';
 import { getAIService, getLMStudioService, getGroqService, getOpenRouterService, getMistralService, getGoogleAIService } from '../services/ai-provider.factory';
 import { GroqService } from '../services/groq.service';
 import type { MeaningAnalysisType } from '../../shared/types/meaning-analysis.types';
+import type { SimplerAnalysisResponse } from '../../shared/types/ipc.types';
 
 export function registerAIHandlers(): void {
   // Get word definition - uses selected AI provider
@@ -192,6 +193,33 @@ export function registerAIHandlers(): void {
           success: false,
           analysisType,
           error: error instanceof Error ? error.message : 'Unable to generate meaning analysis. Please check your AI connection.',
+        };
+      }
+    }
+  );
+
+  // Get simpler analysis - uses selected AI provider
+  ipcMain.handle(
+    IPC_CHANNELS.AI_GET_SIMPLER_ANALYSIS,
+    async (
+      _,
+      word: string,
+      sentence: string,
+      viewContent: string,
+      language = 'en'
+    ): Promise<SimplerAnalysisResponse> => {
+      try {
+        const service = await getAIService();
+        const analysis = await service.getSimplerAnalysis(word, sentence, viewContent, language);
+        return {
+          success: true,
+          analysis,
+        };
+      } catch (error) {
+        console.error('Failed to get simpler analysis:', error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unable to get simpler analysis. Please check your AI connection.',
         };
       }
     }

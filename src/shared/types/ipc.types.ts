@@ -5,6 +5,7 @@ import type { WordDefinitionResult, IPAPronunciationResult, BatchIPAResult, Simp
 import type { TTSResponse, IPAResponse, PronunciationServerStatus, IPALanguagesResponse, InstallLanguageResponse, VoiceModelsResponse, DownloadModelResponse, DeleteModelResponse } from './pronunciation.types';
 import type { PreStudyNotesRequest, PreStudyNotesResult, PreStudyProgress } from './pre-study-notes.types';
 import type { GrammarAnalysis } from './grammar.types';
+import type { SimplerAnalysis } from './simpler-analysis.types';
 import type {
   MeaningAnalysis,
   MeaningAnalysisType,
@@ -33,6 +34,13 @@ export interface GrammarAnalysisResponse extends Partial<GrammarAnalysis> {
 export interface MeaningAnalysisResponse extends Partial<MeaningAnalysis> {
   success: boolean;
   analysisType?: MeaningAnalysisType;
+  error?: string;
+}
+
+// Simpler Analysis Result with success/error handling
+export interface SimplerAnalysisResponse {
+  success: boolean;
+  analysis?: SimplerAnalysis;
   error?: string;
 }
 
@@ -105,6 +113,12 @@ export interface ElectronAPI {
       focusWord?: string,
       focusSentence?: string
     ) => Promise<MeaningAnalysisResponse>;
+    getSimplerAnalysis: (
+      word: string,
+      sentence: string,
+      viewContent: string,
+      language?: string
+    ) => Promise<SimplerAnalysisResponse>;
     testConnection: () => Promise<LMStudioConnectionResult>;
     testGroqConnection: () => Promise<GroqConnectionResult>;
     testOpenRouterConnection: () => Promise<ConnectionResult>;

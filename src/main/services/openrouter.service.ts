@@ -11,6 +11,7 @@ import type {
   MeaningAnalysis,
   MeaningAnalysisType
 } from '../../shared/types/meaning-analysis.types';
+import type { SimplerAnalysis } from '../../shared/types/simpler-analysis.types';
 import { settingsRepository } from '../../database/repositories';
 
 /**
@@ -1225,6 +1226,75 @@ IMPORTANT:
       console.error('[OpenRouter] Failed to parse meaning analysis:', error);
       // Return partial result with error indication
       return this.getDefaultMeaningAnalysis(analysisType);
+    }
+  }
+
+  async getSimplerAnalysis(
+    word: string,
+    sentence: string,
+    viewContent: string,
+    language = 'en'
+  ): Promise<SimplerAnalysis> {
+    const languageInstruction = language === 'en'
+      ? ''
+      : `The text is in ${language}. Provide all responses in English.`;
+    const isPhrase = word.trim().includes(' ');
+    const viewSnippet = viewContent.length > 5000 ? viewContent.slice(0, 5000) : viewContent;
+    const simplerInstruction = isPhrase
+      ? '1. SIMPLER VERSION: Provide simpler alternatives for the key words in the phrase. Return 4-8 lines in the format "original -> simpler".'
+      : `1. SIMPLER VERSION: A simpler alternative for "${word}" (1-5 words maximum)`;
+
+    const prompt = `You are an expert language teacher helping students understand complex text.
+
+${languageInstruction}
+
+TARGET WORD/PHRASE: "${word}"
+SENTENCE CONTEXT: "${sentence}"
+FULL VIEW: "${viewSnippet}"
+
+Please provide:
+
+${simplerInstruction}
+2. ROLE IN CONTEXT: Explain the role/function of "${word}" in this sentence (2-3 sentences)
+3. PARAPHRASES: Provide 2-3 alternative ways to express "${word}" in this context
+4. SIMPLIFIED VIEW: Rewrite the ENTIRE FULL VIEW using simpler language while keeping the same meaning
+
+Format your response as JSON:
+{
+  "simplerVersion": "...",
+  "roleInContext": "...",
+  "paraphrases": ["...", "...", "..."],
+  "simplifiedView": "...",
+  "complexityReduction": "..." (optional, e.g., "B2 -> A2")
+}
+
+If you provide multiple lines, separate them with "\\n".`;
+
+    const response = await this.chat(prompt, 2000);
+
+    try {
+      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('No valid JSON found in response');
+      }
+
+      const parsed = JSON.parse(jsonMatch[0]);
+
+      return {
+        simplerVersion: parsed.simplerVersion || word,
+        roleInContext: parsed.roleInContext || 'Role explanation not available.',
+        paraphrases: Array.isArray(parsed.paraphrases) ? parsed.paraphrases : [],
+        simplifiedView: parsed.simplifiedView || viewSnippet,
+        complexityReduction: parsed.complexityReduction,
+      };
+    } catch (error) {
+      console.error('[OpenRouter] Failed to parse simpler analysis JSON:', error);
+      return {
+        simplerVersion: word,
+        roleInContext: 'Role explanation not available.',
+        paraphrases: [],
+        simplifiedView: viewSnippet,
+      };
     }
   }
 

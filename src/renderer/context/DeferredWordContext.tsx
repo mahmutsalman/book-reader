@@ -156,14 +156,12 @@ export const DeferredWordProvider: React.FC<DeferredWordProviderProps> = ({ chil
 
       if (isPhraseEntry) {
         // Phrase handling: get phrase meaning instead of word definition
-        console.log('[PHRASE DEBUG] Sending phrase to AI:', { phrase: entry.word, sentence: entry.sentence, language: entry.language });
         try {
           const phraseMeaningResult = await window.electronAPI.ai.getPhraseMeaning(
             entry.word,
             entry.sentence,
             entry.language
           );
-          console.log('[PHRASE DEBUG] AI phrase response:', phraseMeaningResult);
           if (phraseMeaningResult.shortMeaning !== undefined) {
             results.shortMeaning = phraseMeaningResult.shortMeaning;
           }

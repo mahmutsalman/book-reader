@@ -92,6 +92,19 @@ const electronAPI: ElectronAPI = {
         focusWord,
         focusSentence
       ),
+    getSimplerAnalysis: (
+      word: string,
+      sentence: string,
+      viewContent: string,
+      language?: string
+    ) =>
+      ipcRenderer.invoke(
+        IPC_CHANNELS.AI_GET_SIMPLER_ANALYSIS,
+        word,
+        sentence,
+        viewContent,
+        language || 'en'
+      ),
     testConnection: () =>
       ipcRenderer.invoke(IPC_CHANNELS.AI_TEST_CONNECTION),
     testGroqConnection: () =>

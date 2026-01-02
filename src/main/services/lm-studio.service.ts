@@ -1,6 +1,7 @@
 import type { AIServiceInterface } from './ai-service.interface';
 import type { PreStudyWordEntry } from '../../shared/types/pre-study-notes.types';
 import type { GrammarAnalysis, PartOfSpeech, WordPOS, GrammarExample } from '../../shared/types/grammar.types';
+import type { SimplerAnalysis } from '../../shared/types/simpler-analysis.types';
 
 interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
@@ -826,8 +827,8 @@ PARTICLE: [particle(s) if phrasal verb, otherwise leave empty]`;
    * Core chat method - returns raw cleaned response.
    * Use chatShort() for single word/phrase answers.
    */
-  private async chat(content: string): Promise<string> {
-    const rawContent = await this.rawChat(content);
+  private async chat(content: string, maxTokens = 500): Promise<string> {
+    const rawContent = await this.rawChat(content, maxTokens);
     return this.cleanAIResponse(rawContent, 'full');
   }
 
@@ -836,14 +837,14 @@ PARTICLE: [particle(s) if phrasal verb, otherwise leave empty]`;
    * Applies aggressive cleaning to extract just the answer.
    */
   private async chatShort(content: string): Promise<string> {
-    const rawContent = await this.rawChat(content);
+    const rawContent = await this.rawChat(content, 100);
     return this.cleanAIResponse(rawContent, 'short');
   }
 
   /**
    * Raw chat method - no cleaning applied.
    */
-  private async rawChat(content: string): Promise<string> {
+  private async rawChat(content: string, maxTokens = 500): Promise<string> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.timeout);
 
@@ -859,7 +860,7 @@ PARTICLE: [particle(s) if phrasal verb, otherwise leave empty]`;
             { role: 'user', content } as ChatMessage,
           ],
           temperature: 0.7,
-          max_tokens: 500,
+          max_tokens: maxTokens,
           stream: false,
         }),
         signal: controller.signal,
@@ -1065,6 +1066,75 @@ IMPORTANT:
 
     // Fallback if JSON parsing fails
     return this.getDefaultGrammarAnalysis(text, sentence);
+  }
+
+  async getSimplerAnalysis(
+    word: string,
+    sentence: string,
+    viewContent: string,
+    language = 'en'
+  ): Promise<SimplerAnalysis> {
+    const languageInstruction = language === 'en'
+      ? ''
+      : `The text is in ${language}. Provide all responses in English.`;
+    const isPhrase = word.trim().includes(' ');
+    const viewSnippet = viewContent.length > 5000 ? viewContent.slice(0, 5000) : viewContent;
+    const simplerInstruction = isPhrase
+      ? '1. SIMPLER VERSION: Provide simpler alternatives for the key words in the phrase. Return 4-8 lines in the format "original -> simpler".'
+      : `1. SIMPLER VERSION: A simpler alternative for "${word}" (1-5 words maximum)`;
+
+    const prompt = `You are an expert language teacher helping students understand complex text.
+
+${languageInstruction}
+
+TARGET WORD/PHRASE: "${word}"
+SENTENCE CONTEXT: "${sentence}"
+FULL VIEW: "${viewSnippet}"
+
+Please provide:
+
+${simplerInstruction}
+2. ROLE IN CONTEXT: Explain the role/function of "${word}" in this sentence (2-3 sentences)
+3. PARAPHRASES: Provide 2-3 alternative ways to express "${word}" in this context
+4. SIMPLIFIED VIEW: Rewrite the ENTIRE FULL VIEW using simpler language while keeping the same meaning
+
+Format your response as JSON:
+{
+  "simplerVersion": "...",
+  "roleInContext": "...",
+  "paraphrases": ["...", "...", "..."],
+  "simplifiedView": "...",
+  "complexityReduction": "..." (optional, e.g., "B2 -> A2")
+}
+
+If you provide multiple lines, separate them with "\\n".`;
+
+    const response = await this.chat(prompt, 2000);
+
+    try {
+      const jsonMatch = response.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error('No valid JSON found in response');
+      }
+
+      const parsed = JSON.parse(jsonMatch[0]);
+
+      return {
+        simplerVersion: parsed.simplerVersion || word,
+        roleInContext: parsed.roleInContext || 'Role explanation not available.',
+        paraphrases: Array.isArray(parsed.paraphrases) ? parsed.paraphrases : [],
+        simplifiedView: parsed.simplifiedView || viewSnippet,
+        complexityReduction: parsed.complexityReduction,
+      };
+    } catch (error) {
+      console.error('[LM Studio] Failed to parse simpler analysis JSON:', error);
+      return {
+        simplerVersion: word,
+        roleInContext: 'Role explanation not available.',
+        paraphrases: [],
+        simplifiedView: viewSnippet,
+      };
+    }
   }
 
   /**

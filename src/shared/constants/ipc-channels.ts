@@ -37,6 +37,7 @@ export const IPC_CHANNELS = {
   AI_GET_PHRASE_MEANING: 'ai:get-phrase-meaning',
   AI_GET_GRAMMAR_ANALYSIS: 'ai:get-grammar-analysis',
   AI_GET_CONTEXTUAL_MEANING: 'ai:get-contextual-meaning',
+  AI_GET_SIMPLER_ANALYSIS: 'ai:get-simpler-analysis',
   AI_TEST_CONNECTION: 'ai:test-connection',
   AI_TEST_GROQ_CONNECTION: 'ai:test-groq-connection',
   AI_TEST_OPENROUTER_CONNECTION: 'ai:test-openrouter-connection',

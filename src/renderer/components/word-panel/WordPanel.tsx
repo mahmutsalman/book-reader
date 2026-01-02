@@ -7,6 +7,7 @@ import type { BookLanguage, WordType } from '../../../shared/types';
 import type { GrammarAnalysis } from '../../../shared/types/grammar.types';
 import type { MeaningAnalysisType } from '../../../shared/types/meaning-analysis.types';
 import { useMeaningAnalysis } from '../../hooks/useMeaningAnalysis';
+import { useSimplerAnalysis } from '../../hooks/useSimplerAnalysis';
 import PronunciationButton from './PronunciationButton';
 import LoopPlayButton from './LoopPlayButton';
 import SlowLoopPlayButton from './SlowLoopPlayButton';
@@ -33,6 +34,7 @@ interface WordPanelProps {
   preloadedGrammarData?: GrammarAnalysis;
   isGrammarMode?: boolean;
   isMeaningMode?: boolean;
+  isSimplerMode?: boolean;
   pageContent?: string;
   pageIndex?: number;
 }
@@ -89,6 +91,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
   preloadedGrammarData,
   isGrammarMode = false,
   isMeaningMode = false,
+  isSimplerMode = false,
   pageContent,
   pageIndex,
 }) => {
@@ -115,6 +118,15 @@ const WordPanel: React.FC<WordPanelProps> = ({
   const [selectedMeaningType, setSelectedMeaningType] = useState<MeaningAnalysisType | null>(null);
   const { analysis: meaningAnalysis, loading: meaningLoading, error: meaningError, fetchAnalysis } = useMeaningAnalysis();
 
+  // Simpler mode state
+  const {
+    analysis: simplerAnalysis,
+    loading: simplerLoading,
+    error: simplerError,
+    fetchAnalysis: fetchSimplerAnalysis,
+    clearAnalysis: clearSimplerAnalysis
+  } = useSimplerAnalysis();
+
   // Syllable mode state
   const [syllableModeEnabled, setSyllableModeEnabled] = useState(false);
   const [syllableModeLoading, setSyllableModeLoading] = useState(false);
@@ -123,6 +135,17 @@ const WordPanel: React.FC<WordPanelProps> = ({
   // Retry trigger for rate limit errors
   const [retryTrigger, setRetryTrigger] = useState(0);
   const [retryingModel, setRetryingModel] = useState<string | null>(null);
+  const simplerLines = simplerAnalysis?.simplerVersion
+    ? simplerAnalysis.simplerVersion.split('\n').map(line => line.trim()).filter(Boolean)
+    : [];
+  const showSimplerList = Boolean(selectedWord?.isPhrase && simplerLines.length > 1);
+  const simplerMappings = simplerLines.map((line) => {
+    const [original, ...rest] = line.split('->');
+    if (rest.length === 0) {
+      return { original: line, simpler: '' };
+    }
+    return { original: original.trim(), simpler: rest.join('->').trim() };
+  });
 
   // Format model name for display
   const formatModelName = (model: string): string => {
@@ -351,17 +374,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
 
   // Fetch meaning analysis when type is selected
   useEffect(() => {
-    console.log('[MEANING DEBUG] useEffect triggered:', {
-      isMeaningMode,
-      selectedMeaningType,
-      hasPageContent: !!pageContent,
-      pageIndex,
-      selectedWord: selectedWord?.word,
-      selectedSentence: selectedWord?.sentence
-    });
-
     if (isMeaningMode && selectedMeaningType && pageContent && pageIndex !== undefined) {
-      console.log('[MEANING DEBUG] Calling fetchAnalysis with word:', selectedWord?.word);
       fetchAnalysis(
         pageContent,
         selectedMeaningType,
@@ -380,6 +393,32 @@ const WordPanel: React.FC<WordPanelProps> = ({
       setSelectedMeaningType(null);
     }
   }, [isMeaningMode]);
+
+  // Fetch simpler analysis when in simpler mode
+  useEffect(() => {
+    if (!isSimplerMode || !selectedWord || !isOpen || !pageContent) {
+      clearSimplerAnalysis();
+      return;
+    }
+
+    fetchSimplerAnalysis(
+      selectedWord.word,
+      selectedWord.sentence,
+      pageContent,
+      bookId,
+      bookLanguage
+    );
+  }, [
+    isSimplerMode,
+    selectedWord?.word,
+    selectedWord?.sentence,
+    isOpen,
+    pageContent,
+    bookId,
+    bookLanguage,
+    fetchSimplerAnalysis,
+    clearSimplerAnalysis
+  ]);
 
   // Fetch word data when word changes (or use preloaded data)
   useEffect(() => {
@@ -774,8 +813,184 @@ const WordPanel: React.FC<WordPanelProps> = ({
 
         {/* Content */}
         <div className="flex-1 overflow-auto p-3 space-y-3 reader-scrollbar">
-          {/* Meaning Mode Content */}
-          {isMeaningMode ? (
+          {/* Simpler Mode Content */}
+          {isSimplerMode ? (
+            <>
+              {simplerLoading ? (
+                <div className="text-center py-8">
+                  <div className="text-4xl animate-pulse mb-2">💡</div>
+                  <div style={{ color: theme.textSecondary }}>
+                    Simplifying...
+                  </div>
+                </div>
+              ) : simplerError ? (
+                <div className="bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 p-3 rounded-lg">
+                  <p>{simplerError}</p>
+                </div>
+              ) : simplerAnalysis ? (
+                <div className="space-y-3">
+                  {/* Section 1: Simpler Version */}
+                  <section>
+                    <h3
+                      className="font-semibold mb-2 flex items-center gap-2"
+                      style={{ color: theme.accent }}
+                    >
+                      <span className="text-xl">✨</span>
+                      Simpler Version
+                    </h3>
+                    <div
+                      className="p-3 rounded-lg border-l-4"
+                      style={{
+                        backgroundColor: theme.panel,
+                        borderLeftColor: theme.accent,
+                        color: theme.text
+                      }}
+                    >
+                      {showSimplerList ? (
+                        <div className="space-y-2 text-sm">
+                          {simplerMappings.map((mapping, index) => (
+                            <div key={index}>
+                              {mapping.simpler ? (
+                                <div className="grid grid-cols-[1fr_auto_1fr] gap-x-2 items-start">
+                                  <span style={{ color: theme.text }}>
+                                    {mapping.original}
+                                  </span>
+                                  <span style={{ color: theme.textSecondary }}>→</span>
+                                  <span style={{ color: theme.text }}>
+                                    {mapping.simpler}
+                                  </span>
+                                </div>
+                              ) : (
+                                <span style={{ color: theme.text }}>{mapping.original}</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-lg font-medium">{simplerAnalysis.simplerVersion}</p>
+                      )}
+                      {simplerAnalysis.complexityReduction && (
+                        <p className="text-xs mt-2" style={{ color: theme.textSecondary }}>
+                          Complexity: {simplerAnalysis.complexityReduction}
+                        </p>
+                      )}
+                    </div>
+                  </section>
+
+                  {/* Section 2: Role in Context */}
+                  <section>
+                    <h3
+                      className="font-semibold mb-2 flex items-center gap-2"
+                      style={{ color: theme.accent }}
+                    >
+                      <span className="text-xl">🎯</span>
+                      Role in Context
+                    </h3>
+                    <p
+                      className="p-3 rounded-lg"
+                      style={{
+                        backgroundColor: theme.panel,
+                        color: theme.text
+                      }}
+                    >
+                      {simplerAnalysis.roleInContext}
+                    </p>
+                  </section>
+
+                  {/* Section 3: Paraphrased Versions */}
+                  {simplerAnalysis.paraphrases && simplerAnalysis.paraphrases.length > 0 && (
+                    <section>
+                      <h3
+                        className="font-semibold mb-2 flex items-center gap-2"
+                        style={{ color: theme.accent }}
+                      >
+                        <span className="text-xl">🔄</span>
+                        Other Ways to Say It
+                      </h3>
+                      <div className="space-y-2">
+                        {simplerAnalysis.paraphrases.map((paraphrase, idx) => (
+                          <div
+                            key={idx}
+                            className="p-3 rounded-lg flex items-start gap-2"
+                            style={{
+                              backgroundColor: theme.panel,
+                              color: theme.text
+                            }}
+                          >
+                            <span
+                              className="text-sm font-semibold mt-0.5"
+                              style={{ color: theme.accent }}
+                            >
+                              {idx + 1}.
+                            </span>
+                            <span>{paraphrase}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  )}
+
+                  {/* Section 4: Simplified View */}
+                  <section>
+                    <h3
+                      className="font-semibold mb-2 flex items-center gap-2"
+                      style={{ color: theme.accent }}
+                    >
+                      <span className="text-xl">📄</span>
+                      Simplified View
+                    </h3>
+                    <p
+                      className="text-xs mb-2"
+                      style={{ color: theme.textSecondary }}
+                    >
+                      The entire current view in simpler language:
+                    </p>
+                    <div
+                      className="p-3 rounded-lg text-sm leading-relaxed"
+                      style={{
+                        backgroundColor: theme.panel,
+                        color: theme.text,
+                        maxHeight: '220px',
+                        overflowY: 'auto'
+                      }}
+                    >
+                      {simplerAnalysis.simplifiedView}
+                    </div>
+                  </section>
+
+                  {/* Section 5: Original View */}
+                  {pageContent && (
+                    <section>
+                      <h3
+                        className="font-semibold mb-2 flex items-center gap-2"
+                        style={{ color: theme.accent }}
+                      >
+                        <span className="text-xl">🧾</span>
+                        Original View
+                      </h3>
+                      <p
+                        className="text-xs mb-2"
+                        style={{ color: theme.textSecondary }}
+                      >
+                        Original current view:
+                      </p>
+                      <div
+                        className="p-3 rounded-lg text-xs leading-relaxed"
+                        style={{
+                          backgroundColor: theme.panel,
+                          color: theme.textSecondary,
+                          maxHeight: '180px',
+                          overflowY: 'auto'
+                        }}
+                      >
+                        {pageContent}
+                      </div>
+                    </section>
+                  )}
+                </div>
+              ) : null}
+            </>
+          ) : isMeaningMode ? (
             <>
               {/* Analysis Type Buttons */}
               <div className="grid grid-cols-2 gap-2 mb-3">

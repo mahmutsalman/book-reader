@@ -11,6 +11,7 @@ import type { CachedWordData } from '../../../shared/types/deferred-word.types';
 import type { PreStudyProgress } from '../../../shared/types/pre-study-notes.types';
 import type { GrammarAnalysis } from '../../../shared/types/grammar.types';
 import { calculateMiddleIndex, isWithinAdjacency } from '../../../shared/types/deferred-word.types';
+import { generateSimplerCacheKey } from '../../../shared/types/simpler-analysis.types';
 import { cleanWord, createWordBoundaryRegex } from '../../../shared/utils/text-utils';
 import WordPanel from '../word-panel/WordPanel';
 import PreStudyNotesButton from './PreStudyNotesButton';
@@ -23,6 +24,7 @@ import { RemoveWordMenu } from './RemoveWordMenu';
 import { readerThemes } from '../../config/readerThemes';
 import { useReaderTheme } from '../../hooks/useReaderTheme';
 import { addAlpha, getContrastColor } from '../../utils/colorUtils';
+import simplerCache from '../../services/deferredSimplerContext';
 
 const MAX_PHRASE_WORDS = 10;
 
@@ -107,6 +109,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
   // Grammar perspective mode state - loaded from settings
   const isGrammarMode = settings.is_grammar_mode;
   const isMeaningMode = settings.is_meaning_mode;
+  const isSimplerMode = settings.is_simpler_mode;
 
   // Track words that have been looked up before (across all pages in this book)
   // Used to show gray dots for known words that haven't been fetched for current page
@@ -115,6 +118,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
   // Pre-study notes state
   const [isGeneratingNotes, setIsGeneratingNotes] = useState(false);
   const [notesProgress, setNotesProgress] = useState<PreStudyProgress | null>(null);
+  const [, setSimplerCacheVersion] = useState(0);
 
   // Theme context menu state
   const [showThemeMenu, setShowThemeMenu] = useState(false);
@@ -150,6 +154,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
   // Refs to access current state values in useEffect without adding them as dependencies
   const phraseRangesRef = useRef<Map<string, PhraseRange>>(new Map());
   const loadingPositionsRef = useRef<Set<number>>(new Set());
+  const simplerPrefetchInFlightRef = useRef<Set<string>>(new Set());
 
   // Use the text reflow hook
   const {
@@ -356,11 +361,70 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
     return sentences;
   }, [reflowState.currentText, extractSentenceFromCurrentView]);
 
+  const prefetchSimplerAnalysis = useCallback(async (word: string, sentence: string) => {
+    if (!isSimplerMode || !reflowState.currentText) return;
+    if (!word || !sentence) return;
+
+    if (simplerCache.get(book.id, word, sentence)) {
+      return;
+    }
+
+    const key = generateSimplerCacheKey(book.id, word, sentence);
+    if (simplerPrefetchInFlightRef.current.has(key)) {
+      return;
+    }
+
+    simplerPrefetchInFlightRef.current.add(key);
+    try {
+      const response = await window.electronAPI?.ai.getSimplerAnalysis(
+        word,
+        sentence,
+        reflowState.currentText,
+        book.language
+      );
+
+      if (response?.success && response.analysis) {
+        simplerCache.set(book.id, word, sentence, response.analysis);
+        setSimplerCacheVersion(prev => prev + 1);
+      }
+    } finally {
+      simplerPrefetchInFlightRef.current.delete(key);
+    }
+  }, [isSimplerMode, reflowState.currentText, book.id, book.language, setSimplerCacheVersion]);
+
+  // Prefetch simpler analysis when ready data exists so red dots imply Simpler availability
+  useEffect(() => {
+    if (!isSimplerMode || !reflowState.currentText) return;
+
+    wordSentences.forEach((sentence, index) => {
+      const word = wordIndexMapRef.current.get(index);
+      if (!word || !sentence) return;
+      if (isWordReady(word, sentence, book.id)) {
+        void prefetchSimplerAnalysis(word, sentence);
+      }
+    });
+
+    phraseRanges.forEach((range, phrase) => {
+      if (range.status !== 'ready') return;
+      const phraseSentence = extractSentenceFromCurrentView(phrase);
+      if (!phraseSentence) return;
+      void prefetchSimplerAnalysis(phrase, phraseSentence);
+    });
+  }, [
+    isSimplerMode,
+    reflowState.currentText,
+    wordSentences,
+    phraseRanges,
+    isWordReady,
+    book.id,
+    extractSentenceFromCurrentView,
+    prefetchSimplerAnalysis
+  ]);
+
   // Build phrase from selected indices
   const buildPhraseFromIndices = useCallback((indices: number[]): string => {
     const sorted = [...indices].sort((a, b) => a - b);
     const words = sorted.map(idx => wordIndexMapRef.current.get(idx) || '');
-    console.log('[PHRASE DEBUG] buildPhraseFromIndices:', { indices: sorted, words, mapSize: wordIndexMapRef.current.size });
     return words.filter(Boolean).join(' ');
   }, []);
 
@@ -425,11 +489,8 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
 
   // Finalize phrase selection and trigger AI lookup
   const finalizePhrase = useCallback(() => {
-    console.log('[PHRASE DEBUG] finalizePhrase called with selectedIndices:', selectedIndices);
-
     if (selectedIndices.length <= 1) {
       // Single word or empty - clear selection
-      console.log('[PHRASE DEBUG] Single word or empty, clearing selection');
       setSelectedIndices([]);
       return;
     }
@@ -441,7 +502,6 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
     });
 
     if (wordOnlyIndices.length <= 1) {
-      console.log('[PHRASE DEBUG] Word-only selection too short, clearing selection');
       setSelectedIndices([]);
       return;
     }
@@ -450,12 +510,8 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
     const middleIndex = calculateMiddleIndex(wordOnlyIndices);
     const fullSentence = extractSentenceFromCurrentView(phrase);
 
-    console.log('[PHRASE DEBUG] finalizePhrase:', { sortedIndices, wordOnlyIndices, phrase, middleIndex, fullSentence });
-
     // Grammar mode: create phrase range with loading state, don't open panel yet
     if (isGrammarMode) {
-      console.log('[PHRASE DEBUG] Grammar mode: creating phrase range with loading status');
-
       // Create phrase range with 'loading' status (yellow dot should appear)
       setPhraseRanges(prev => {
         const newMap = new Map(prev);
@@ -465,7 +521,6 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
           phrase,
           status: 'loading',
         });
-        console.log('[PHRASE DEBUG] Created phrase range:', { phrase, middleIndex, status: 'loading', indices: wordOnlyIndices });
         return newMap;
       });
 
@@ -528,7 +583,18 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
 
     // Clear selection
     setSelectedIndices([]);
-  }, [selectedIndices, buildPhraseFromIndices, extractSentenceFromCurrentView, reflowState.originalPage, book.id, isGrammarMode, isWordReady, getWordData, queueWord, analyzeGrammarInBackground]);
+  }, [
+    selectedIndices,
+    buildPhraseFromIndices,
+    extractSentenceFromCurrentView,
+    reflowState.originalPage,
+    book.id,
+    isGrammarMode,
+    isWordReady,
+    getWordData,
+    queueWord,
+    analyzeGrammarInBackground
+  ]);
 
   // Handle context menu for theme selection
   const handleContextMenu = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
@@ -753,8 +819,6 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
   const handleWordClick = useCallback((word: string, wordIndex: number, event: React.MouseEvent) => {
     const cleanedWord = cleanWord(word);
 
-    console.log('[PHRASE DEBUG] handleWordClick:', { word: cleanedWord, wordIndex, shiftKey: event.shiftKey, currentSelectedIndices: selectedIndices });
-
     // Store word in map for phrase construction
     wordIndexMapRef.current.set(wordIndex, cleanedWord);
 
@@ -764,7 +828,6 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
       event.preventDefault();
 
       setSelectedIndices(prev => {
-        console.log('[PHRASE DEBUG] Shift+click - updating selectedIndices from:', prev);
         // Check if this word is within valid adjacency
         if (prev.length > 0 && !isWithinAdjacency(wordIndex, prev)) {
           // Too far - start new selection from this word
@@ -804,7 +867,6 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
         });
         setPreloadedData(getWordData(phrase, phraseSentence, book.id));
         setIsPanelOpen(true);
-        console.log('[PHRASE DEBUG] Opened phrase panel:', phrase, 'mode:', isGrammarMode ? 'grammar' : 'vocabulary');
         return;
       }
     }
@@ -859,7 +921,19 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
         }, 400);
       }
     }
-  }, [extractSentenceFromCurrentView, reflowState.originalPage, book.id, isWordReady, getWordData, getWordStatus, queueWord, selectedIndices, phraseRanges]);
+  }, [
+    extractSentenceFromCurrentView,
+    reflowState.originalPage,
+    book.id,
+    book.language,
+    isWordReady,
+    getWordData,
+    getWordStatus,
+    queueWord,
+    selectedIndices,
+    phraseRanges,
+    isGrammarMode
+  ]);
 
   // === DRAG SELECTION HANDLERS ===
   // Implements Android gallery-style drag-to-select for phrase creation
@@ -946,6 +1020,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
         setIsShiftHeld(false);
         updateSetting('is_grammar_mode', false); // Also exit grammar mode on Escape
         updateSetting('is_meaning_mode', false); // Also exit meaning mode on Escape
+        updateSetting('is_simpler_mode', false); // Also exit simpler mode on Escape
       }
     };
 
@@ -1138,7 +1213,6 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
           if (phrase === selectedWord.word && range.status === 'loading') {
             newMap.set(phrase, { ...range, status: 'ready' });
             hasChanges = true;
-            console.log('[PHRASE DEBUG] Updated phrase status to ready:', phrase);
           }
         }
 
@@ -1297,35 +1371,30 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
   }, []);
 
   // Helper to check if an index is part of any phrase range
-  const getPhraseInfoForIndex = useCallback((index: number): { isInPhrase: boolean; isMiddle: boolean; status: 'loading' | 'ready' | null } => {
-    for (const [phrase, range] of phraseRanges) {
+  const getPhraseInfoForIndex = useCallback((index: number): {
+    isInPhrase: boolean;
+    isMiddle: boolean;
+    status: 'loading' | 'ready' | null;
+    phrase: string | null;
+  } => {
+    for (const [, range] of phraseRanges) {
       if (range.indices.includes(index)) {
         const isMiddle = index === range.middleIndex;
-        console.log('[DOT DEBUG] getPhraseInfoForIndex match:', { index, phrase, middleIndex: range.middleIndex, isMiddle, status: range.status, allIndices: range.indices });
         return {
           isInPhrase: true,
           isMiddle,
           status: range.status,
+          phrase: range.phrase,
         };
       }
     }
-    return { isInPhrase: false, isMiddle: false, status: null };
+    return { isInPhrase: false, isMiddle: false, status: null, phrase: null };
   }, [phraseRanges]);
 
   // Render text with clickable words and ready indicators
   const renderText = (text: string) => {
     if (!text) {
       return <span className="italic" style={{ color: theme.textSecondary }}>Empty page</span>;
-    }
-
-    // Debug: Log phrase ranges on each render
-    if (phraseRanges.size > 0) {
-      console.log('[DOT DEBUG] renderText - phraseRanges:', Array.from(phraseRanges.entries()).map(([phrase, range]) => ({
-        phrase,
-        middleIndex: range.middleIndex,
-        status: range.status,
-        indices: range.indices
-      })));
     }
 
     // Split by words while preserving whitespace and newlines
@@ -1379,18 +1448,41 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
       if (phraseInfo.isInPhrase) {
         // Part of a phrase - only middle word gets the dot
         if (phraseInfo.isMiddle) {
-          showRedDot = phraseInfo.status === 'ready';
-          showYellowDot = phraseInfo.status === 'loading';
-          console.log('[DOT DEBUG] Phrase middle word - dot decision:', { index, showRedDot, showYellowDot, status: phraseInfo.status });
+          if (isSimplerMode) {
+            const phraseSentence = phraseInfo.phrase
+              ? extractSentenceFromCurrentView(phraseInfo.phrase)
+              : '';
+            const simplerReady = phraseInfo.phrase && phraseSentence
+              ? simplerCache.get(book.id, phraseInfo.phrase, phraseSentence)
+              : null;
+            showRedDot = Boolean(simplerReady);
+            showYellowDot = !simplerReady && phraseInfo.status !== null;
+          } else {
+            showRedDot = phraseInfo.status === 'ready';
+            showYellowDot = phraseInfo.status === 'loading';
+          }
         }
       } else {
         // Single word behavior - three-dot system
-        if (wordIsReady) {
-          showRedDot = true;
-        } else if (isLoading) {
-          showYellowDot = true;
-        } else if (isKnownWord) {
-          showGrayDot = true; // Word was looked up before, but not for this sentence context
+        if (isSimplerMode) {
+          const simplerReady = wordSentence
+            ? simplerCache.get(book.id, cleanedWord, wordSentence)
+            : null;
+          if (simplerReady) {
+            showRedDot = true;
+          } else if (wordIsReady || isLoading) {
+            showYellowDot = true;
+          } else if (isKnownWord) {
+            showGrayDot = true;
+          }
+        } else {
+          if (wordIsReady) {
+            showRedDot = true;
+          } else if (isLoading) {
+            showYellowDot = true;
+          } else if (isKnownWord) {
+            showGrayDot = true; // Word was looked up before, but not for this sentence context
+          }
         }
       }
 
@@ -1550,6 +1642,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
               // Grammar mode is mutually exclusive with meaning mode
               if (newValue) {
                 updateSetting('is_meaning_mode', false);
+                updateSetting('is_simpler_mode', false);
               }
             }}
             className="w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200"
@@ -1584,6 +1677,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
               // Meaning mode is mutually exclusive with grammar mode
               if (newValue) {
                 updateSetting('is_grammar_mode', false);
+                updateSetting('is_simpler_mode', false);
               }
             }}
             className="w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200"
@@ -1608,6 +1702,41 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
               <path d="M11.25 4.533A9.707 9.707 0 006 3a9.735 9.735 0 00-3.25.555.75.75 0 00-.5.707v14.25a.75.75 0 001 .707A8.237 8.237 0 016 18.75c1.995 0 3.823.707 5.25 1.886V4.533zM12.75 20.636A8.214 8.214 0 0118 18.75c.966 0 1.89.166 2.75.47a.75.75 0 001-.708V4.262a.75.75 0 00-.5-.707A9.735 9.735 0 0018 3a9.707 9.707 0 00-5.25 1.533v16.103z" />
               <path d="M12 2.25a.75.75 0 01.75.75v18a.75.75 0 01-1.5 0V3a.75.75 0 01.75-.75z" />
+            </svg>
+          </button>
+
+          {/* Simpler mode toggle button */}
+          <button
+            onClick={() => {
+              const newValue = !isSimplerMode;
+              updateSetting('is_simpler_mode', newValue);
+              // Simpler mode is mutually exclusive with grammar and meaning modes
+              if (newValue) {
+                updateSetting('is_grammar_mode', false);
+                updateSetting('is_meaning_mode', false);
+              }
+            }}
+            className="w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200"
+            style={{
+              backgroundColor: isSimplerMode ? theme.accent : theme.panelBorder,
+              color: isSimplerMode ? accentTextColor : theme.textSecondary,
+              boxShadow: isSimplerMode ? `0 8px 16px ${addAlpha(theme.accent, 0.25)}` : 'none',
+              border: isSimplerMode ? `1px solid ${addAlpha(theme.accent, 0.6)}` : `1px solid ${theme.border}`,
+            }}
+            onMouseEnter={(event) => {
+              if (!isSimplerMode) {
+                event.currentTarget.style.backgroundColor = hoverFill;
+              }
+            }}
+            onMouseLeave={(event) => {
+              if (!isSimplerMode) {
+                event.currentTarget.style.backgroundColor = theme.panelBorder;
+              }
+            }}
+            title={isSimplerMode ? 'Simpler Mode ON - Click to disable' : 'Enable Simpler Mode'}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+              <path d="M12 2.25a.75.75 0 01.75.75v2.25a.75.75 0 01-1.5 0V3a.75.75 0 01.75-.75zM7.5 12a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM18.894 6.166a.75.75 0 00-1.06-1.06l-1.591 1.59a.75.75 0 101.06 1.061l1.591-1.59zM21.75 12a.75.75 0 01-.75.75h-2.25a.75.75 0 010-1.5H21a.75.75 0 01.75.75zM17.834 18.894a.75.75 0 001.06-1.06l-1.59-1.591a.75.75 0 10-1.061 1.06l1.59 1.591zM12 18a.75.75 0 01.75.75V21a.75.75 0 01-1.5 0v-2.25A.75.75 0 0112 18zM7.758 17.303a.75.75 0 00-1.061-1.06l-1.591 1.59a.75.75 0 001.06 1.061l1.591-1.59zM6 12a.75.75 0 01-.75.75H3a.75.75 0 010-1.5h2.25A.75.75 0 016 12zM6.697 7.757a.75.75 0 001.06-1.06l-1.59-1.591a.75.75 0 00-1.061 1.06l1.59 1.591z" />
             </svg>
           </button>
 
@@ -1671,11 +1800,13 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
         <FocusModeHeader
           isGrammarMode={isGrammarMode}
           isMeaningMode={isMeaningMode}
+          isSimplerMode={isSimplerMode}
           onToggleGrammar={() => {
             const newValue = !isGrammarMode;
             updateSetting('is_grammar_mode', newValue);
             if (newValue) {
               updateSetting('is_meaning_mode', false);
+              updateSetting('is_simpler_mode', false);
             }
           }}
           onToggleMeaning={() => {
@@ -1683,6 +1814,15 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
             updateSetting('is_meaning_mode', newValue);
             if (newValue) {
               updateSetting('is_grammar_mode', false);
+              updateSetting('is_simpler_mode', false);
+            }
+          }}
+          onToggleSimpler={() => {
+            const newValue = !isSimplerMode;
+            updateSetting('is_simpler_mode', newValue);
+            if (newValue) {
+              updateSetting('is_grammar_mode', false);
+              updateSetting('is_meaning_mode', false);
             }
           }}
         />
@@ -1846,23 +1986,24 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
       )}
 
       {/* Word Panel */}
-      <WordPanel
-        isOpen={isPanelOpen}
-        onClose={() => {
-          setIsPanelOpen(false);
-          setPreloadedData(null);
-        }}
-        selectedWord={selectedWord}
-        bookId={book.id}
-        bookLanguage={book.language}
-        onNavigateToPage={goToOriginalPage}
-        preloadedData={preloadedData}
-        preloadedGrammarData={selectedWord ? grammarCache.get(selectedWord.word) : undefined}
-        isGrammarMode={isGrammarMode}
-        isMeaningMode={isMeaningMode}
-        pageContent={reflowState.currentText}
-        pageIndex={reflowState.currentPageIndex}
-      />
+        <WordPanel
+          isOpen={isPanelOpen}
+          onClose={() => {
+            setIsPanelOpen(false);
+            setPreloadedData(null);
+          }}
+          selectedWord={selectedWord}
+          bookId={book.id}
+          bookLanguage={book.language}
+          onNavigateToPage={goToOriginalPage}
+          preloadedData={preloadedData}
+          preloadedGrammarData={selectedWord ? grammarCache.get(selectedWord.word) : undefined}
+          isGrammarMode={isGrammarMode}
+          isMeaningMode={isMeaningMode}
+          isSimplerMode={isSimplerMode}
+          pageContent={reflowState.currentText}
+          pageIndex={reflowState.currentPageIndex}
+        />
 
       {/* Floating Progress Panel for Pre-Study Notes */}
       <FloatingProgressPanel

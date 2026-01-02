@@ -4,3 +4,4 @@ export * from './settings.types';
 export * from './ai.types';
 export * from './ipc.types';
 export * from './grammar.types';
+export * from './simpler-analysis.types';
