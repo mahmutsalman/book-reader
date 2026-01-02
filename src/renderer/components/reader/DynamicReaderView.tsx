@@ -199,6 +199,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
     // Set CSS variables for current theme
     root.style.setProperty('--theme-accent', theme.accent);
     root.style.setProperty('--theme-accent-rgb', hexToRgb(theme.accent));
+    root.style.setProperty('--theme-accent-contrast', accentTextColor);
     root.style.setProperty('--theme-panel', theme.panel);
     root.style.setProperty('--theme-panel-rgb', hexToRgb(theme.panel));
     root.style.setProperty('--theme-text', theme.text);

@@ -39,6 +39,16 @@
   #root {
     @apply h-full;
   }
+
+  ::selection {
+    background-color: var(--theme-accent, #0ea5e9);
+    color: var(--theme-accent-contrast, #ffffff);
+  }
+
+  ::-moz-selection {
+    background-color: var(--theme-accent, #0ea5e9);
+    color: var(--theme-accent-contrast, #ffffff);
+  }
 }
 
 /* Custom component styles */

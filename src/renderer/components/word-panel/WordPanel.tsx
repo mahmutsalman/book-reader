@@ -12,7 +12,6 @@ import PronunciationButton from './PronunciationButton';
 import LoopPlayButton from './LoopPlayButton';
 import SlowLoopPlayButton from './SlowLoopPlayButton';
 import { useAudioCache, AudioType } from '../../hooks/useAudioCache';
-import { useAudioPlayer } from '../../hooks/useAudioPlayer';
 import { useReaderTheme } from '../../hooks/useReaderTheme';
 
 interface SelectedWord {
@@ -97,8 +96,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
 }) => {
   const { settings } = useSettings();
   const { addSessionEntry } = useSessionVocabulary();
-  const { preloadAudio, getAudio, setAudio } = useAudioCache();
-  const { playAudio, stop: stopAudio, isLoading: isLoadingAudio, setIsLoading } = useAudioPlayer();
+  const { preloadAudio } = useAudioCache();
   const theme = useReaderTheme();
   const readerScrollbarStyles = {
     '--reader-scrollbar-track': theme.panel,
@@ -231,49 +229,6 @@ const WordPanel: React.FC<WordPanelProps> = ({
       </>
     );
   }, []);
-
-  // Helper function to play audio for clickable areas
-  // Clicking always stops current audio and starts new one immediately
-  const playText = useCallback(async (text: string, language: string, audioType: AudioType) => {
-    // Stop any currently playing audio first
-    stopAudio();
-
-    if (isLoadingAudio) return; // Only skip if we're still loading/fetching
-    setIsLoading(true);
-
-    try {
-      // Check cache first
-      const cached = await getAudio(text, language, audioType);
-      if (cached) {
-        console.log('[WordPanel] Cache hit for', audioType);
-        await playAudio(cached);
-        return;
-      }
-
-      // Fetch from server
-      console.log('[WordPanel] Fetching audio:', { text: text.substring(0, 50), language, audioType });
-      const response = await window.electronAPI?.pronunciation.getTTS(text, language);
-
-      if (!response?.success || !response.audio_base64) {
-        const errorMsg = response?.error || 'Server returned no audio data';
-        console.error('[WordPanel] TTS failed:', {
-          text: text.substring(0, 50),
-          language,
-          error: errorMsg,
-          response
-        });
-        throw new Error(errorMsg);
-      }
-
-      await setAudio(text, language, audioType, response.audio_base64);
-      await playAudio(response.audio_base64);
-    } catch (error) {
-      console.error('[WordPanel] playText error:', error);
-      // Silent failure - could add toast notification here in future
-    } finally {
-      setIsLoading(false);
-    }
-  }, [isLoadingAudio, stopAudio, playAudio, setIsLoading, getAudio, setAudio]);
 
   // Preload audio when panel opens (background fetch)
   // Note: For German nouns with articles, we re-preload when article becomes available
@@ -691,33 +646,14 @@ const WordPanel: React.FC<WordPanelProps> = ({
         className="fixed top-0 right-0 h-full w-96 shadow-2xl z-[10000] overflow-hidden flex flex-col"
         style={{ backgroundColor: theme.background, color: theme.text, ...readerScrollbarStyles }}
       >
-        {/* Header - entire area clickable for word pronunciation */}
+        {/* Header */}
         <div
-          className={`px-3 py-2.5 flex items-center justify-between transition-colors ${!selectedWord.isPhrase ? 'cursor-pointer' : ''}`}
+          className="px-3 py-2.5 flex items-center justify-between"
           style={{
             backgroundColor: theme.panel,
             color: theme.text,
             borderBottom: `1px solid ${theme.panelBorder}`
           }}
-          onClick={() => {
-            if (!selectedWord.isPhrase) {
-              const wordText = wordData.germanArticle
-                ? `${wordData.germanArticle} ${capitalizeGermanNoun(selectedWord.word)}`
-                : selectedWord.word;
-              playText(wordText, bookLanguage, AudioType.WORD);
-            }
-          }}
-          onMouseEnter={(e) => {
-            if (!selectedWord.isPhrase) {
-              e.currentTarget.style.backgroundColor = theme.background;
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (!selectedWord.isPhrase) {
-              e.currentTarget.style.backgroundColor = theme.panel;
-            }
-          }}
-          title={!selectedWord.isPhrase ? 'Click anywhere to hear pronunciation' : undefined}
         >
           <div className="flex items-center gap-2">
             <div>
@@ -1804,16 +1740,8 @@ const WordPanel: React.FC<WordPanelProps> = ({
                   </div>
                 ) : (
                   <p
-                    className="p-3 rounded-lg italic cursor-pointer transition-colors"
+                    className="p-3 rounded-lg italic"
                     style={{ backgroundColor: theme.panel, color: theme.text }}
-                    onClick={() => playText(normalizeForTTS(selectedWord.sentence), bookLanguage, AudioType.SENTENCE)}
-                    title="Click to hear sentence"
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.opacity = '0.8';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.opacity = '1';
-                    }}
                   >
                     "{highlightWord(selectedWord.sentence, selectedWord.word)}"
                   </p>
@@ -1856,16 +1784,8 @@ const WordPanel: React.FC<WordPanelProps> = ({
                     </div>
                   </div>
                   <p
-                    className="p-3 rounded-lg cursor-pointer transition-colors"
+                    className="p-3 rounded-lg"
                     style={{ backgroundColor: theme.panel, color: theme.text }}
-                    onClick={() => playText(wordData.simplifiedSentence!, bookLanguage, AudioType.SIMPLIFIED)}
-                    title="Click to hear simplified sentence"
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.opacity = '0.8';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.opacity = '1';
-                    }}
                   >
                     {wordData.wordEquivalent
                       ? highlightWord(wordData.simplifiedSentence, wordData.wordEquivalent)
