@@ -35,6 +35,8 @@ export interface AppSettings {
   is_grammar_mode: boolean;          // Persist grammar analysis mode toggle
   is_meaning_mode: boolean;          // Persist meaning analysis mode toggle
   is_simpler_mode: boolean;          // Persist simpler mode toggle
+  // Vocabulary view persistence
+  vocab_last_book_id: number;        // Last selected book id in vocabulary (0 = all books)
 }
 
 // Settings update

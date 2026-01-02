@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import type { VocabularyEntry, Book, WordType, WordTypeCounts, VocabularyExportType } from '../../shared/types';
 import { useSessionVocabulary } from '../context/SessionVocabularyContext';
+import { useSettings } from '../context/SettingsContext';
 import VocabularyTabs, { type VocabularyTab } from '../components/vocabulary/VocabularyTabs';
 import BookFilter from '../components/vocabulary/BookFilter';
 import { ExportContextMenu } from '../components/vocabulary/ExportContextMenu';
@@ -20,6 +21,7 @@ const VocabularyPage: React.FC = () => {
   const [exportMenuPosition, setExportMenuPosition] = useState({ x: 0, y: 0 });
   const exportButtonRef = useRef<HTMLButtonElement>(null);
   const theme = useReaderTheme();
+  const { settings, updateSetting, loading: settingsLoading } = useSettings();
 
   const { getSessionEntries, getSessionCounts, totalSessionCount } = useSessionVocabulary();
 
@@ -75,6 +77,23 @@ const VocabularyPage: React.FC = () => {
   }, [loadBooks]);
 
   useEffect(() => {
+    if (settingsLoading) return;
+    const storedBookId = settings.vocab_last_book_id;
+    setSelectedBookId(storedBookId > 0 ? storedBookId : null);
+  }, [settingsLoading, settings.vocab_last_book_id]);
+
+  useEffect(() => {
+    if (settingsLoading) return;
+    const storedBookId = settings.vocab_last_book_id;
+    if (storedBookId > 0 && books.length > 0 && !books.some(book => book.id === storedBookId)) {
+      setSelectedBookId(null);
+      updateSetting('vocab_last_book_id', 0).catch(error => {
+        console.error('Failed to reset vocabulary book filter:', error);
+      });
+    }
+  }, [books, settingsLoading, settings.vocab_last_book_id, updateSetting]);
+
+  useEffect(() => {
     loadCounts();
   }, [loadCounts]);
 
@@ -102,6 +121,9 @@ const VocabularyPage: React.FC = () => {
 
   const handleBookChange = (bookId: number | null) => {
     setSelectedBookId(bookId);
+    updateSetting('vocab_last_book_id', bookId ?? 0).catch(error => {
+      console.error('Failed to persist vocabulary book filter:', error);
+    });
   };
 
   // Show export menu

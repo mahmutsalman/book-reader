@@ -34,6 +34,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   is_grammar_mode: false,        // Default: grammar mode off
   is_meaning_mode: false,        // Default: meaning mode off
   is_simpler_mode: false,        // Default: simpler mode off
+  // Vocabulary view persistence
+  vocab_last_book_id: 0,         // Default: all books
 };
 
 // Zoom level constraints
