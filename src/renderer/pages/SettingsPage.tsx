@@ -1523,6 +1523,38 @@ const SettingsPage: React.FC = () => {
               style={{ backgroundColor: theme.panelBorder, accentColor: theme.accent }}
             />
           </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1" style={{ color: theme.textSecondary }}>
+              Side Panel Font Size (Non-Focus): {settings.side_panel_font_size}px
+            </label>
+            <input
+              type="range"
+              min="12"
+              max="24"
+              step="1"
+              value={settings.side_panel_font_size}
+              onChange={(e) => updateSetting('side_panel_font_size', parseInt(e.target.value))}
+              className="w-full h-2 rounded-lg appearance-none cursor-pointer"
+              style={{ backgroundColor: theme.panelBorder, accentColor: theme.accent }}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1" style={{ color: theme.textSecondary }}>
+              Side Panel Font Size (Focus): {settings.side_panel_font_size_focus}px
+            </label>
+            <input
+              type="range"
+              min="12"
+              max="24"
+              step="1"
+              value={settings.side_panel_font_size_focus}
+              onChange={(e) => updateSetting('side_panel_font_size_focus', parseInt(e.target.value))}
+              className="w-full h-2 rounded-lg appearance-none cursor-pointer"
+              style={{ backgroundColor: theme.panelBorder, accentColor: theme.accent }}
+            />
+          </div>
         </div>
       </div>
 

@@ -13,6 +13,8 @@ export interface AppSettings {
   font_family: string;
   line_height: number;
   page_margin: number;
+  side_panel_font_size: number;
+  side_panel_font_size_focus: number;
   // Pre-Study Notes settings
   pre_study_view_count: number;      // Number of views to process (1-20, default: 10)
   pre_study_sentence_limit: number;  // Max sentences per view (0 = all, 1-2 for testing)

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useSettings } from '../../context/SettingsContext';
+import { useFocusMode } from '../../context/FocusModeContext';
 import { useSessionVocabulary } from '../../context/SessionVocabularyContext';
 import type { CachedWordData } from '../../../shared/types/deferred-word.types';
 import { getWordBoundaryPattern } from '../../../shared/utils/text-utils';
@@ -95,9 +96,13 @@ const WordPanel: React.FC<WordPanelProps> = ({
   pageIndex,
 }) => {
   const { settings } = useSettings();
+  const { isFocusMode } = useFocusMode();
   const { addSessionEntry } = useSessionVocabulary();
   const { preloadAudio } = useAudioCache();
   const theme = useReaderTheme();
+  const panelFontSize = isFocusMode
+    ? settings.side_panel_font_size_focus
+    : settings.side_panel_font_size;
   const readerScrollbarStyles = {
     '--reader-scrollbar-track': theme.panel,
     '--reader-scrollbar-thumb': theme.panelBorder,
@@ -748,7 +753,10 @@ const WordPanel: React.FC<WordPanelProps> = ({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-auto p-3 space-y-3 reader-scrollbar">
+        <div
+          className="flex-1 overflow-auto p-3 space-y-3 reader-scrollbar"
+          style={{ fontSize: `${panelFontSize}px` }}
+        >
           {/* Simpler Mode Content */}
           {isSimplerMode ? (
             <>
