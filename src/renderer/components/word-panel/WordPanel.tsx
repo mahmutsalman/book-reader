@@ -820,7 +820,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
                       }}
                     >
                       {showSimplerList ? (
-                        <div className="space-y-2 text-sm">
+                        <div className="space-y-2" style={{ fontSize: '0.9em' }}>
                           {simplerMappings.map((mapping, index) => (
                             <div key={index}>
                               {mapping.simpler ? (
@@ -840,10 +840,12 @@ const WordPanel: React.FC<WordPanelProps> = ({
                           ))}
                         </div>
                       ) : (
-                        <p className="text-lg font-medium">{simplerAnalysis.simplerVersion}</p>
+                        <p className="font-medium" style={{ fontSize: '1.1em' }}>
+                          {simplerAnalysis.simplerVersion}
+                        </p>
                       )}
                       {simplerAnalysis.complexityReduction && (
-                        <p className="text-xs mt-2" style={{ color: theme.textSecondary }}>
+                        <p className="mt-2" style={{ color: theme.textSecondary, fontSize: '0.8em' }}>
                           Complexity: {simplerAnalysis.complexityReduction}
                         </p>
                       )}
@@ -913,16 +915,17 @@ const WordPanel: React.FC<WordPanelProps> = ({
                       Simplified View
                     </h3>
                     <p
-                      className="text-xs mb-2"
-                      style={{ color: theme.textSecondary }}
+                      className="mb-2"
+                      style={{ color: theme.textSecondary, fontSize: '0.8em' }}
                     >
                       The entire current view in simpler language:
                     </p>
                     <div
-                      className="p-3 rounded-lg text-sm leading-relaxed"
+                      className="p-3 rounded-lg leading-relaxed"
                       style={{
                         backgroundColor: theme.panel,
                         color: theme.text,
+                        fontSize: '0.9em',
                         maxHeight: '220px',
                         overflowY: 'auto'
                       }}
@@ -942,16 +945,17 @@ const WordPanel: React.FC<WordPanelProps> = ({
                         Original View
                       </h3>
                       <p
-                        className="text-xs mb-2"
-                        style={{ color: theme.textSecondary }}
+                        className="mb-2"
+                        style={{ color: theme.textSecondary, fontSize: '0.8em' }}
                       >
                         Original current view:
                       </p>
                       <div
-                        className="p-3 rounded-lg text-xs leading-relaxed"
+                        className="p-3 rounded-lg leading-relaxed"
                         style={{
                           backgroundColor: theme.panel,
                           color: theme.textSecondary,
+                          fontSize: '0.8em',
                           maxHeight: '180px',
                           overflowY: 'auto'
                         }}
