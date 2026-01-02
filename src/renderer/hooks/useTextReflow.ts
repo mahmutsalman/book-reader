@@ -24,6 +24,7 @@ interface UseTextReflowReturn {
   state: ReflowState;
   goToNextPage: () => void;
   goToPrevPage: () => void;
+  goToPageIndex: (pageIndex: number) => void;
   goToCharacterOffset: (offset: number) => void;
   goToOriginalPage: (pageNum: number) => void;
   reflowPages: () => void;
@@ -254,6 +255,24 @@ export function useTextReflow({
     }));
   }, [state.currentPageIndex]);
 
+  const goToPageIndex = useCallback((pageIndex: number) => {
+    const maxIndex = pagesRef.current.length - 1;
+    if (maxIndex < 0) return;
+    const clampedIndex = Math.max(0, Math.min(pageIndex, maxIndex));
+    const newOffset = pageOffsetsRef.current[clampedIndex] || 0;
+    characterOffsetRef.current = newOffset; // Update ref first
+    const originalPage = findOriginalPage(newOffset, pageMapRef.current);
+
+    setState(prev => ({
+      ...prev,
+      currentPageIndex: clampedIndex,
+      currentText: pagesRef.current[clampedIndex] || '',
+      characterOffset: newOffset,
+      chapterName: originalPage?.chapter || null,
+      originalPage: originalPage?.page || 1,
+    }));
+  }, []);
+
   const goToCharacterOffset = useCallback((offset: number) => {
     const clampedOffset = Math.max(0, Math.min(offset, fullTextRef.current.length));
     characterOffsetRef.current = clampedOffset; // Update ref first
@@ -277,6 +296,7 @@ export function useTextReflow({
     state,
     goToNextPage,
     goToPrevPage,
+    goToPageIndex,
     goToCharacterOffset,
     goToOriginalPage,
     reflowPages,

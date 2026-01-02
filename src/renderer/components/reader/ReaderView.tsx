@@ -5,6 +5,7 @@ import { ZOOM_LEVELS } from '../../../shared/constants';
 import { cleanWord } from '../../../shared/utils/text-utils';
 import type { Book, BookData, ReadingProgress } from '../../../shared/types';
 import WordPanel from '../word-panel/WordPanel';
+import InlineEditablePageNumber from './InlineEditablePageNumber';
 import { useReaderTheme } from '../../hooks/useReaderTheme';
 import { addAlpha } from '../../utils/colorUtils';
 
@@ -306,20 +307,13 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, bookData, initialProgress
           </button>
 
           <div className="flex items-center gap-2">
-            <input
-              type="number"
-              min={1}
-              max={bookData.total_pages}
-              value={currentPage}
-              onChange={(e) => goToPage(parseInt(e.target.value, 10) || 1)}
-              className="w-16 px-2 py-1 text-center border rounded"
-              style={{
-                backgroundColor: theme.panel,
-                color: theme.text,
-                borderColor: theme.border,
-              }}
+            <span style={{ color: theme.textSecondary }}>View</span>
+            <InlineEditablePageNumber
+              currentPage={currentPage}
+              totalPages={bookData.total_pages}
+              onPageChange={goToPage}
+              theme={theme}
             />
-            <span style={{ color: theme.textSecondary }}>of {bookData.total_pages}</span>
           </div>
 
           <button

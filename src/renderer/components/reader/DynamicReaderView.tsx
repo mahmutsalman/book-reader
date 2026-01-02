@@ -21,6 +21,7 @@ import { FloatingProgressPanel } from './FloatingProgressPanel';
 import { ThemeContextMenu } from './ThemeContextMenu';
 import { ClearSelectionsMenu } from './ClearSelectionsMenu';
 import { RemoveWordMenu } from './RemoveWordMenu';
+import InlineEditablePageNumber from './InlineEditablePageNumber';
 import { readerThemes } from '../../config/readerThemes';
 import { useReaderTheme } from '../../hooks/useReaderTheme';
 import { addAlpha, getContrastColor } from '../../utils/colorUtils';
@@ -161,6 +162,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
     state: reflowState,
     goToNextPage,
     goToPrevPage,
+    goToPageIndex,
     goToOriginalPage,
     reflowPages,
   } = useTextReflow({
@@ -170,6 +172,10 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
     initialCharacterOffset: initialProgress?.character_offset || 0,
     initialProgressPercentage: initialProgress?.progress_percentage,
   });
+
+  const handleViewChange = useCallback((viewIndex: number) => {
+    goToPageIndex(viewIndex - 1);
+  }, [goToPageIndex]);
 
   // Extract unique chapters with their starting pages
   const chapters = useMemo(() => {
@@ -1973,9 +1979,12 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
 
           <div className="flex items-center gap-2 text-sm" style={{ color: theme.textSecondary }}>
             <span>View</span>
-            <span className="font-medium">{reflowState.currentPageIndex + 1}</span>
-            <span>of</span>
-            <span>{reflowState.totalPages}</span>
+            <InlineEditablePageNumber
+              currentPage={reflowState.currentPageIndex + 1}
+              totalPages={reflowState.totalPages}
+              onPageChange={handleViewChange}
+              theme={theme}
+            />
           </div>
 
           <button
