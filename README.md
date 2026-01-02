@@ -1,7 +1,7 @@
 # Smart Book Reader
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Code Signing](https://img.shields.io/badge/code%20signing-SignPath-green)
+![Code Signing](https://img.shields.io/badge/code%20signing-pending-yellow)
 
 A smart book reader application with dynamic text wrapping, AI-powered word lookup, offline pronunciation audio, and vocabulary tracking.
 
@@ -20,7 +20,7 @@ A smart book reader application with dynamic text wrapping, AI-powered word look
 
 This project follows professional open-source standards to ensure user safety and build integrity:
 
-* **Code Signing**: This project uses code signing services provided by [SignPath Foundation](https://signpath.org/). See our [Code Signing Policy](CODESIGNING.md) for details.
+* **Code Signing**: Application submitted to [SignPath Foundation](https://signpath.org/) for free code signing certificate. Awaiting approval. See our [Code Signing Policy](CODESIGNING.md) for details.
 * **Privacy**: Your reading data stays on your device. Read our [Privacy Policy](PRIVACY.md) regarding local storage and optional AI lookups.
 * **Licensing**: All third-party components and their licenses are documented in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 * **Community**: We are committed to a welcoming environment. Please review our [Code of Conduct](CODE_OF_CONDUCT.md).
