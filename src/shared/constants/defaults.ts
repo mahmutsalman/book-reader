@@ -10,6 +10,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   theme: 'light',
   reader_theme: 'darkComfort',  // Default reader theme
   font_family: 'Georgia, serif',
+  side_panel_font_family: 'system-ui, sans-serif',
   line_height: 1.8,
   page_margin: 40,
   side_panel_font_size: 16,

@@ -100,6 +100,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
   const { addSessionEntry } = useSessionVocabulary();
   const { preloadAudio } = useAudioCache();
   const theme = useReaderTheme();
+  const panelFontFamily = settings.side_panel_font_family || settings.font_family;
   const panelFontSize = isFocusMode
     ? settings.side_panel_font_size_focus
     : settings.side_panel_font_size;
@@ -649,7 +650,12 @@ const WordPanel: React.FC<WordPanelProps> = ({
       {/* Panel */}
       <div
         className="fixed top-0 right-0 h-full w-96 shadow-2xl z-[10000] overflow-hidden flex flex-col"
-        style={{ backgroundColor: theme.background, color: theme.text, ...readerScrollbarStyles }}
+        style={{
+          backgroundColor: theme.background,
+          color: theme.text,
+          fontFamily: panelFontFamily,
+          ...readerScrollbarStyles
+        }}
       >
         {/* Header */}
         <div

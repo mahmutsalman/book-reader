@@ -115,6 +115,7 @@ export const migration001 = {
     insertSetting.run('default_zoom', '1.0');
     insertSetting.run('theme', 'light');
     insertSetting.run('font_family', 'Georgia, serif');
+    insertSetting.run('side_panel_font_family', 'system-ui, sans-serif');
     insertSetting.run('line_height', '1.8');
     insertSetting.run('page_margin', '40');
     insertSetting.run('side_panel_font_size', '16');

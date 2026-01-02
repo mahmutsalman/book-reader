@@ -35,6 +35,17 @@ const GOOGLE_MODELS = [
   { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro (Best Quality - 5 RPM, 25/day)' },
 ];
 
+const FONT_FAMILY_OPTIONS = [
+  { value: 'Georgia, serif', label: 'Georgia (Serif)' },
+  { value: "'Literata', Georgia, serif", label: 'Literata (Serif)' },
+  { value: "'Libre Baskerville', Georgia, serif", label: 'Libre Baskerville (Serif)' },
+  { value: "'Times New Roman', serif", label: 'Times New Roman (Serif)' },
+  { value: 'system-ui, sans-serif', label: 'System Sans-Serif' },
+  { value: "'Roboto', system-ui, sans-serif", label: 'Roboto (Sans-Serif)' },
+  { value: "'Inter', system-ui, sans-serif", label: 'Inter (Sans-Serif)' },
+  { value: "'Courier New', monospace", label: 'Courier (Monospace)' },
+];
+
 const SettingsPage: React.FC = () => {
   const { settings, updateSetting, loading } = useSettings();
   const theme = useReaderTheme();
@@ -1491,7 +1502,7 @@ const SettingsPage: React.FC = () => {
 
           <div>
             <label className="block text-sm font-medium mb-1" style={{ color: theme.textSecondary }}>
-              Font Family
+              Font Family (Reading Area)
             </label>
             <select
               value={settings.font_family}
@@ -1501,10 +1512,31 @@ const SettingsPage: React.FC = () => {
               onFocus={handleInputFocus}
               onBlur={handleInputBlur}
             >
-              <option value="Georgia, serif">Georgia (Serif)</option>
-              <option value="'Times New Roman', serif">Times New Roman</option>
-              <option value="system-ui, sans-serif">System Sans-Serif</option>
-              <option value="'Courier New', monospace">Courier (Monospace)</option>
+              {FONT_FAMILY_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1" style={{ color: theme.textSecondary }}>
+              Font Family (Side Panel)
+            </label>
+            <select
+              value={settings.side_panel_font_family}
+              onChange={(e) => updateSetting('side_panel_font_family', e.target.value)}
+              className="w-full px-4 py-2 border rounded-lg focus:outline-none"
+              style={inputStyle}
+              onFocus={handleInputFocus}
+              onBlur={handleInputBlur}
+            >
+              {FONT_FAMILY_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
             </select>
           </div>
 

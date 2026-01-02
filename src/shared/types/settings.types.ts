@@ -11,6 +11,7 @@ export interface AppSettings {
   theme: 'light' | 'dark' | 'system';
   reader_theme: string;  // Reader-specific theme (sepiaClassic, darkComfort, trueBlack, oceanBlue, forestGreen, purpleTwilight)
   font_family: string;
+  side_panel_font_family: string;
   line_height: number;
   page_margin: number;
   side_panel_font_size: number;
