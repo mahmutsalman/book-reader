@@ -32,8 +32,14 @@ class MeaningAnalysisCache {
    * Get cached meaning analysis
    * Returns null if expired or not found
    */
-  get(bookId: number, pageIndex: number, analysisType: MeaningAnalysisType): MeaningAnalysis | null {
-    const key = generateMeaningCacheKey(bookId, pageIndex, analysisType);
+  get(
+    bookId: number,
+    pageIndex: number,
+    analysisType: MeaningAnalysisType,
+    focusWord?: string,
+    focusSentence?: string
+  ): MeaningAnalysis | null {
+    const key = generateMeaningCacheKey(bookId, pageIndex, analysisType, focusWord, focusSentence);
     const entry = this.cache.get(key);
 
     if (!entry) return null;
@@ -64,9 +70,11 @@ class MeaningAnalysisCache {
     bookId: number,
     pageIndex: number,
     analysisType: MeaningAnalysisType,
-    analysis: MeaningAnalysis
+    analysis: MeaningAnalysis,
+    focusWord?: string,
+    focusSentence?: string
   ): void {
-    const key = generateMeaningCacheKey(bookId, pageIndex, analysisType);
+    const key = generateMeaningCacheKey(bookId, pageIndex, analysisType, focusWord, focusSentence);
     const now = Date.now();
 
     // LRU eviction if cache is full

@@ -48,17 +48,23 @@ export function useMeaningAnalysis(): UseMeaningAnalysisResult {
       pageContentLength: pageContent?.length
     });
 
-    // Check cache first (but skip cache when focusWord is provided - always fetch fresh word-specific analysis)
-    if (!focusWord) {
-      const cached = meaningCache.get(bookId, pageIndex, analysisType);
-      if (cached) {
-        console.log('[useMeaningAnalysis] Using cached result (page-level)');
-        setAnalysis(cached);
-        setError(null);
-        return;
-      }
-    } else {
-      console.log('[useMeaningAnalysis] Skipping cache - fetching word-specific analysis for:', focusWord);
+    // Check cache first (supports page-level and word-specific analysis)
+    const cached = meaningCache.get(
+      bookId,
+      pageIndex,
+      analysisType,
+      focusWord,
+      focusSentence
+    );
+    if (cached) {
+      console.log('[useMeaningAnalysis] Using cached result:', {
+        analysisType,
+        focusWord,
+        hasFocusSentence: !!focusSentence
+      });
+      setAnalysis(cached);
+      setError(null);
+      return;
     }
 
     // Fetch from AI
@@ -89,11 +95,15 @@ export function useMeaningAnalysis(): UseMeaningAnalysisResult {
           simplified: result.simplified,
         };
 
-        // Cache successful result (but only for page-level analysis, not word-specific)
-        // Word-specific analysis is always fetched fresh to ensure accuracy
-        if (!focusWord) {
-          meaningCache.set(bookId, pageIndex, analysisType, analysisData);
-        }
+        // Cache successful result (page-level or word-specific)
+        meaningCache.set(
+          bookId,
+          pageIndex,
+          analysisType,
+          analysisData,
+          focusWord,
+          focusSentence
+        );
         setAnalysis(analysisData);
       } else {
         setError(result.error || 'Failed to fetch analysis');

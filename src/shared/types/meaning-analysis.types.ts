@@ -89,7 +89,7 @@ export interface MeaningAnalysis {
 
 /**
  * Cache entry for meaning analysis
- * Stored per page + analysis type combination
+ * Stored per page + analysis type + optional word/sentence combination
  */
 export interface CachedMeaningData {
   cacheVersion: number;
@@ -99,14 +99,29 @@ export interface CachedMeaningData {
 
 /**
  * Cache key generation for meaning analysis
- * Format: `${bookId}-meaning-${pageIndex}-${analysisType}`
+ * Format (page-level): `${bookId}-meaning-${pageIndex}-${analysisType}`
+ * Format (word-level): `${bookId}-meaning-${pageIndex}-${analysisType}-${word}-${sentenceHash}`
  */
 export function generateMeaningCacheKey(
   bookId: number,
   pageIndex: number,
-  analysisType: MeaningAnalysisType
+  analysisType: MeaningAnalysisType,
+  focusWord?: string,
+  focusSentence?: string
 ): string {
-  return `${bookId}-meaning-${pageIndex}-${analysisType}`;
+  const baseKey = `${bookId}-meaning-${pageIndex}-${analysisType}`;
+  const normalizedWord = focusWord?.trim();
+
+  if (!normalizedWord) {
+    return baseKey;
+  }
+
+  const sentence = focusSentence?.trim() ?? '';
+  const sentenceHash = sentence
+    ? sentence.substring(0, 80).replace(/\s+/g, '-')
+    : 'no-sentence';
+
+  return `${baseKey}-${normalizedWord}-${sentenceHash}`;
 }
 
 /**
