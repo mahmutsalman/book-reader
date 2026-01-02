@@ -55,8 +55,20 @@ setup_venv() {
     # Activate venv
     source "$VENV_DIR/bin/activate"
 
+    # If pip is broken, recreate the venv
+    if ! python -m pip --version >/dev/null 2>&1; then
+        echo "Pip is not working in the virtual environment; recreating..."
+        if type deactivate >/dev/null 2>&1; then
+            deactivate
+        fi
+        rm -rf "$VENV_DIR"
+        $PYTHON_CMD -m venv "$VENV_DIR"
+        source "$VENV_DIR/bin/activate"
+    fi
+
     # Upgrade pip
-    pip install --upgrade pip wheel setuptools
+    python -m ensurepip --upgrade >/dev/null 2>&1 || true
+    python -m pip install --upgrade pip wheel setuptools
 }
 
 # Install dependencies
