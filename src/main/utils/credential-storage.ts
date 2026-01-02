@@ -36,8 +36,17 @@ class SecureCredentialStore {
         const buffer = Buffer.from(encrypted, 'base64');
         return safeStorage.decryptString(buffer);
       } catch (error) {
-        console.error(`[Security] Failed to decrypt ${key}:`, error);
-        return '';
+        // If decryption fails, the value might be plaintext from dev mode
+        // Try to use it as plaintext and re-encrypt it for future use
+        console.warn(`[Security] Detected plaintext ${key}, re-encrypting...`);
+        try {
+          // Re-encrypt the plaintext value
+          await this.set(key, encrypted);
+          return encrypted;
+        } catch (reencryptError) {
+          console.error(`[Security] Failed to re-encrypt ${key}:`, reencryptError);
+          return '';
+        }
       }
     }
 
