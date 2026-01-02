@@ -686,14 +686,15 @@ const WordPanel: React.FC<WordPanelProps> = ({
           style={{
             backgroundColor: theme.panel,
             color: theme.text,
-            borderBottom: `1px solid ${theme.panelBorder}`
+            borderBottom: `1px solid ${theme.panelBorder}`,
+            fontSize: `${panelFontSize}px`
           }}
         >
           <div className="flex items-center gap-2">
             <div>
               <div className="flex items-center gap-2">
                 {/* Display word with German article if available */}
-                <h2 className="text-lg font-semibold">
+                <h2 className="font-semibold" style={{ fontSize: '1.1em' }}>
                   {wordData.germanArticle
                     ? `${wordData.germanArticle} ${capitalizeGermanNoun(selectedWord.word)}`
                     : selectedWord.word}
@@ -732,7 +733,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
               </div>
               {/* Only show IPA and syllables for single words, not phrases */}
               {!selectedWord.isPhrase && (wordData.ipa || wordData.syllables) && (
-                <div className="flex items-center gap-2 text-sm">
+                <div className="flex items-center gap-2" style={{ fontSize: '0.9em' }}>
                   {wordData.ipa && (
                     <span className="font-mono" style={{ color: theme.textSecondary }}>
                       /{wordData.ipa}/
@@ -748,14 +749,18 @@ const WordPanel: React.FC<WordPanelProps> = ({
               {/* Word type badge - on its own line to avoid crowding IPA */}
               {!selectedWord.isPhrase && wordData.wordType && (
                 <span
-                  className="px-2 py-0.5 text-xs rounded-full inline-block mt-1"
-                  style={{ backgroundColor: theme.background, color: theme.text }}
+                  className="px-2 py-0.5 rounded-full inline-block mt-1"
+                  style={{
+                    backgroundColor: theme.background,
+                    color: theme.text,
+                    fontSize: '0.8em'
+                  }}
                 >
                   {wordData.wordType}
                 </span>
               )}
               {selectedWord.isPhrase && (
-                <span className="text-xs" style={{ color: theme.textSecondary }}>
+                <span style={{ color: theme.textSecondary, fontSize: '0.8em' }}>
                   phrase
                 </span>
               )}
@@ -766,8 +771,8 @@ const WordPanel: React.FC<WordPanelProps> = ({
               e.stopPropagation();
               onClose();
             }}
-            className="text-2xl rounded-lg px-2 py-1 transition-colors"
-            style={{ color: theme.textSecondary }}
+            className="rounded-lg px-2 py-1 transition-colors"
+            style={{ color: theme.textSecondary, fontSize: '1.4em' }}
             onMouseEnter={(e) => {
               e.currentTarget.style.color = theme.text;
               e.currentTarget.style.backgroundColor = theme.background;
