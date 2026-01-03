@@ -10,6 +10,7 @@ import type { Book, BookData, ReadingProgress, MangaPage } from '../../../shared
 import type { CachedWordData } from '../../../shared/types/deferred-word.types';
 import type { PreStudyProgress } from '../../../shared/types/pre-study-notes.types';
 import type { GrammarAnalysis } from '../../../shared/types/grammar.types';
+import type { OCREngine } from '../../../shared/types/settings.types';
 import { calculateMiddleIndex, isWithinAdjacency } from '../../../shared/types/deferred-word.types';
 import { generateSimplerCacheKey } from '../../../shared/types/simpler-analysis.types';
 import { cleanWord, createWordBoundaryRegex } from '../../../shared/utils/text-utils';
@@ -21,6 +22,7 @@ import { FloatingProgressPanel } from './FloatingProgressPanel';
 import { ThemeContextMenu } from './ThemeContextMenu';
 import { ClearSelectionsMenu } from './ClearSelectionsMenu';
 import { RemoveWordMenu } from './RemoveWordMenu';
+import { OCREngineSelector } from '../OCREngineSelector';
 import InlineEditablePageNumber from './InlineEditablePageNumber';
 import { MangaImageView } from './MangaImageView';
 import { readerThemes } from '../../config/readerThemes';
@@ -135,6 +137,12 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
   const [showRemoveWordMenu, setShowRemoveWordMenu] = useState(false);
   const [removeWordMenuPosition, setRemoveWordMenuPosition] = useState({ x: 0, y: 0 });
   const [selectedWordIndex, setSelectedWordIndex] = useState<number | null>(null);
+
+  // OCR Engine selection context menu state
+  const [showOCREngineMenu, setShowOCREngineMenu] = useState(false);
+  const [ocrEngineMenuPosition, setOCREngineMenuPosition] = useState({ x: 0, y: 0 });
+  const [currentOCREngine, setCurrentOCREngine] = useState<OCREngine>('paddleocr'); // Default to PaddleOCR (recommended)
+  const ocrEngineMenuRef = useRef<HTMLDivElement>(null);
 
   // Focus Mode state - isFocusMode now from context
   const [showFocusNavigation, setShowFocusNavigation] = useState(false);
@@ -264,6 +272,31 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
     };
     saveProgress();
   }, [reflowState.characterOffset, reflowState.originalPage, reflowState.totalCharacters, zoom, updateProgress]);
+
+  // Close OCR Engine menu on click outside or Escape key
+  useEffect(() => {
+    if (!showOCREngineMenu) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (ocrEngineMenuRef.current && !ocrEngineMenuRef.current.contains(event.target as Node)) {
+        setShowOCREngineMenu(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setShowOCREngineMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [showOCREngineMenu]);
 
   // Helper to normalize quotes in text for consistent matching
   // Comprehensive apostrophe normalization covering:
@@ -1780,6 +1813,11 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
           {bookData.type === 'manga' && (
             <button
               onClick={() => setOcrSelectionMode(prev => !prev)}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                setOCREngineMenuPosition({ x: e.clientX, y: e.clientY });
+                setShowOCREngineMenu(true);
+              }}
               className="w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200"
               style={{
                 backgroundColor: ocrSelectionMode ? theme.accent : theme.panelBorder,
@@ -1797,7 +1835,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
                   event.currentTarget.style.backgroundColor = theme.panelBorder;
                 }
               }}
-              title={ocrSelectionMode ? 'Exit OCR Selection Mode (Ctrl+O)' : 'OCR Selection Mode (Ctrl+O)'}
+              title={ocrSelectionMode ? 'Exit OCR Selection Mode (Ctrl+O)\nRight-click to change OCR engine' : 'OCR Selection Mode (Ctrl+O)\nRight-click to change OCR engine'}
               aria-pressed={ocrSelectionMode}
             >
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
@@ -1928,6 +1966,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
               bookId={book.id}
               bookLanguage={book.language}
               ocrSelectionMode={ocrSelectionMode}
+              ocrEngine={currentOCREngine}
               onOcrSelectionModeChange={setOcrSelectionMode}
               onWordClick={(word, sentence, regionIndex, event) => {
                 // Reuse existing word click handler with OCR sentence context.
@@ -2116,6 +2155,34 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
           onThemeSelect={handleThemeSelect}
           onClose={() => setShowThemeMenu(false)}
         />
+      )}
+
+      {/* OCR Engine Context Menu */}
+      {showOCREngineMenu && (
+        <div
+          ref={ocrEngineMenuRef}
+          style={{
+            position: 'fixed',
+            top: ocrEngineMenuPosition.y,
+            left: ocrEngineMenuPosition.x,
+            zIndex: 10000,
+            backgroundColor: 'white',
+            borderRadius: '8px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+            border: '1px solid #e5e7eb',
+          }}
+        >
+          <OCREngineSelector
+            value={currentOCREngine}
+            onChange={(engine) => {
+              setCurrentOCREngine(engine);
+              setShowOCREngineMenu(false);
+              // TODO: Persist to settings and notify backend
+              console.log('Selected OCR engine:', engine);
+            }}
+            compact={true}
+          />
+        </div>
       )}
 
       {/* Clear Selections Context Menu */}

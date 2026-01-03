@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { IPC_CHANNELS } from './shared/constants/ipc-channels';
 import type { ElectronAPI } from './shared/types/ipc.types';
+import type { OCREngine } from './shared/types/settings.types';
 import type { PreStudyNotesRequest, PreStudyProgress } from './shared/types/pre-study-notes.types';
 
 // Create the API object to expose to the renderer
@@ -15,21 +16,23 @@ const electronAPI: ElectronAPI = {
       ipcRenderer.invoke(IPC_CHANNELS.BOOK_IMPORT_TXT, txtPath, language || 'en'),
     importEpub: (epubPath: string, language?: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.BOOK_IMPORT_EPUB, epubPath, language || 'en'),
-    importManga: (mangaPath: string, language?: string) =>
-      ipcRenderer.invoke(IPC_CHANNELS.BOOK_IMPORT_MANGA, mangaPath, language || 'en'),
-    importPng: (pngPath: string, language?: string) =>
-      ipcRenderer.invoke(IPC_CHANNELS.BOOK_IMPORT_PNG, pngPath, language || 'en'),
+    importManga: (mangaPath: string, language?: string, ocrEngine?: OCREngine) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BOOK_IMPORT_MANGA, mangaPath, language || 'en', ocrEngine),
+    importPng: (pngPath: string, language?: string, ocrEngine?: OCREngine) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BOOK_IMPORT_PNG, pngPath, language || 'en', ocrEngine),
     getMangaImagePath: (relativePath: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.BOOK_GET_MANGA_IMAGE_PATH, relativePath),
     ocrMangaRegion: (
       imagePath: string,
       region: { x: number; y: number; width: number; height: number },
-      language?: string
+      language?: string,
+      ocrEngine?: OCREngine
     ) => ipcRenderer.invoke(
       IPC_CHANNELS.BOOK_MANGA_OCR_REGION,
       imagePath,
       region,
-      language || 'en'
+      language || 'en',
+      ocrEngine
     ),
     updateMangaPageOCR: (bookId: number, pageNumber: number, regions) =>
       ipcRenderer.invoke(IPC_CHANNELS.BOOK_UPDATE_MANGA_PAGE_OCR, bookId, pageNumber, regions),

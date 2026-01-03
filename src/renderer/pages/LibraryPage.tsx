@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { useBooks } from '../context/BookContext';
 import type { Book, BookLanguage } from '../../shared/types';
 import { BOOK_LANGUAGES } from '../../shared/types';
+import type { OCREngine } from '../../shared/types/settings.types';
 import { useReaderTheme } from '../hooks/useReaderTheme';
 import { adjustColor, getContrastColor } from '../utils/colorUtils';
+import { OCREngineSelector } from '../components/OCREngineSelector';
 
 // Get display name for a language code
 const getLanguageName = (code: BookLanguage): string => {
@@ -26,6 +28,7 @@ const LibraryPage: React.FC = () => {
   const [isPngFile, setIsPngFile] = useState(false);
   const [showFormatDialog, setShowFormatDialog] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState<BookLanguage>('en');
+  const [selectedOCREngine, setSelectedOCREngine] = useState<OCREngine>('paddleocr'); // Default to PaddleOCR (recommended for comics)
   const [collapsedSections, setCollapsedSections] = useState<Set<BookLanguage>>(new Set());
 
   // Group books by language
@@ -134,14 +137,14 @@ const LibraryPage: React.FC = () => {
       } else if (isMangaFile) {
         // Manga/Comic import
         setImportProgress('Extracting comic pages...');
-        await window.electronAPI.book.importManga(pendingFilePath, selectedLanguage);
+        await window.electronAPI.book.importManga(pendingFilePath, selectedLanguage, selectedOCREngine);
         // Reload books to show the new import
         await loadBooks();
         setImportProgress('');
       } else if (isPngFile) {
         // Single PNG import for testing
         setImportProgress('Processing PNG with OCR...');
-        await window.electronAPI.book.importPng(pendingFilePath, selectedLanguage);
+        await window.electronAPI.book.importPng(pendingFilePath, selectedLanguage, selectedOCREngine);
         // Reload books to show the new import
         await loadBooks();
         setImportProgress('');
@@ -598,6 +601,30 @@ const LibraryPage: React.FC = () => {
                 <>Standard English word lookup will be used.</>
               )}
             </p>
+
+            {/* OCR Engine Selection (only for manga/comic imports) */}
+            {(isMangaFile || isPngFile) && (
+              <div className="mb-4">
+                <p className="text-sm font-medium mb-3" style={{ color: theme.text }}>
+                  Select OCR Engine:
+                </p>
+                <div
+                  className="overflow-y-auto pr-2"
+                  style={{ maxHeight: '300px' }}
+                >
+                  <OCREngineSelector
+                    value={selectedOCREngine}
+                    onChange={setSelectedOCREngine}
+                    showDescriptions={true}
+                  />
+                </div>
+                <p className="text-xs mt-3" style={{ color: theme.textSecondary }}>
+                  💡 <strong>Tesseract</strong> and <strong>PaddleOCR</strong> are installed by default.
+                  Other engines (TrOCR, EasyOCR) can be downloaded from the UI when needed.
+                </p>
+              </div>
+            )}
+
             {importing && importProgress && (
               <div
                 className="p-3 rounded-lg mb-4"

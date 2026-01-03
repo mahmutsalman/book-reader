@@ -1,6 +1,9 @@
 // AI Provider type
 export type AIProvider = 'local' | 'groq' | 'openrouter' | 'mistral' | 'google-ai';
 
+// OCR Engine type
+export type OCREngine = 'tesseract' | 'paddleocr' | 'trocr' | 'easyocr' | 'hybrid';
+
 // App settings
 export interface AppSettings {
   lm_studio_url: string;
@@ -32,6 +35,10 @@ export interface AppSettings {
   google_api_key: string;            // Google AI Studio API key
   google_model: string;              // Google model (default: 'gemini-2.0-flash-exp')
   contextualMeaningMaxTokens: number; // Max tokens for contextual meaning analysis (default: 1000)
+  // OCR Engine settings
+  ocr_engine: OCREngine;             // OCR engine to use ('tesseract', 'paddleocr', 'trocr', 'easyocr', 'hybrid')
+  ocr_confidence_threshold: number;  // Confidence threshold for filtering results (0-100, default: 15)
+  ocr_preprocessing_profile: string; // Preprocessing profile ('none', 'minimal', 'default', 'adaptive', etc.)
   // Reader mode persistence
   is_grammar_mode: boolean;          // Persist grammar analysis mode toggle
   is_meaning_mode: boolean;          // Persist meaning analysis mode toggle

@@ -12,6 +12,7 @@ export interface OCRTextRegion {
   text: string;                              // Extracted text
   bbox: [number, number, number, number];    // [x, y, width, height] in pixels
   confidence: number;                        // OCR confidence (0-1)
+  confidence_tier?: 'high' | 'medium' | 'low';  // Confidence tier for visual feedback
 }
 
 // Manga page extends BookPage with image and OCR data

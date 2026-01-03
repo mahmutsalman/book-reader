@@ -11,6 +11,7 @@
  */
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import type { BookLanguage, MangaPage, OCRTextRegion } from '../../../shared/types';
+import type { OCREngine } from '../../../shared/types/settings.types';
 
 interface MangaImageViewProps {
   page: MangaPage;
@@ -18,6 +19,7 @@ interface MangaImageViewProps {
   bookId: number;
   bookLanguage: BookLanguage;
   ocrSelectionMode: boolean;
+  ocrEngine: OCREngine;
   onOcrSelectionModeChange: (active: boolean) => void;
   onWordClick: (word: string, sentence: string, regionIndex: number, event?: React.MouseEvent) => void;
   onPhraseSelect?: (phrase: string, sentence: string) => void;
@@ -30,6 +32,7 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
   bookId,
   bookLanguage,
   ocrSelectionMode,
+  ocrEngine,
   onOcrSelectionModeChange,
   onWordClick,
   onPhraseSelect,
@@ -45,6 +48,21 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
   const [imagePath, setImagePath] = useState<string>('');
   const [imageScale, setImageScale] = useState<number>(1);
   const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
+  const [ocrMetadata, setOcrMetadata] = useState<{
+    total_extracted?: number;
+    filtered_count?: number;
+    filtered_out?: number;
+    confidence_stats?: {
+      count: number;
+      min: number;
+      max: number;
+      avg: number;
+      median: number;
+      distribution: { high: number; medium: number; low: number };
+    };
+  } | null>(null);
+  const [showDebugInfo, setShowDebugInfo] = useState(false);
+  const [showOcrFeedback, setShowOcrFeedback] = useState(false);
   const imageRef = useRef<HTMLImageElement>(null);
   const selectionStartRef = useRef<{ x: number; y: number } | null>(null);
   const selectionTransformRef = useRef<{ rect: DOMRect; zoom: number; imageScale: number } | null>(null);
@@ -300,7 +318,7 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
     };
   };
 
-  const rectanglesOverlap = (
+  const rectanglesOverlap = useCallback((
     bbox1: [number, number, number, number],
     bbox2: [number, number, number, number]
   ): boolean => {
@@ -313,7 +331,7 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
       y1 + h1 < y2 ||
       y2 + h2 < y1
     );
-  };
+  }, []);
 
   const performInReadingOCR = useCallback(async (rect: { x: number; y: number; width: number; height: number }) => {
     if (!window.electronAPI) {
@@ -324,17 +342,30 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
     setIsOcrProcessing(true);
 
     try {
-      const newRegions = await window.electronAPI.book.ocrMangaRegion(
+      const response = await window.electronAPI.book.ocrMangaRegion(
         page.image_path,
         rect,
-        bookLanguage
+        bookLanguage,
+        ocrEngine
       );
+
+      // Capture metadata for debugging and user feedback
+      if (response.metadata) {
+        setOcrMetadata(response.metadata);
+      }
 
       const filteredRegions = ocrRegions.filter(region => !rectanglesOverlap(
         region.bbox,
         [rect.x, rect.y, rect.width, rect.height]
       ));
-      const updatedRegions = [...filteredRegions, ...newRegions];
+      const updatedRegions = [...filteredRegions, ...response.regions];
+
+      // Show feedback notification if current OCR returned 0 regions
+      if (response.regions.length === 0 && response.metadata?.total_extracted) {
+        setShowOcrFeedback(true);
+        // Auto-dismiss after 4 seconds
+        setTimeout(() => setShowOcrFeedback(false), 4000);
+      }
 
       const persistedPage = await window.electronAPI.book.updateMangaPageOCR(
         bookId,
@@ -353,7 +384,7 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
     } finally {
       setIsOcrProcessing(false);
     }
-  }, [bookId, bookLanguage, ocrRegions, page.image_path, page.page]);
+  }, [bookId, bookLanguage, ocrEngine, ocrRegions, page.image_path, page.page, rectanglesOverlap]);
 
   const handleSelectionStart = useCallback((event: React.MouseEvent) => {
     if (!ocrSelectionMode || isOcrProcessing) return;
@@ -501,6 +532,53 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
     };
   }, [isSelecting, handleSelectionMove, handleSelectionEnd]);
 
+  /**
+   * Get color scheme for OCR region based on confidence tier.
+   * Returns background and border colors for different confidence levels.
+   */
+  const getConfidenceColor = useCallback((confidence: number, tier?: string): {
+    bg: string;
+    border: string;
+    bgHover: string;
+    borderHover: string;
+  } => {
+    const effectiveTier = tier || (
+      confidence >= 0.60 ? 'high' :
+      confidence >= 0.30 ? 'medium' : 'low'
+    );
+
+    switch (effectiveTier) {
+      case 'high':
+        return {
+          bg: 'rgba(34, 197, 94, 0.15)',        // Green - reliable
+          border: '1px solid rgba(34, 197, 94, 0.4)',
+          bgHover: 'rgba(34, 197, 94, 0.25)',
+          borderHover: '1px solid rgba(34, 197, 94, 0.6)'
+        };
+      case 'medium':
+        return {
+          bg: 'rgba(251, 191, 36, 0.15)',       // Yellow - partial
+          border: '1px solid rgba(251, 191, 36, 0.4)',
+          bgHover: 'rgba(251, 191, 36, 0.25)',
+          borderHover: '1px solid rgba(251, 191, 36, 0.6)'
+        };
+      case 'low':
+        return {
+          bg: 'rgba(239, 68, 68, 0.12)',        // Red - questionable
+          border: '1px solid rgba(239, 68, 68, 0.3)',
+          bgHover: 'rgba(239, 68, 68, 0.2)',
+          borderHover: '1px solid rgba(239, 68, 68, 0.5)'
+        };
+      default:
+        return {
+          bg: 'rgba(156, 163, 175, 0.15)',      // Gray - unknown
+          border: '1px solid rgba(156, 163, 175, 0.4)',
+          bgHover: 'rgba(156, 163, 175, 0.25)',
+          borderHover: '1px solid rgba(156, 163, 175, 0.6)'
+        };
+    }
+  }, []);
+
   const hasOCRRegions = ocrRegions.length > 0;
 
   return (
@@ -558,39 +636,48 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
               border: '2px solid rgba(255, 0, 0, 0.3)',
             }}
           >
-            {ocrRegions.map((region, idx) => (
-              <span
-                key={idx}
-                className={getRegionClassName(idx)}
-                data-word-index={idx}
-                data-text={region.text}
-                title={`${region.text} (${Math.round(region.confidence * 100)}% confidence)`}
-                style={{
-                  position: 'absolute',
-                  left: `${region.bbox[0] * imageScale}px`,
-                  top: `${region.bbox[1] * imageScale}px`,
-                  width: `${region.bbox[2] * imageScale}px`,
-                  height: `${region.bbox[3] * imageScale}px`,
-                  cursor: 'pointer',
-                  pointerEvents: ocrSelectionMode ? 'none' : 'auto',
-                  // DEBUG: Show all OCR regions with visible highlights
-                  backgroundColor: selectedRegions.includes(idx)
-                    ? 'rgba(251, 191, 36, 0.3)' // Yellow for selected
-                    : hoveredRegion === idx
-                    ? 'rgba(59, 130, 246, 0.25)' // Blue for hover
-                    : 'rgba(0, 255, 0, 0.15)', // Green for all regions (DEBUG)
-                  border: selectedRegions.includes(idx)
-                    ? '2px solid rgba(251, 191, 36, 0.8)'
-                    : hoveredRegion === idx
-                    ? '2px solid rgba(59, 130, 246, 0.6)'
-                    : '1px solid rgba(0, 255, 0, 0.4)', // Green border (DEBUG)
-                  transition: 'all 150ms ease',
-                }}
-                onClick={(e) => handleRegionClick(region, idx, e)}
-                onMouseEnter={() => setHoveredRegion(idx)}
-                onMouseLeave={() => setHoveredRegion(null)}
-              />
-            ))}
+            {ocrRegions.map((region, idx) => {
+              const colors = getConfidenceColor(region.confidence, region.confidence_tier);
+              const isSelected = selectedRegions.includes(idx);
+              const isHovered = hoveredRegion === idx;
+              const tierLabel = region.confidence_tier || (
+                region.confidence >= 0.60 ? 'high' :
+                region.confidence >= 0.30 ? 'medium' : 'low'
+              );
+
+              return (
+                <span
+                  key={idx}
+                  className={getRegionClassName(idx)}
+                  data-word-index={idx}
+                  data-text={region.text}
+                  title={`${region.text}\nConfidence: ${Math.round(region.confidence * 100)}% (${tierLabel})`}
+                  style={{
+                    position: 'absolute',
+                    left: `${region.bbox[0] * imageScale}px`,
+                    top: `${region.bbox[1] * imageScale}px`,
+                    width: `${region.bbox[2] * imageScale}px`,
+                    height: `${region.bbox[3] * imageScale}px`,
+                    cursor: 'pointer',
+                    pointerEvents: ocrSelectionMode ? 'none' : 'auto',
+                    backgroundColor: isSelected
+                      ? 'rgba(59, 130, 246, 0.3)' // Blue for selected (overrides tier color)
+                      : isHovered
+                      ? colors.bgHover
+                      : colors.bg,
+                    border: isSelected
+                      ? '2px solid rgba(59, 130, 246, 0.8)'
+                      : isHovered
+                      ? colors.borderHover
+                      : colors.border,
+                    transition: 'all 150ms ease',
+                  }}
+                  onClick={(e) => handleRegionClick(region, idx, e)}
+                  onMouseEnter={() => setHoveredRegion(idx)}
+                  onMouseLeave={() => setHoveredRegion(null)}
+                />
+              );
+            })}
           </div>
         ) : hasOCRRegions ? (
           <div
@@ -612,17 +699,53 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
           <div
             style={{
               position: 'absolute',
-              top: '10px',
-              left: '10px',
-              backgroundColor: 'rgba(255, 0, 0, 0.8)',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              backgroundColor: 'rgba(0, 0, 0, 0.85)',
               color: 'white',
-              padding: '8px 12px',
-              borderRadius: '4px',
-              fontSize: '14px',
+              padding: '20px 24px',
+              borderRadius: '8px',
+              maxWidth: '400px',
               zIndex: 1000,
+              textAlign: 'center',
             }}
           >
-            No OCR regions found (has_text: {String(page.has_text)}, regions: {ocrRegions.length})
+            <div style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '12px' }}>
+              {ocrMetadata?.total_extracted && ocrMetadata.total_extracted > 0
+                ? `⚠️ All ${ocrMetadata.total_extracted} regions filtered`
+                : '🔍 No text detected'}
+            </div>
+
+            {ocrMetadata?.total_extracted && ocrMetadata.total_extracted > 0 ? (
+              <div style={{ fontSize: '14px', lineHeight: '1.6' }}>
+                <p>OCR detected text but confidence was too low.</p>
+                <p style={{ marginTop: '8px', color: '#fbbf24' }}>
+                  Try: Redraw selection or adjust OCR settings
+                </p>
+              </div>
+            ) : (
+              <div style={{ fontSize: '14px', lineHeight: '1.6' }}>
+                <p>No text found in this {page.has_text ? 'selection' : 'page'}.</p>
+                <p style={{ marginTop: '8px', color: '#60a5fa' }}>
+                  Try: Select speech bubble more precisely
+                </p>
+              </div>
+            )}
+
+            {ocrMetadata?.confidence_stats && ocrMetadata.confidence_stats.distribution.low > 0 && (
+              <div
+                style={{
+                  marginTop: '12px',
+                  padding: '8px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                  borderRadius: '4px',
+                  fontSize: '12px',
+                }}
+              >
+                Filtered: {ocrMetadata.confidence_stats.distribution.low} low confidence regions
+              </div>
+            )}
           </div>
         )}
 
@@ -660,6 +783,157 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
             }}
           >
             {selectedRegions.length} selected
+          </div>
+        )}
+
+        {/* Debug stats toggle button */}
+        {hasOCRRegions && (
+          <button
+            onClick={() => setShowDebugInfo(!showDebugInfo)}
+            style={{
+              position: 'absolute',
+              top: '10px',
+              left: '10px',
+              padding: '6px 12px',
+              backgroundColor: 'rgba(0, 0, 0, 0.6)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '12px',
+              zIndex: 1001,
+              transition: 'background-color 150ms ease',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.8)')}
+            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.6)')}
+          >
+            {showDebugInfo ? 'Hide' : 'Show'} OCR Stats
+          </button>
+        )}
+
+        {/* Debug statistics panel */}
+        {showDebugInfo && ocrMetadata?.confidence_stats && (
+          <div
+            style={{
+              position: 'absolute',
+              bottom: '10px',
+              right: '10px',
+              backgroundColor: 'rgba(0, 0, 0, 0.9)',
+              color: 'white',
+              padding: '12px',
+              borderRadius: '6px',
+              fontSize: '12px',
+              fontFamily: 'monospace',
+              maxWidth: '300px',
+              zIndex: 1000,
+              boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+            }}
+          >
+            <div style={{ fontWeight: 'bold', marginBottom: '8px', fontSize: '13px' }}>
+              OCR Confidence Stats
+            </div>
+            <div style={{ lineHeight: '1.8' }}>
+              <div>Total: {ocrMetadata.confidence_stats.count} regions</div>
+              <div>
+                Range: {(ocrMetadata.confidence_stats.min * 100).toFixed(0)}%-
+                {(ocrMetadata.confidence_stats.max * 100).toFixed(0)}%
+              </div>
+              <div>Average: {(ocrMetadata.confidence_stats.avg * 100).toFixed(1)}%</div>
+              <div>Median: {(ocrMetadata.confidence_stats.median * 100).toFixed(1)}%</div>
+              <div
+                style={{
+                  marginTop: '6px',
+                  borderTop: '1px solid rgba(255,255,255,0.2)',
+                  paddingTop: '6px',
+                }}
+              >
+                <div style={{ color: '#22c55e' }}>
+                  🟢 High (≥60%): {ocrMetadata.confidence_stats.distribution.high}
+                </div>
+                <div style={{ color: '#fbbf24' }}>
+                  🟡 Medium (30-60%): {ocrMetadata.confidence_stats.distribution.medium}
+                </div>
+                <div style={{ color: '#ef4444' }}>
+                  🔴 Low (15-30%): {ocrMetadata.confidence_stats.distribution.low}
+                </div>
+              </div>
+              {ocrMetadata.total_extracted && (
+                <div
+                  style={{
+                    marginTop: '6px',
+                    borderTop: '1px solid rgba(255,255,255,0.2)',
+                    paddingTop: '6px',
+                    fontSize: '11px',
+                    color: '#999',
+                  }}
+                >
+                  Extracted: {ocrMetadata.total_extracted} | Filtered: {ocrMetadata.filtered_out || 0}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* OCR Feedback Notification - shows when OCR returns 0 regions */}
+        {showOcrFeedback && ocrMetadata && (
+          <div
+            style={{
+              position: 'fixed',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              backgroundColor: 'rgba(0, 0, 0, 0.92)',
+              color: 'white',
+              padding: '24px 28px',
+              borderRadius: '12px',
+              maxWidth: '450px',
+              zIndex: 2000,
+              textAlign: 'center',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+              border: '2px solid rgba(251, 191, 36, 0.4)',
+            }}
+          >
+            <div style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '14px' }}>
+              {ocrMetadata.total_extracted && ocrMetadata.total_extracted > 0
+                ? `⚠️ All ${ocrMetadata.total_extracted} region${ocrMetadata.total_extracted > 1 ? 's' : ''} filtered`
+                : '🔍 No text detected'}
+            </div>
+
+            {ocrMetadata.total_extracted && ocrMetadata.total_extracted > 0 ? (
+              <div style={{ fontSize: '15px', lineHeight: '1.7' }}>
+                <p style={{ marginBottom: '10px' }}>OCR detected text but confidence was too low (below 15%).</p>
+                <p style={{ color: '#fbbf24', fontWeight: '500' }}>
+                  💡 Try: Redraw selection more precisely or choose clearer text
+                </p>
+                {ocrMetadata.confidence_stats && (
+                  <div
+                    style={{
+                      marginTop: '14px',
+                      padding: '10px',
+                      backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                      borderRadius: '6px',
+                      fontSize: '13px',
+                    }}
+                  >
+                    <div>Confidence: {Math.round(ocrMetadata.confidence_stats.min * 100)}% - {Math.round(ocrMetadata.confidence_stats.max * 100)}%</div>
+                    <div style={{ marginTop: '4px', color: '#ef4444' }}>
+                      🔴 All regions below 15% threshold
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div style={{ fontSize: '15px', lineHeight: '1.7' }}>
+                <p style={{ marginBottom: '10px' }}>No text found in the selected area.</p>
+                <p style={{ color: '#60a5fa', fontWeight: '500' }}>
+                  💡 Try: Select speech bubble or text area more carefully
+                </p>
+              </div>
+            )}
+
+            <div style={{ marginTop: '16px', fontSize: '12px', color: '#999' }}>
+              This message will auto-dismiss in 4 seconds
+            </div>
           </div>
         )}
       </div>

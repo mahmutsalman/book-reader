@@ -6,6 +6,7 @@ import { txtImportService } from '../services/txt-import.service';
 import { epubImportService } from '../services/epub-import.service';
 import { mangaImportService } from '../services/manga-import.service';
 import type { BookLanguage, OCRTextRegion } from '../../shared/types';
+import type { OCREngine } from '../../shared/types/settings.types';
 
 export function registerBookHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.BOOK_IMPORT, async (_, filePath: string, language: BookLanguage = 'en') => {
@@ -32,13 +33,13 @@ export function registerBookHandlers(): void {
   });
 
   // Manga/Comic Import handler
-  ipcMain.handle(IPC_CHANNELS.BOOK_IMPORT_MANGA, async (_, mangaPath: string, language: BookLanguage = 'en') => {
-    return mangaImportService.importManga(mangaPath, language);
+  ipcMain.handle(IPC_CHANNELS.BOOK_IMPORT_MANGA, async (_, mangaPath: string, language: BookLanguage = 'en', ocrEngine: OCREngine = 'paddleocr') => {
+    return mangaImportService.importManga(mangaPath, language, ocrEngine);
   });
 
   // PNG Test Import handler
-  ipcMain.handle(IPC_CHANNELS.BOOK_IMPORT_PNG, async (_, pngPath: string, language: BookLanguage = 'en') => {
-    return mangaImportService.importPng(pngPath, language);
+  ipcMain.handle(IPC_CHANNELS.BOOK_IMPORT_PNG, async (_, pngPath: string, language: BookLanguage = 'en', ocrEngine: OCREngine = 'paddleocr') => {
+    return mangaImportService.importPng(pngPath, language, ocrEngine);
   });
 
   // Get manga image as data URL
@@ -75,9 +76,10 @@ export function registerBookHandlers(): void {
       _,
       imagePath: string,
       region: { x: number; y: number; width: number; height: number },
-      language: BookLanguage = 'en'
+      language: BookLanguage = 'en',
+      ocrEngine: OCREngine = 'paddleocr'
     ) => {
-      return mangaImportService.ocrPartialRegion(imagePath, region, language);
+      return mangaImportService.ocrPartialRegion(imagePath, region, language, ocrEngine);
     }
   );
 

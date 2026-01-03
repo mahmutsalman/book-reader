@@ -1,6 +1,6 @@
 import type { Book, BookData, ReadingProgress, BookLanguage, MangaPage, OCRTextRegion } from './book.types';
 import type { VocabularyEntry, CreateVocabularyEntry, VocabularyFilters, StoredWordOccurrence, WordTypeCounts } from './vocabulary.types';
-import type { AppSettings, LMStudioConnectionResult, GroqConnectionResult } from './settings.types';
+import type { AppSettings, LMStudioConnectionResult, GroqConnectionResult, OCREngine } from './settings.types';
 import type { WordDefinitionResult, IPAPronunciationResult, BatchIPAResult, SimplifiedSentenceResult, WordEquivalentResult, PhraseMeaningResult, TatoebaSentence, TatoebaStatus } from './ai.types';
 import type { TTSResponse, IPAResponse, PronunciationServerStatus, IPALanguagesResponse, InstallLanguageResponse, VoiceModelsResponse, DownloadModelResponse, DeleteModelResponse } from './pronunciation.types';
 import type { PreStudyNotesRequest, PreStudyNotesResult, PreStudyProgress } from './pre-study-notes.types';
@@ -76,14 +76,32 @@ export interface ElectronAPI {
     importPdf: (pdfPath: string, language?: BookLanguage, useOcr?: boolean) => Promise<Book>;
     importTxt: (txtPath: string, language?: BookLanguage) => Promise<Book>;
     importEpub: (epubPath: string, language?: BookLanguage) => Promise<Book>;
-    importManga: (mangaPath: string, language?: BookLanguage) => Promise<Book>;
-    importPng: (pngPath: string, language?: BookLanguage) => Promise<Book>;
+    importManga: (mangaPath: string, language?: BookLanguage, ocrEngine?: OCREngine) => Promise<Book>;
+    importPng: (pngPath: string, language?: BookLanguage, ocrEngine?: OCREngine) => Promise<Book>;
     getMangaImagePath: (relativePath: string) => Promise<string>;
     ocrMangaRegion: (
       imagePath: string,
       region: { x: number; y: number; width: number; height: number },
-      language?: BookLanguage
-    ) => Promise<OCRTextRegion[]>;
+      language?: BookLanguage,
+      ocrEngine?: OCREngine
+    ) => Promise<{
+      regions: OCRTextRegion[];
+      metadata?: {
+        confidence_stats?: {
+          count: number;
+          min: number;
+          max: number;
+          avg: number;
+          median: number;
+          distribution: { high: number; medium: number; low: number };
+        };
+        preprocessing_profile?: string;
+        psm_mode?: string;
+        total_extracted?: number;
+        filtered_count?: number;
+        filtered_out?: number;
+      };
+    }>;
     updateMangaPageOCR: (bookId: number, pageNumber: number, regions: OCRTextRegion[]) => Promise<MangaPage | null>;
     getPdfStatus: () => Promise<PdfStatusResponse>;
     getAll: () => Promise<Book[]>;

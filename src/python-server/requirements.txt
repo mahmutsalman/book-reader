@@ -9,7 +9,12 @@ piper-tts>=1.2.0
 # IPA Transcription
 gruut>=2.3.0
 
-# PDF Processing
+# PDF Processing & OCR
 PyMuPDF>=1.23.0
 pytesseract>=0.3.10
 Pillow>=10.0.0
+scipy>=1.10.0
+
+# OCR Engines (default installation)
+paddleocr>=2.7.0
+paddlepaddle>=2.5.0

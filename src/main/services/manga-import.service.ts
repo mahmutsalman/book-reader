@@ -219,9 +219,9 @@ class MangaImportService {
   /**
    * Perform OCR on a single manga page image.
    */
-  private async performOCR(imagePath: string, language: BookLanguage): Promise<OCRTextRegion[]> {
+  private async performOCR(imagePath: string, language: BookLanguage, ocrEngine = 'paddleocr'): Promise<OCRTextRegion[]> {
     try {
-      console.log(`[MangaImportService] Performing OCR on: ${path.basename(imagePath)}`);
+      console.log(`[MangaImportService] Performing OCR on: ${path.basename(imagePath)} (engine=${ocrEngine})`);
 
       // Check if Python server is ready
       if (!pythonManager.ready) {
@@ -236,6 +236,7 @@ class MangaImportService {
         body: JSON.stringify({
           image_path: imagePath,
           language: language,
+          ocr_engine: ocrEngine,
         }),
         signal: AbortSignal.timeout(30000), // 30 second timeout
       });
@@ -263,8 +264,12 @@ class MangaImportService {
   async ocrPartialRegion(
     imagePath: string,
     region: { x: number; y: number; width: number; height: number },
-    language: BookLanguage = 'en'
-  ): Promise<OCRTextRegion[]> {
+    language: BookLanguage = 'en',
+    ocrEngine = 'paddleocr'
+  ): Promise<{
+    regions: OCRTextRegion[];
+    metadata?: any;
+  }> {
     try {
       if (!pythonManager.ready) {
         console.warn('[MangaImportService] Python server not ready, skipping partial OCR');
@@ -282,6 +287,7 @@ class MangaImportService {
           image_path: absolutePath,
           region: [region.x, region.y, region.width, region.height],
           language,
+          ocr_engine: ocrEngine,
         }),
         signal: AbortSignal.timeout(30000),
       });
@@ -290,13 +296,16 @@ class MangaImportService {
         throw new Error(`Partial OCR request failed: ${response.status} ${response.statusText}`);
       }
 
-      const data = await response.json() as { success: boolean; regions?: OCRTextRegion[]; error?: string };
+      const data = await response.json() as { success: boolean; regions?: OCRTextRegion[]; metadata?: any; error?: string };
 
       if (!data.success) {
         throw new Error(data.error || 'Partial OCR failed');
       }
 
-      return data.regions || [];
+      return {
+        regions: data.regions || [],
+        metadata: data.metadata,
+      };
     } catch (error) {
       console.error('[MangaImportService] Partial OCR failed:', error);
       throw error;
@@ -309,6 +318,7 @@ class MangaImportService {
   private async batchOCR(
     imagePaths: string[],
     language: BookLanguage,
+    ocrEngine: string,
     onProgress?: (current: number, total: number) => void
   ): Promise<Map<string, OCRTextRegion[]>> {
     const ocrResults = new Map<string, OCRTextRegion[]>();
@@ -322,7 +332,7 @@ class MangaImportService {
 
       // Process batch in parallel
       const batchPromises = batch.map(async (imagePath) => {
-        const regions = await this.performOCR(imagePath, language);
+        const regions = await this.performOCR(imagePath, language, ocrEngine);
         ocrResults.set(imagePath, regions);
       });
 
@@ -383,6 +393,7 @@ class MangaImportService {
   async importManga(
     mangaPath: string,
     language: BookLanguage = 'en',
+    ocrEngine = 'paddleocr',
     onProgress?: (current: number, total: number, status: string) => void
   ): Promise<Book> {
     // Validate file exists
@@ -433,7 +444,7 @@ class MangaImportService {
     // Perform OCR with progress tracking
     onProgress?.(10, 100, `Running OCR (0/${images.length})...`);
 
-    const ocrResults = await this.batchOCR(images, language, (current, total) => {
+    const ocrResults = await this.batchOCR(images, language, ocrEngine, (current, total) => {
       const progressPercent = 10 + Math.floor((current / total) * 80); // 10-90%
       onProgress?.(progressPercent, 100, `Running OCR (${current}/${total})...`);
     });
@@ -487,7 +498,8 @@ class MangaImportService {
    */
   async importPng(
     pngPath: string,
-    language: BookLanguage = 'en'
+    language: BookLanguage = 'en',
+    ocrEngine = 'paddleocr'
   ): Promise<Book> {
     const mangaId = uuidv4();
     const filename = path.basename(pngPath, path.extname(pngPath));
@@ -509,36 +521,13 @@ class MangaImportService {
 
     // Run OCR on the single image
     console.log(`[MangaImportService] Running OCR on PNG: ${destPath}`);
-    const ocrRegions = await this.performOCR(destPath, language);
+    const ocrRegions = await this.performOCR(destPath, language, ocrEngine);
 
     console.log(`[MangaImportService] ✅ OCR extracted ${ocrRegions.length} text regions`);
 
     if (ocrRegions.length === 0) {
       console.warn(`[MangaImportService] ⚠️ WARNING: No text regions extracted from PNG.`);
     }
-
-    // Save OCR debug output
-    const debugPath = path.join(mangaDir, 'ocr_debug.txt');
-    const debugOutput = [
-      `OCR Extraction Debug Report`,
-      `===========================`,
-      `Image: ${filename}`,
-      `Total Regions: ${ocrRegions.length}`,
-      `Timestamp: ${new Date().toISOString()}`,
-      ``,
-      `Extracted Text Regions:`,
-      `======================`,
-      ...ocrRegions.map((r, i) =>
-        `[${i + 1}] "${r.text}" (confidence: ${(r.confidence * 100).toFixed(1)}%) @ [${r.bbox.map(v => Math.round(v)).join(', ')}]`
-      ),
-      ``,
-      `Full Text (concatenated):`,
-      `========================`,
-      ocrRegions.map(r => r.text).join(' ')
-    ].join('\n');
-
-    fs.writeFileSync(debugPath, debugOutput, 'utf-8');
-    console.log(`[MangaImportService] 📄 Debug file saved: ${debugPath}`);
 
     // Build relative image path
     const relativeImagePath = `manga/${mangaId}/images/${imageName}`;

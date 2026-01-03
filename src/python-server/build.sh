@@ -40,6 +40,41 @@ check_python() {
     echo "Found Python $PYTHON_VERSION at $($PYTHON_CMD -c 'import sys; print(sys.executable)')"
 }
 
+# Check for Tesseract OCR system dependency
+check_tesseract() {
+    echo ""
+    echo "Checking Tesseract OCR..."
+
+    if command -v tesseract &> /dev/null; then
+        TESS_VERSION=$(tesseract --version 2>&1 | head -n 1)
+        echo "✅ Found: $TESS_VERSION"
+    else
+        echo "❌ Tesseract OCR not found!"
+        echo ""
+        echo "Manga/Comic OCR requires Tesseract OCR to be installed."
+        echo ""
+        echo "Installation instructions:"
+        echo "  macOS:   brew install tesseract"
+        echo "  Ubuntu:  sudo apt-get install tesseract-ocr"
+        echo "  Windows: Download from https://github.com/UB-Mannheim/tesseract/wiki"
+        echo ""
+        echo "After installation, restart the terminal and run this script again."
+        echo ""
+
+        # Ask if they want to continue without Tesseract
+        if [ -z "$CI" ] && [ -z "$GITHUB_ACTIONS" ]; then
+            echo "Continue without Tesseract? (OCR features will not work) [y/N]"
+            read -r response
+            if [[ ! "$response" =~ ^[Yy]$ ]]; then
+                echo "Exiting. Please install Tesseract OCR and try again."
+                exit 1
+            fi
+        else
+            echo "⚠️  Continuing without Tesseract (CI mode)"
+        fi
+    fi
+}
+
 # Create virtual environment
 setup_venv() {
     echo ""
@@ -166,6 +201,7 @@ build_binary() {
 
 # Main
 check_python
+check_tesseract
 
 case "${1:-}" in
     --dev)
@@ -173,7 +209,9 @@ case "${1:-}" in
         install_deps
         check_models
         echo ""
-        echo "Development setup complete. Run 'source venv/bin/activate' to activate."
+        echo "✅ Development setup complete!"
+        echo "   Python packages installed (including scipy for OCR)"
+        echo "   Run 'source venv/bin/activate' to activate."
         ;;
     --binary)
         source "$VENV_DIR/bin/activate"
