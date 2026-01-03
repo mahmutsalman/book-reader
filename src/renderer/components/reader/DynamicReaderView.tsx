@@ -122,6 +122,8 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
 
   // Manga translation status tracking
   const [mangaRegionStatus, setMangaRegionStatus] = useState<Map<number, 'loading' | 'ready'>>(new Map());
+  const [hasMangaSelections, setHasMangaSelections] = useState(false);
+  const clearMangaSelectionsRef = useRef<(() => void) | null>(null);
 
   // Pre-study notes state
   const [isGeneratingNotes, setIsGeneratingNotes] = useState(false);
@@ -735,11 +737,33 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
     }
   }, [updateSetting]);
 
+  // Handle manga context menu
+  const handleMangaContextMenu = useCallback((event: React.MouseEvent, clickedOnRegion: boolean) => {
+    event.preventDefault();
+
+    if (clickedOnRegion) {
+      // TODO: Could show remove word menu for manga OCR regions in future
+      // For now, just ignore clicks on regions
+      return;
+    }
+
+    // Empty space clicked - show clear selections menu
+    setClearMenuPosition({ x: event.clientX, y: event.clientY });
+    setShowClearMenu(true);
+    setShowThemeMenu(false);
+    setShowRemoveWordMenu(false);
+  }, []);
+
   // Handle clearing all selections for current page
   const handleClearSelections = useCallback(() => {
     console.log('[CLEAR] Clearing all selections for current page');
 
-    // Core selection state
+    // For manga mode, clear manga selections via ref
+    if (bookData.type === 'manga' && clearMangaSelectionsRef.current) {
+      clearMangaSelectionsRef.current();
+    }
+
+    // Core selection state (for text mode)
     setSelectedIndices([]);
     setPhraseRanges(new Map());
 
@@ -769,7 +793,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
     wordIndexMapRef.current.clear();
 
     console.log('[CLEAR] Selections cleared successfully');
-  }, [reflowState.currentPageIndex]);
+  }, [bookData.type, reflowState.currentPageIndex]);
 
   // Remove a specific word/phrase selection
   const handleRemoveWordSelection = useCallback((wordIndex: number) => {
@@ -876,10 +900,15 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
 
   // Check if current page has any selections
   const hasSelectionsOnPage = useCallback((): boolean => {
-    return selectedIndices.length > 0 ||
-           phraseRanges.size > 0 ||
-           loadingPositions.size > 0;
-  }, [selectedIndices, phraseRanges, loadingPositions]);
+    // For text mode, check text selections
+    if (bookData.type !== 'manga') {
+      return selectedIndices.length > 0 ||
+             phraseRanges.size > 0 ||
+             loadingPositions.size > 0;
+    }
+    // For manga mode, check manga selections
+    return hasMangaSelections;
+  }, [bookData.type, selectedIndices, phraseRanges, loadingPositions, hasMangaSelections]);
 
   // Handle word click with deferred lookup behavior and phrase selection
   const handleWordClick = useCallback((
@@ -2021,6 +2050,9 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
               knownWords={knownWords}
               isWordReady={isWordReady}
               onTranslationStatusChange={handleMangaTranslationStatusChange}
+              onSelectionsChange={setHasMangaSelections}
+              clearSelectionsRef={clearMangaSelectionsRef}
+              onContextMenu={handleMangaContextMenu}
             />
           ) : (
             renderText(reflowState.currentText)

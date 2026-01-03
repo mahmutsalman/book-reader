@@ -33,6 +33,11 @@ interface MangaImageViewProps {
   knownWords?: Set<string>;
   isWordReady?: (word: string, sentence: string, bookId: number) => boolean;
   onTranslationStatusChange?: (regionIndex: number, status: 'loading' | 'ready') => void;
+  // Selection state tracking
+  onSelectionsChange?: (hasSelections: boolean) => void;
+  clearSelectionsRef?: React.MutableRefObject<(() => void) | null>;
+  // Context menu
+  onContextMenu?: (event: React.MouseEvent, clickedOnRegion: boolean) => void;
 }
 
 export const MangaImageView: React.FC<MangaImageViewProps> = ({
@@ -51,6 +56,9 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
   knownWords,
   isWordReady,
   onTranslationStatusChange,
+  onSelectionsChange,
+  clearSelectionsRef,
+  onContextMenu: onContextMenuProp,
 }) => {
   const [selectedRegions, setSelectedRegions] = useState<number[]>([]);
   const [isShiftPressed, setIsShiftPressed] = useState(false);
@@ -114,6 +122,31 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
   useEffect(() => {
     selectedRegionsRef.current = selectedRegions;
   }, [selectedRegions]);
+
+  // Notify parent component when selections change
+  useEffect(() => {
+    const hasSelections = selectedRegions.length > 0 ||
+                         mangaPhraseRanges.size > 0 ||
+                         regionTranslationStatus.size > 0;
+    onSelectionsChange?.(hasSelections);
+  }, [selectedRegions, mangaPhraseRanges, regionTranslationStatus, onSelectionsChange]);
+
+  // Expose clear selections function to parent via ref
+  useEffect(() => {
+    if (clearSelectionsRef) {
+      clearSelectionsRef.current = () => {
+        console.log('[MangaImageView] Clearing all manga selections');
+        setSelectedRegions([]);
+        setMangaPhraseRanges(new Map());
+        setRegionTranslationStatus(new Map());
+      };
+    }
+    return () => {
+      if (clearSelectionsRef) {
+        clearSelectionsRef.current = null;
+      }
+    };
+  }, [clearSelectionsRef]);
 
   const ocrReadingOrder = useMemo(() => {
     if (ocrRegions.length === 0) return [];
@@ -236,6 +269,11 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
       window.clearTimeout(dragActivationTimeoutRef.current);
       dragActivationTimeoutRef.current = null;
     }
+    // Clear phrase ranges and translation status to prevent state leakage across pages.
+    // These use relative indices (0, 1, 2, ...) that would incorrectly match
+    // different OCR regions on new pages.
+    setMangaPhraseRanges(new Map());
+    setRegionTranslationStatus(new Map());
   }, [page.page, page.ocr_regions]);
 
   useEffect(() => {
@@ -1134,6 +1172,18 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
     setIsSelecting(true);
   }, [ocrSelectionMode, isOcrProcessing, imageDimensions, zoom, imageScale]);
 
+  const handleContextMenuInternal = useCallback((event: React.MouseEvent) => {
+    if (!onContextMenuProp) return;
+
+    // Check if an OCR region was clicked
+    const target = event.target as HTMLElement;
+    const isOcrRegion = target.classList.contains('ocr-region-invisible') ||
+                        target.closest('.ocr-region-invisible') !== null;
+
+    // Call parent handler with info about whether a region was clicked
+    onContextMenuProp(event, isOcrRegion);
+  }, [onContextMenuProp]);
+
   const handleSelectionMove = useCallback((event: MouseEvent) => {
     if (!isSelecting || !selectionStartRef.current || !selectionTransformRef.current) return;
 
@@ -1446,6 +1496,7 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
             handleDragStart(e);
           }
         }}
+        onContextMenu={handleContextMenuInternal}
       >
         {imagePath ? (
           <img
