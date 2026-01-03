@@ -14,6 +14,46 @@ A smart book reader application with dynamic text wrapping, AI-powered word look
 - **Multi-Format Support**: EPUB, PDF, and text files.
 - **Adaptive Themes**: Multiple reading themes with automatic adjustment.
 
+## Screenshots
+
+<div align="center">
+
+### Reading Experience
+<img src="screenshots/app-reading-full-screen1.png" alt="Full Screen Reading View" width="800"/>
+
+*Immersive full-screen reading mode with clean typography*
+
+---
+
+### AI-Powered Word Lookup
+
+<div style="display: flex; gap: 10px; justify-content: center;">
+  <img src="screenshots/app-reading-view-ex1.png" alt="Reading View with Word Lookup" width="400"/>
+  <img src="screenshots/app-reading-view-ex2.png" alt="Reading View Alternative" width="400"/>
+</div>
+
+*Instant word definitions and context analysis*
+
+---
+
+### Smart Side Panel Features
+
+<div style="display: flex; gap: 10px; justify-content: center;">
+  <img src="screenshots/side-panel-opened1.png" alt="Side Panel with Features" width="400"/>
+  <img src="screenshots/only-sidepanel-opened-grammer-toggle.png" alt="Grammar Toggle Panel" width="400"/>
+</div>
+
+*Pronunciation, IPA transcription, and grammar insights*
+
+---
+
+### Vocabulary Tracking
+<img src="screenshots/vocabulary.png" alt="Vocabulary Management" width="800"/>
+
+*Build and track your vocabulary over time*
+
+</div>
+
 ---
 
 ## 📋 Governance & Security
