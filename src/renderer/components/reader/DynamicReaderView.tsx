@@ -1968,6 +1968,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
               ocrSelectionMode={ocrSelectionMode}
               ocrEngine={currentOCREngine}
               onOcrSelectionModeChange={setOcrSelectionMode}
+              onZoomChange={setZoom}
               onWordClick={(word, sentence, regionIndex, event) => {
                 // Reuse existing word click handler with OCR sentence context.
                 handleWordClick(word, regionIndex, event, sentence);

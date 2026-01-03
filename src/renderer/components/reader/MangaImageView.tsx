@@ -23,6 +23,7 @@ interface MangaImageViewProps {
   onOcrSelectionModeChange: (active: boolean) => void;
   onWordClick: (word: string, sentence: string, regionIndex: number, event?: React.MouseEvent) => void;
   onPhraseSelect?: (phrase: string, sentence: string) => void;
+  onZoomChange?: (zoom: number) => void;
   className?: string;
 }
 
@@ -36,6 +37,7 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
   onOcrSelectionModeChange,
   onWordClick,
   onPhraseSelect,
+  onZoomChange,
   className = '',
 }) => {
   const [selectedRegions, setSelectedRegions] = useState<number[]>([]);
@@ -61,12 +63,16 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
       distribution: { high: number; medium: number; low: number };
     };
   } | null>(null);
-  const [showDebugInfo, setShowDebugInfo] = useState(false);
   const [showOcrFeedback, setShowOcrFeedback] = useState(false);
+  // Pan and zoom state
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const imageRef = useRef<HTMLImageElement>(null);
   const selectionStartRef = useRef<{ x: number; y: number } | null>(null);
   const selectionTransformRef = useRef<{ rect: DOMRect; zoom: number; imageScale: number } | null>(null);
   const ocrOverridesRef = useRef<Map<number, OCRTextRegion[]>>(new Map());
+  const wrapperRef = useRef<HTMLDivElement>(null);
   
   useEffect(() => {
     const overrideRegions = ocrOverridesRef.current.get(page.page);
@@ -114,6 +120,99 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
       window.removeEventListener('keyup', handleKeyUp);
     };
   }, [selectedRegions, onPhraseSelect]);
+
+  // Reset pan offset when zoom changes or page changes
+  useEffect(() => {
+    setPanOffset({ x: 0, y: 0 });
+  }, [zoom, page.page]);
+
+  /**
+   * Handle mouse wheel for zooming and panning.
+   * - Ctrl+wheel or trackpad pinch gesture → zoom
+   * - Two-finger scroll or regular wheel → pan when zoomed in
+   */
+  const handleWheel = useCallback((event: WheelEvent) => {
+    // Pinch-to-zoom gesture (trackpad pinch or Ctrl+wheel)
+    if (event.ctrlKey) {
+      if (!onZoomChange) return;
+      event.preventDefault();
+
+      const delta = event.deltaY;
+      const zoomDelta = delta > 0 ? -0.1 : 0.1;
+      const newZoom = Math.max(0.5, Math.min(3.0, zoom + zoomDelta));
+      onZoomChange(newZoom);
+    }
+    // Two-finger scroll for panning (only when zoomed in)
+    else if (zoom > 1.0 && !ocrSelectionMode) {
+      event.preventDefault();
+
+      setPanOffset(prev => ({
+        x: prev.x - event.deltaX,  // Horizontal pan
+        y: prev.y - event.deltaY,  // Vertical pan
+      }));
+    }
+    // Regular mouse wheel when not zoomed - zoom in/out
+    else if (!ocrSelectionMode && onZoomChange) {
+      event.preventDefault();
+
+      const delta = event.deltaY;
+      const zoomDelta = delta > 0 ? -0.1 : 0.1;
+      const newZoom = Math.max(0.5, Math.min(3.0, zoom + zoomDelta));
+      onZoomChange(newZoom);
+    }
+  }, [zoom, onZoomChange, ocrSelectionMode]);
+
+  /**
+   * Handle drag start for panning when zoomed in.
+   */
+  const handleDragStart = useCallback((event: React.MouseEvent) => {
+    // Only allow dragging if zoomed in and not in OCR selection mode
+    if (zoom <= 1.0 || ocrSelectionMode) return;
+
+    // Don't interfere with OCR region clicks
+    const target = event.target as HTMLElement;
+    if (target.classList.contains('ocr-region')) return;
+
+    // Prevent any default behavior
+    event.preventDefault();
+
+    setIsDragging(true);
+    setDragStart({
+      x: event.clientX - panOffset.x,
+      y: event.clientY - panOffset.y,
+    });
+
+    // Change cursor
+    if (wrapperRef.current) {
+      wrapperRef.current.style.cursor = 'grabbing';
+    }
+  }, [zoom, ocrSelectionMode, panOffset]);
+
+  /**
+   * Handle drag move for panning.
+   */
+  const handleDragMove = useCallback((event: MouseEvent) => {
+    if (!isDragging) return;
+
+    event.preventDefault();
+
+    setPanOffset({
+      x: event.clientX - dragStart.x,
+      y: event.clientY - dragStart.y,
+    });
+  }, [isDragging, dragStart]);
+
+  /**
+   * Handle drag end.
+   */
+  const handleDragEnd = useCallback(() => {
+    setIsDragging(false);
+
+    // Reset cursor
+    if (wrapperRef.current && zoom > 1.0) {
+      wrapperRef.current.style.cursor = 'grab';
+    }
+  }, [zoom]);
 
   /**
    * Extract sentence context from surrounding OCR regions.
@@ -532,6 +631,31 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
     };
   }, [isSelecting, handleSelectionMove, handleSelectionEnd]);
 
+  // Attach wheel event listener for zoom
+  useEffect(() => {
+    const wrapper = wrapperRef.current;
+    if (!wrapper || !onZoomChange) return;
+
+    wrapper.addEventListener('wheel', handleWheel, { passive: false });
+
+    return () => {
+      wrapper.removeEventListener('wheel', handleWheel);
+    };
+  }, [handleWheel, onZoomChange]);
+
+  // Attach drag event listeners for panning
+  useEffect(() => {
+    if (!isDragging) return;
+
+    window.addEventListener('mousemove', handleDragMove);
+    window.addEventListener('mouseup', handleDragEnd);
+
+    return () => {
+      window.removeEventListener('mousemove', handleDragMove);
+      window.removeEventListener('mouseup', handleDragEnd);
+    };
+  }, [isDragging, handleDragMove, handleDragEnd]);
+
   /**
    * Get color scheme for OCR region based on confidence tier.
    * Returns background and border colors for different confidence levels.
@@ -585,13 +709,23 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
     <div className={`manga-page-container ${ocrSelectionMode ? 'ocr-selection-active' : ''} ${className}`}>
       {/* Comic page image */}
       <div
+        ref={wrapperRef}
         className="manga-image-wrapper"
         style={{
-          transform: `scale(${zoom})`,
+          transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoom})`,
           transformOrigin: 'top center',
-          transition: 'transform 200ms ease-out',
+          transition: isDragging ? 'none' : 'transform 200ms ease-out',
+          cursor: zoom > 1.0 && !ocrSelectionMode ? 'grab' : 'default',
+          userSelect: 'none',
+          WebkitUserSelect: 'none',
         }}
-        onMouseDown={handleSelectionStart}
+        onMouseDown={(e) => {
+          if (ocrSelectionMode) {
+            handleSelectionStart(e);
+          } else if (zoom > 1.0) {
+            handleDragStart(e);
+          }
+        }}
       >
         {imagePath ? (
           <img
@@ -599,11 +733,15 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
             src={imagePath}
             alt={`Page ${page.page}`}
             className="manga-image"
+            draggable={false}
+            onDragStart={(e) => e.preventDefault()}
             onLoad={handleImageLoad}
             style={{
               maxWidth: '100%',
               height: 'auto',
               display: 'block',
+              userSelect: 'none',
+              WebkitUserDrag: 'none',
             }}
           />
         ) : (
@@ -731,94 +869,6 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
             }}
           >
             {selectedRegions.length} selected
-          </div>
-        )}
-
-        {/* Debug stats toggle button */}
-        {hasOCRRegions && (
-          <button
-            onClick={() => setShowDebugInfo(!showDebugInfo)}
-            style={{
-              position: 'absolute',
-              top: '10px',
-              left: '10px',
-              padding: '6px 12px',
-              backgroundColor: 'rgba(0, 0, 0, 0.6)',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '12px',
-              zIndex: 1001,
-              transition: 'background-color 150ms ease',
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.8)')}
-            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.6)')}
-          >
-            {showDebugInfo ? 'Hide' : 'Show'} OCR Stats
-          </button>
-        )}
-
-        {/* Debug statistics panel */}
-        {showDebugInfo && ocrMetadata?.confidence_stats && (
-          <div
-            style={{
-              position: 'absolute',
-              bottom: '10px',
-              right: '10px',
-              backgroundColor: 'rgba(0, 0, 0, 0.9)',
-              color: 'white',
-              padding: '12px',
-              borderRadius: '6px',
-              fontSize: '12px',
-              fontFamily: 'monospace',
-              maxWidth: '300px',
-              zIndex: 1000,
-              boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
-            }}
-          >
-            <div style={{ fontWeight: 'bold', marginBottom: '8px', fontSize: '13px' }}>
-              OCR Confidence Stats
-            </div>
-            <div style={{ lineHeight: '1.8' }}>
-              <div>Total: {ocrMetadata.confidence_stats.count} regions</div>
-              <div>
-                Range: {(ocrMetadata.confidence_stats.min * 100).toFixed(0)}%-
-                {(ocrMetadata.confidence_stats.max * 100).toFixed(0)}%
-              </div>
-              <div>Average: {(ocrMetadata.confidence_stats.avg * 100).toFixed(1)}%</div>
-              <div>Median: {(ocrMetadata.confidence_stats.median * 100).toFixed(1)}%</div>
-              <div
-                style={{
-                  marginTop: '6px',
-                  borderTop: '1px solid rgba(255,255,255,0.2)',
-                  paddingTop: '6px',
-                }}
-              >
-                <div style={{ color: '#22c55e' }}>
-                  🟢 High (≥60%): {ocrMetadata.confidence_stats.distribution.high}
-                </div>
-                <div style={{ color: '#fbbf24' }}>
-                  🟡 Medium (30-60%): {ocrMetadata.confidence_stats.distribution.medium}
-                </div>
-                <div style={{ color: '#ef4444' }}>
-                  🔴 Low (15-30%): {ocrMetadata.confidence_stats.distribution.low}
-                </div>
-              </div>
-              {ocrMetadata.total_extracted && (
-                <div
-                  style={{
-                    marginTop: '6px',
-                    borderTop: '1px solid rgba(255,255,255,0.2)',
-                    paddingTop: '6px',
-                    fontSize: '11px',
-                    color: '#999',
-                  }}
-                >
-                  Extracted: {ocrMetadata.total_extracted} | Filtered: {ocrMetadata.filtered_out || 0}
-                </div>
-              )}
-            </div>
           </div>
         )}
 
