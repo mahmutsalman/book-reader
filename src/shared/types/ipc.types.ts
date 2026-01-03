@@ -77,6 +77,7 @@ export interface ElectronAPI {
     importTxt: (txtPath: string, language?: BookLanguage) => Promise<Book>;
     importEpub: (epubPath: string, language?: BookLanguage) => Promise<Book>;
     importManga: (mangaPath: string, language?: BookLanguage, ocrEngine?: OCREngine) => Promise<Book>;
+    importMangaFolder: (folderPath: string, language?: BookLanguage) => Promise<Book>;
     importPng: (pngPath: string, language?: BookLanguage, ocrEngine?: OCREngine) => Promise<Book>;
     getMangaImagePath: (relativePath: string) => Promise<string>;
     ocrMangaRegion: (
@@ -166,6 +167,7 @@ export interface ElectronAPI {
   };
   dialog: {
     openFile: (options: { filters?: { name: string; extensions: string[] }[] }) => Promise<string | null>;
+    openDirectory: () => Promise<string | null>;
   };
   pronunciation: {
     getTTS: (text: string, language?: string) => Promise<TTSResponse>;

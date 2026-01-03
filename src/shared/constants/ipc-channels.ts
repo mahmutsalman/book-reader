@@ -6,6 +6,7 @@ export const IPC_CHANNELS = {
   BOOK_IMPORT_TXT: 'book:import-txt',
   BOOK_IMPORT_EPUB: 'book:import-epub',
   BOOK_IMPORT_MANGA: 'book:import-manga',
+  BOOK_IMPORT_MANGA_FOLDER: 'book:import-manga-folder',
   BOOK_IMPORT_PNG: 'book:import-png',
   BOOK_GET_MANGA_IMAGE_PATH: 'book:get-manga-image-path',
   BOOK_MANGA_OCR_REGION: 'book:manga-ocr-region',
@@ -62,6 +63,7 @@ export const IPC_CHANNELS = {
 
   // File dialogs
   DIALOG_OPEN_FILE: 'dialog:open-file',
+  DIALOG_OPEN_DIRECTORY: 'dialog:open-directory',
 
   // Pronunciation Services
   PRONUNCIATION_GET_TTS: 'pronunciation:get-tts',

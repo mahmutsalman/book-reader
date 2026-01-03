@@ -124,10 +124,13 @@ export function useTextReflow({
   initialCharacterOffset = 0,
   initialProgressPercentage,
 }: UseTextReflowOptions): UseTextReflowReturn {
+  // Check if this is a manga (image-based) book
+  const isManga = bookData.type === 'manga';
+
   const [state, setState] = useState<ReflowState>({
     currentText: '',
     currentPageIndex: 0,
-    totalPages: 1,
+    totalPages: isManga ? bookData.pages.length : 1,
     totalCharacters: 0,
     characterOffset: initialCharacterOffset,
     chapterName: null,
@@ -146,6 +149,24 @@ export function useTextReflow({
   // Build full text and page map once
   // Also calculate initial character offset from percentage if provided (more stable than absolute offset)
   useEffect(() => {
+    // For manga, skip text-based processing - use page-based navigation
+    if (isManga) {
+      // Create a simple page map for manga (one entry per image page)
+      pageMapRef.current = bookData.pages.map((page, index) => ({
+        offset: index,
+        page,
+      }));
+      // Set total pages from the actual page count
+      setState(prev => ({
+        ...prev,
+        totalPages: bookData.pages.length,
+        currentPageIndex: Math.min(prev.currentPageIndex, bookData.pages.length - 1),
+        originalPage: prev.currentPageIndex + 1,
+        chapterName: bookData.pages[prev.currentPageIndex]?.chapter || null,
+      }));
+      return;
+    }
+
     fullTextRef.current = buildFullText(bookData.pages);
     pageMapRef.current = buildPageMap(bookData.pages);
 
@@ -155,7 +176,7 @@ export function useTextReflow({
       const calculatedOffset = Math.floor(fullTextRef.current.length * initialProgressPercentage);
       characterOffsetRef.current = Math.min(calculatedOffset, fullTextRef.current.length);
     }
-  }, [bookData, initialProgressPercentage]);
+  }, [bookData, initialProgressPercentage, isManga]);
 
   // Calculate font size from zoom
   const fontSize = useMemo(() => REFLOW_SETTINGS.BASE_FONT_SIZE * zoom, [zoom]);
@@ -163,6 +184,22 @@ export function useTextReflow({
   // Reflow text when zoom or container changes (NOT when navigating)
   // Uses characterOffsetRef to decouple navigation from re-pagination
   const reflowPages = useCallback(() => {
+    // For manga, skip text-based reflow - pages are fixed (one per image)
+    if (isManga) {
+      const totalMangaPages = bookData.pages.length;
+      const currentIndex = Math.min(state.currentPageIndex, totalMangaPages - 1);
+      const currentMangaPage = bookData.pages[currentIndex];
+
+      setState(prev => ({
+        ...prev,
+        currentPageIndex: currentIndex,
+        totalPages: totalMangaPages,
+        originalPage: currentIndex + 1,
+        chapterName: currentMangaPage?.chapter || null,
+      }));
+      return;
+    }
+
     const container = containerRef.current;
     if (!container || !fullTextRef.current) return;
 
@@ -209,7 +246,7 @@ export function useTextReflow({
       chapterName: originalPage?.chapter || null,
       originalPage: originalPage?.page || 1,
     }));
-  }, [containerRef, fontSize]); // Removed state.characterOffset - navigation won't trigger reflow
+  }, [containerRef, fontSize, isManga, bookData.pages, state.currentPageIndex]); // Added manga dependencies
 
   // Reflow on mount and when dependencies change
   // Note: Window resize listener removed intentionally to keep word count stable.
@@ -221,57 +258,98 @@ export function useTextReflow({
   // Navigation functions - update ref first, then state (no reflow triggered)
   const goToNextPage = useCallback(() => {
     const nextIndex = state.currentPageIndex + 1;
-    if (nextIndex >= pagesRef.current.length) return;
 
-    const newOffset = pageOffsetsRef.current[nextIndex] || 0;
-    characterOffsetRef.current = newOffset; // Update ref first
-    const originalPage = findOriginalPage(newOffset, pageMapRef.current);
+    // For manga, use bookData.pages.length; for text, use pagesRef
+    const maxPages = isManga ? bookData.pages.length : pagesRef.current.length;
+    if (nextIndex >= maxPages) return;
 
-    setState(prev => ({
-      ...prev,
-      currentPageIndex: nextIndex,
-      currentText: pagesRef.current[nextIndex] || '',
-      characterOffset: newOffset,
-      chapterName: originalPage?.chapter || null,
-      originalPage: originalPage?.page || 1,
-    }));
-  }, [state.currentPageIndex]);
+    if (isManga) {
+      // Manga navigation - simple page index change
+      const mangaPage = bookData.pages[nextIndex];
+      setState(prev => ({
+        ...prev,
+        currentPageIndex: nextIndex,
+        originalPage: nextIndex + 1,
+        chapterName: mangaPage?.chapter || null,
+      }));
+    } else {
+      // Text navigation - uses character offsets
+      const newOffset = pageOffsetsRef.current[nextIndex] || 0;
+      characterOffsetRef.current = newOffset;
+      const originalPage = findOriginalPage(newOffset, pageMapRef.current);
+
+      setState(prev => ({
+        ...prev,
+        currentPageIndex: nextIndex,
+        currentText: pagesRef.current[nextIndex] || '',
+        characterOffset: newOffset,
+        chapterName: originalPage?.chapter || null,
+        originalPage: originalPage?.page || 1,
+      }));
+    }
+  }, [state.currentPageIndex, isManga, bookData.pages]);
 
   const goToPrevPage = useCallback(() => {
     const prevIndex = state.currentPageIndex - 1;
     if (prevIndex < 0) return;
 
-    const newOffset = pageOffsetsRef.current[prevIndex] || 0;
-    characterOffsetRef.current = newOffset; // Update ref first
-    const originalPage = findOriginalPage(newOffset, pageMapRef.current);
+    if (isManga) {
+      // Manga navigation - simple page index change
+      const mangaPage = bookData.pages[prevIndex];
+      setState(prev => ({
+        ...prev,
+        currentPageIndex: prevIndex,
+        originalPage: prevIndex + 1,
+        chapterName: mangaPage?.chapter || null,
+      }));
+    } else {
+      // Text navigation - uses character offsets
+      const newOffset = pageOffsetsRef.current[prevIndex] || 0;
+      characterOffsetRef.current = newOffset;
+      const originalPage = findOriginalPage(newOffset, pageMapRef.current);
 
-    setState(prev => ({
-      ...prev,
-      currentPageIndex: prevIndex,
-      currentText: pagesRef.current[prevIndex] || '',
-      characterOffset: newOffset,
-      chapterName: originalPage?.chapter || null,
-      originalPage: originalPage?.page || 1,
-    }));
-  }, [state.currentPageIndex]);
+      setState(prev => ({
+        ...prev,
+        currentPageIndex: prevIndex,
+        currentText: pagesRef.current[prevIndex] || '',
+        characterOffset: newOffset,
+        chapterName: originalPage?.chapter || null,
+        originalPage: originalPage?.page || 1,
+      }));
+    }
+  }, [state.currentPageIndex, isManga, bookData.pages]);
 
   const goToPageIndex = useCallback((pageIndex: number) => {
-    const maxIndex = pagesRef.current.length - 1;
+    // For manga, use bookData.pages.length; for text, use pagesRef
+    const maxIndex = isManga ? bookData.pages.length - 1 : pagesRef.current.length - 1;
     if (maxIndex < 0) return;
     const clampedIndex = Math.max(0, Math.min(pageIndex, maxIndex));
-    const newOffset = pageOffsetsRef.current[clampedIndex] || 0;
-    characterOffsetRef.current = newOffset; // Update ref first
-    const originalPage = findOriginalPage(newOffset, pageMapRef.current);
 
-    setState(prev => ({
-      ...prev,
-      currentPageIndex: clampedIndex,
-      currentText: pagesRef.current[clampedIndex] || '',
-      characterOffset: newOffset,
-      chapterName: originalPage?.chapter || null,
-      originalPage: originalPage?.page || 1,
-    }));
-  }, []);
+    if (isManga) {
+      // Manga navigation - simple page index change
+      const mangaPage = bookData.pages[clampedIndex];
+      setState(prev => ({
+        ...prev,
+        currentPageIndex: clampedIndex,
+        originalPage: clampedIndex + 1,
+        chapterName: mangaPage?.chapter || null,
+      }));
+    } else {
+      // Text navigation - uses character offsets
+      const newOffset = pageOffsetsRef.current[clampedIndex] || 0;
+      characterOffsetRef.current = newOffset;
+      const originalPage = findOriginalPage(newOffset, pageMapRef.current);
+
+      setState(prev => ({
+        ...prev,
+        currentPageIndex: clampedIndex,
+        currentText: pagesRef.current[clampedIndex] || '',
+        characterOffset: newOffset,
+        chapterName: originalPage?.chapter || null,
+        originalPage: originalPage?.page || 1,
+      }));
+    }
+  }, [isManga, bookData.pages]);
 
   const goToCharacterOffset = useCallback((offset: number) => {
     const clampedOffset = Math.max(0, Math.min(offset, fullTextRef.current.length));
@@ -286,11 +364,19 @@ export function useTextReflow({
   }, [reflowPages]);
 
   const goToOriginalPage = useCallback((pageNum: number) => {
-    const pageEntry = pageMapRef.current.find(p => p.page.page === pageNum);
-    if (pageEntry) {
-      goToCharacterOffset(pageEntry.offset);
+    if (isManga) {
+      // For manga, page numbers are 1-based, indices are 0-based
+      const pageIndex = pageNum - 1;
+      if (pageIndex >= 0 && pageIndex < bookData.pages.length) {
+        goToPageIndex(pageIndex);
+      }
+    } else {
+      const pageEntry = pageMapRef.current.find(p => p.page.page === pageNum);
+      if (pageEntry) {
+        goToCharacterOffset(pageEntry.offset);
+      }
     }
-  }, [goToCharacterOffset]);
+  }, [goToCharacterOffset, goToPageIndex, isManga, bookData.pages.length]);
 
   return {
     state,

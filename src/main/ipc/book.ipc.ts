@@ -37,6 +37,11 @@ export function registerBookHandlers(): void {
     return mangaImportService.importManga(mangaPath, language, ocrEngine);
   });
 
+  // Manga Folder Import handler
+  ipcMain.handle(IPC_CHANNELS.BOOK_IMPORT_MANGA_FOLDER, async (_, folderPath: string, language: BookLanguage = 'en') => {
+    return mangaImportService.importFolder(folderPath, language);
+  });
+
   // PNG Test Import handler
   ipcMain.handle(IPC_CHANNELS.BOOK_IMPORT_PNG, async (_, pngPath: string, language: BookLanguage = 'en', ocrEngine: OCREngine = 'paddleocr') => {
     return mangaImportService.importPng(pngPath, language, ocrEngine);

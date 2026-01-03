@@ -695,59 +695,7 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
           >
             Loading OCR overlay... (waiting for image dimensions)
           </div>
-        ) : (
-          <div
-            style={{
-              position: 'absolute',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              backgroundColor: 'rgba(0, 0, 0, 0.85)',
-              color: 'white',
-              padding: '20px 24px',
-              borderRadius: '8px',
-              maxWidth: '400px',
-              zIndex: 1000,
-              textAlign: 'center',
-            }}
-          >
-            <div style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '12px' }}>
-              {ocrMetadata?.total_extracted && ocrMetadata.total_extracted > 0
-                ? `⚠️ All ${ocrMetadata.total_extracted} regions filtered`
-                : '🔍 No text detected'}
-            </div>
-
-            {ocrMetadata?.total_extracted && ocrMetadata.total_extracted > 0 ? (
-              <div style={{ fontSize: '14px', lineHeight: '1.6' }}>
-                <p>OCR detected text but confidence was too low.</p>
-                <p style={{ marginTop: '8px', color: '#fbbf24' }}>
-                  Try: Redraw selection or adjust OCR settings
-                </p>
-              </div>
-            ) : (
-              <div style={{ fontSize: '14px', lineHeight: '1.6' }}>
-                <p>No text found in this {page.has_text ? 'selection' : 'page'}.</p>
-                <p style={{ marginTop: '8px', color: '#60a5fa' }}>
-                  Try: Select speech bubble more precisely
-                </p>
-              </div>
-            )}
-
-            {ocrMetadata?.confidence_stats && ocrMetadata.confidence_stats.distribution.low > 0 && (
-              <div
-                style={{
-                  marginTop: '12px',
-                  padding: '8px',
-                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                  borderRadius: '4px',
-                  fontSize: '12px',
-                }}
-              >
-                Filtered: {ocrMetadata.confidence_stats.distribution.low} low confidence regions
-              </div>
-            )}
-          </div>
-        )}
+        ) : null}
 
         {selectionRect && imageDimensions && (
           <div
@@ -874,68 +822,6 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
           </div>
         )}
 
-        {/* OCR Feedback Notification - shows when OCR returns 0 regions */}
-        {showOcrFeedback && ocrMetadata && (
-          <div
-            style={{
-              position: 'fixed',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              backgroundColor: 'rgba(0, 0, 0, 0.92)',
-              color: 'white',
-              padding: '24px 28px',
-              borderRadius: '12px',
-              maxWidth: '450px',
-              zIndex: 2000,
-              textAlign: 'center',
-              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
-              border: '2px solid rgba(251, 191, 36, 0.4)',
-            }}
-          >
-            <div style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '14px' }}>
-              {ocrMetadata.total_extracted && ocrMetadata.total_extracted > 0
-                ? `⚠️ All ${ocrMetadata.total_extracted} region${ocrMetadata.total_extracted > 1 ? 's' : ''} filtered`
-                : '🔍 No text detected'}
-            </div>
-
-            {ocrMetadata.total_extracted && ocrMetadata.total_extracted > 0 ? (
-              <div style={{ fontSize: '15px', lineHeight: '1.7' }}>
-                <p style={{ marginBottom: '10px' }}>OCR detected text but confidence was too low (below 15%).</p>
-                <p style={{ color: '#fbbf24', fontWeight: '500' }}>
-                  💡 Try: Redraw selection more precisely or choose clearer text
-                </p>
-                {ocrMetadata.confidence_stats && (
-                  <div
-                    style={{
-                      marginTop: '14px',
-                      padding: '10px',
-                      backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                      borderRadius: '6px',
-                      fontSize: '13px',
-                    }}
-                  >
-                    <div>Confidence: {Math.round(ocrMetadata.confidence_stats.min * 100)}% - {Math.round(ocrMetadata.confidence_stats.max * 100)}%</div>
-                    <div style={{ marginTop: '4px', color: '#ef4444' }}>
-                      🔴 All regions below 15% threshold
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div style={{ fontSize: '15px', lineHeight: '1.7' }}>
-                <p style={{ marginBottom: '10px' }}>No text found in the selected area.</p>
-                <p style={{ color: '#60a5fa', fontWeight: '500' }}>
-                  💡 Try: Select speech bubble or text area more carefully
-                </p>
-              </div>
-            )}
-
-            <div style={{ marginTop: '16px', fontSize: '12px', color: '#999' }}>
-              This message will auto-dismiss in 4 seconds
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

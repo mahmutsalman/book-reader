@@ -25,6 +25,7 @@ const LibraryPage: React.FC = () => {
   const [isTxtFile, setIsTxtFile] = useState(false);
   const [isEpubFile, setIsEpubFile] = useState(false);
   const [isMangaFile, setIsMangaFile] = useState(false);
+  const [isMangaFolder, setIsMangaFolder] = useState(false);
   const [isPngFile, setIsPngFile] = useState(false);
   const [showFormatDialog, setShowFormatDialog] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState<BookLanguage>('en');
@@ -65,7 +66,7 @@ const LibraryPage: React.FC = () => {
     setShowFormatDialog(true);
   };
 
-  const handleFormatSelect = async (format: 'pdf' | 'txt' | 'epub' | 'manga' | 'png') => {
+  const handleFormatSelect = async (format: 'pdf' | 'txt' | 'epub' | 'manga' | 'manga-folder' | 'png') => {
     setShowFormatDialog(false);
 
     if (!window.electronAPI) {
@@ -74,6 +75,23 @@ const LibraryPage: React.FC = () => {
     }
 
     try {
+      // Handle folder selection separately
+      if (format === 'manga-folder') {
+        const folderPath = await window.electronAPI.dialog.openDirectory();
+
+        if (folderPath) {
+          setIsMangaFolder(true);
+          setIsPdfFile(false);
+          setIsTxtFile(false);
+          setIsEpubFile(false);
+          setIsMangaFile(false);
+          setIsPngFile(false);
+          setPendingFilePath(folderPath);
+          setSelectedLanguage('en');
+        }
+        return;
+      }
+
       const filters = format === 'pdf'
         ? [{ name: 'PDF Documents', extensions: ['pdf'] }]
         : format === 'txt'
@@ -97,6 +115,7 @@ const LibraryPage: React.FC = () => {
         setIsTxtFile(isTxt);
         setIsEpubFile(isEpub);
         setIsMangaFile(isManga);
+        setIsMangaFolder(false);
         setIsPngFile(isPng);
         setPendingFilePath(filePath);
         setSelectedLanguage('en');
@@ -141,6 +160,13 @@ const LibraryPage: React.FC = () => {
         // Reload books to show the new import
         await loadBooks();
         setImportProgress('');
+      } else if (isMangaFolder) {
+        // Manga Folder import
+        setImportProgress('Copying images from folder...');
+        await window.electronAPI.book.importMangaFolder(pendingFilePath, selectedLanguage);
+        // Reload books to show the new import
+        await loadBooks();
+        setImportProgress('');
       } else if (isPngFile) {
         // Single PNG import for testing
         setImportProgress('Processing PNG with OCR...');
@@ -157,6 +183,7 @@ const LibraryPage: React.FC = () => {
       setIsTxtFile(false);
       setIsEpubFile(false);
       setIsMangaFile(false);
+      setIsMangaFolder(false);
       setIsPngFile(false);
     } catch (err) {
       console.error('Import failed:', err);
@@ -174,6 +201,7 @@ const LibraryPage: React.FC = () => {
     setIsTxtFile(false);
     setIsEpubFile(false);
     setIsMangaFile(false);
+    setIsMangaFolder(false);
     setIsPngFile(false);
   };
 
@@ -485,7 +513,33 @@ const LibraryPage: React.FC = () => {
                     Import Comic/Manga (CBZ/CBR)
                   </div>
                   <div className="text-sm" style={{ color: theme.textSecondary }}>
-                    With OCR text extraction for word lookup
+                    Instant import - OCR on-demand during reading
+                  </div>
+                </div>
+              </button>
+
+              <button
+                onClick={() => handleFormatSelect('manga-folder')}
+                className="w-full p-4 border-2 rounded-lg flex items-center gap-3 transition-colors"
+                style={{
+                  borderColor: theme.accent,
+                  color: theme.text,
+                  backgroundColor: theme.background,
+                }}
+                onMouseEnter={(event) => {
+                  event.currentTarget.style.backgroundColor = cardHoverColor;
+                }}
+                onMouseLeave={(event) => {
+                  event.currentTarget.style.backgroundColor = theme.background;
+                }}
+              >
+                <span className="text-3xl">📁</span>
+                <div className="text-left flex-1">
+                  <div className="font-semibold" style={{ color: theme.text }}>
+                    Import Comic/Manga (Folder)
+                  </div>
+                  <div className="text-sm" style={{ color: theme.textSecondary }}>
+                    Import from folder of images - OCR on-demand during reading
                   </div>
                 </div>
               </button>
@@ -545,7 +599,7 @@ const LibraryPage: React.FC = () => {
             }}
           >
             <h3 className="text-lg font-semibold mb-4">
-              Import {isPdfFile ? 'PDF' : isTxtFile ? 'Text File' : isEpubFile ? 'EPUB' : isMangaFile ? 'Comic/Manga' : isPngFile ? 'PNG Test Image' : 'Book'}
+              Import {isPdfFile ? 'PDF' : isTxtFile ? 'Text File' : isEpubFile ? 'EPUB' : isMangaFile ? 'Comic/Manga' : isMangaFolder ? 'Comic/Manga Folder' : isPngFile ? 'PNG Test Image' : 'Book'}
             </h3>
             {isPdfFile && (
               <div className="bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 p-3 rounded-lg mb-4 text-sm">
@@ -565,7 +619,12 @@ const LibraryPage: React.FC = () => {
             )}
             {isMangaFile && (
               <div className="bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 p-3 rounded-lg mb-4 text-sm">
-                <span className="font-medium">Comic/Manga Import:</span> Pages will be extracted from the archive. OCR will extract text from images for word lookup. This may take a few minutes depending on the number of pages.
+                <span className="font-medium">Comic/Manga Import:</span> Pages will be extracted from the archive. Instant import - OCR will be performed on-demand during reading when you select text regions.
+              </div>
+            )}
+            {isMangaFolder && (
+              <div className="bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 p-3 rounded-lg mb-4 text-sm">
+                <span className="font-medium">Folder Import:</span> Images will be copied from the folder. Instant import - OCR will be performed on-demand during reading when you select text regions.
               </div>
             )}
             {isPngFile && (

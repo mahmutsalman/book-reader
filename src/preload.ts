@@ -18,6 +18,8 @@ const electronAPI: ElectronAPI = {
       ipcRenderer.invoke(IPC_CHANNELS.BOOK_IMPORT_EPUB, epubPath, language || 'en'),
     importManga: (mangaPath: string, language?: string, ocrEngine?: OCREngine) =>
       ipcRenderer.invoke(IPC_CHANNELS.BOOK_IMPORT_MANGA, mangaPath, language || 'en', ocrEngine),
+    importMangaFolder: (folderPath: string, language?: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BOOK_IMPORT_MANGA_FOLDER, folderPath, language || 'en'),
     importPng: (pngPath: string, language?: string, ocrEngine?: OCREngine) =>
       ipcRenderer.invoke(IPC_CHANNELS.BOOK_IMPORT_PNG, pngPath, language || 'en', ocrEngine),
     getMangaImagePath: (relativePath: string) =>
@@ -164,6 +166,8 @@ const electronAPI: ElectronAPI = {
   dialog: {
     openFile: (options) =>
       ipcRenderer.invoke(IPC_CHANNELS.DIALOG_OPEN_FILE, options),
+    openDirectory: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.DIALOG_OPEN_DIRECTORY),
   },
 
   // Pronunciation Services

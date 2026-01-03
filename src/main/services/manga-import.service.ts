@@ -441,13 +441,10 @@ class MangaImportService {
     // Extract title
     const title = this.extractTitle(comicInfo || {}, mangaPath);
 
-    // Perform OCR with progress tracking
-    onProgress?.(10, 100, `Running OCR (0/${images.length})...`);
+    // No OCR during import - skip batch OCR
+    onProgress?.(50, 100, 'Processing images...');
 
-    const ocrResults = await this.batchOCR(images, language, ocrEngine, (current, total) => {
-      const progressPercent = 10 + Math.floor((current / total) * 80); // 10-90%
-      onProgress?.(progressPercent, 100, `Running OCR (${current}/${total})...`);
-    });
+    const ocrResults = new Map<string, OCRTextRegion[]>(); // Empty - no OCR during import
 
     // Build MangaBookData
     const pages = this.buildMangaPages(images, ocrResults, mangaId);
@@ -487,6 +484,122 @@ class MangaImportService {
     // Import using repository
     const book = await bookRepository.import(compatJsonPath, language);
     console.log(`[MangaImportService] Imported manga: ${book.title} (ID: ${book.id})`);
+
+    onProgress?.(100, 100, 'Complete!');
+
+    return book;
+  }
+
+  /**
+   * Import manga from a folder of images.
+   * Uses folder name as book title.
+   * No OCR processing during import - all OCR done on-demand during reading.
+   */
+  async importFolder(
+    folderPath: string,
+    language: BookLanguage = 'en',
+    onProgress?: (current: number, total: number, status: string) => void
+  ): Promise<Book> {
+    // Validate folder exists
+    if (!fs.existsSync(folderPath)) {
+      throw new Error(`Folder not found: ${folderPath}`);
+    }
+
+    const stats = fs.statSync(folderPath);
+    if (!stats.isDirectory()) {
+      throw new Error(`Path is not a folder: ${folderPath}`);
+    }
+
+    console.log(`[MangaImportService] Importing manga folder: ${folderPath}`);
+
+    // Generate unique manga ID
+    const mangaId = uuidv4();
+
+    // Create manga directory structure
+    const mangaDir = path.join(app.getPath('userData'), 'manga', mangaId);
+    const imagesDir = path.join(mangaDir, 'images');
+    fs.mkdirSync(imagesDir, { recursive: true });
+
+    onProgress?.(0, 100, 'Scanning folder...');
+
+    // Read all image files from folder
+    const imageExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp'];
+    const allFiles = fs.readdirSync(folderPath);
+    const imageFiles = allFiles.filter(file => {
+      const ext = path.extname(file).toLowerCase();
+      return imageExtensions.includes(ext);
+    });
+
+    if (imageFiles.length === 0) {
+      throw new Error('No image files found in folder');
+    }
+
+    // Sort images naturally (page_001.jpg, page_002.jpg, etc.)
+    imageFiles.sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+
+    console.log(`[MangaImportService] Found ${imageFiles.length} images`);
+
+    // Copy images to manga directory
+    onProgress?.(10, 100, `Copying images (0/${imageFiles.length})...`);
+
+    const copiedImages: string[] = [];
+    for (let i = 0; i < imageFiles.length; i++) {
+      const sourceFile = path.join(folderPath, imageFiles[i]);
+      const destFile = path.join(imagesDir, imageFiles[i]);
+
+      fs.copyFileSync(sourceFile, destFile);
+      copiedImages.push(destFile);
+
+      // Report progress
+      if ((i + 1) % 10 === 0 || i === imageFiles.length - 1) {
+        const progressPercent = 10 + Math.floor(((i + 1) / imageFiles.length) * 80);
+        onProgress?.(progressPercent, 100, `Copying images (${i + 1}/${imageFiles.length})...`);
+      }
+    }
+
+    // Extract title from folder name
+    const folderName = path.basename(folderPath);
+    const title = folderName
+      .replace(/[-_]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    // Build MangaBookData with empty OCR results
+    const ocrResults = new Map<string, OCRTextRegion[]>(); // No OCR during import
+    const pages = this.buildMangaPages(copiedImages, ocrResults, mangaId);
+
+    const bookData: BookData = {
+      type: 'manga',
+      title,
+      source_file: folderPath,
+      total_pages: pages.length,
+      pages,
+      total_words: 0, // Will be updated as OCR happens on-demand
+      total_chars: 0,
+    };
+
+    onProgress?.(90, 100, 'Saving manga data...');
+
+    // Save MangaBookData to JSON
+    const jsonPath = path.join(mangaDir, 'manga_data.json');
+    fs.writeFileSync(jsonPath, JSON.stringify(bookData, null, 2), 'utf-8');
+    console.log(`[MangaImportService] Created JSON at: ${jsonPath}`);
+
+    // Also save to books directory for compatibility
+    const booksDir = path.join(app.getPath('userData'), 'books');
+    if (!fs.existsSync(booksDir)) {
+      fs.mkdirSync(booksDir, { recursive: true });
+    }
+
+    const jsonFileName = `${folderName}_${Date.now()}.json`;
+    const compatJsonPath = path.join(booksDir, jsonFileName);
+    fs.writeFileSync(compatJsonPath, JSON.stringify(bookData, null, 2), 'utf-8');
+
+    onProgress?.(95, 100, 'Importing to database...');
+
+    // Import using repository
+    const book = await bookRepository.import(compatJsonPath, language);
+    console.log(`[MangaImportService] Imported folder manga: ${book.title} (ID: ${book.id})`);
 
     onProgress?.(100, 100, 'Complete!');
 
