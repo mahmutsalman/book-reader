@@ -11,14 +11,17 @@ import os
 import asyncio
 import subprocess
 import sys
+import signal
 import shutil
 import inspect
 import gc
+from contextlib import asynccontextmanager
 from typing import Optional, List, Dict
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from datetime import datetime
 
@@ -66,6 +69,9 @@ os.environ.setdefault("DISABLE_MODEL_SOURCE_CHECK", "True")
 # Limit native thread fan-out to reduce RAM spikes on some systems.
 os.environ.setdefault("OMP_NUM_THREADS", "1")
 os.environ.setdefault("MKL_NUM_THREADS", "1")
+
+# Shutdown flag for graceful termination
+shutdown_flag = False
 
 # PaddleOCR instances (initialized lazily on first use, per language)
 paddle_ocr_instances = {}
@@ -173,11 +179,40 @@ def cleanup_debug_directories():
 # Clean debug folders on startup
 cleanup_debug_directories()
 
-# Initialize FastAPI app
+# Lifespan context manager for graceful startup/shutdown
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Handle server startup and shutdown events.
+
+    This is called by uvicorn when the server starts and stops,
+    allowing us to clean up resources without interfering with
+    PaddleOCR's internal signal handlers.
+    """
+    # Startup: nothing special needed (lazy initialization handles this)
+    print("[Server] Startup complete, ready to accept requests")
+    yield
+
+    # Shutdown: set flag and clean up resources
+    global shutdown_flag
+    print("\n[Server] Shutting down gracefully...")
+    shutdown_flag = True
+
+    # Clean up PaddleOCR instances
+    if paddle_ocr_instances:
+        print(f"[Server] Cleaning up {len(paddle_ocr_instances)} PaddleOCR instances...")
+        paddle_ocr_instances.clear()
+        gc.collect()
+        print("[Server] PaddleOCR cleanup complete")
+
+    print("[Server] Shutdown complete")
+
+# Initialize FastAPI app with lifespan
 app = FastAPI(
     title="BookReader Pronunciation Server",
     version=VERSION,
-    description="TTS and IPA services for BookReader"
+    description="TTS and IPA services for BookReader",
+    lifespan=lifespan
 )
 
 # Allow Electron to connect (localhost only)
@@ -188,6 +223,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Shutdown middleware to prevent new requests during graceful shutdown
+@app.middleware("http")
+async def shutdown_middleware(request: Request, call_next):
+    """Prevent new requests during shutdown to avoid race conditions."""
+    if shutdown_flag:
+        return JSONResponse(
+            status_code=503,
+            content={"success": False, "error": "Server is shutting down"}
+        )
+    return await call_next(request)
 
 
 # Request/Response models
@@ -1937,11 +1983,13 @@ if __name__ == "__main__":
     import uvicorn
 
     port = int(os.environ.get("PORT", DEFAULT_PORT))
-    print(f"Starting BookReader Pronunciation Server on port {port}...")
+    print(f"[Server] Starting BookReader Pronunciation Server on port {port}...")
+    print(f"[Server] Press Ctrl+C to stop gracefully")
 
     uvicorn.run(
         app,
         host="127.0.0.1",
         port=port,
-        log_level="info"
+        log_level="info",
+        timeout_graceful_shutdown=5  # Wait up to 5s for requests to finish
     )
