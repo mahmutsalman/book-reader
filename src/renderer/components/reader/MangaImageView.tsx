@@ -70,6 +70,7 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [showZoomIndicator, setShowZoomIndicator] = useState(false);
+  const [zoomViewportHeight, setZoomViewportHeight] = useState<number | null>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const selectionStartRef = useRef<{ x: number; y: number } | null>(null);
   const selectionTransformRef = useRef<{ rect: DOMRect; zoom: number; imageScale: number } | null>(null);
@@ -110,7 +111,18 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
     if (zoomLevel <= 1.0) return { x: 0, y: 0 };
 
     const viewportWidth = viewportRef.current.clientWidth;
-    const viewportHeight = viewportRef.current.clientHeight;
+    let viewportHeight = viewportRef.current.clientHeight;
+    if (!zoomViewportHeight) {
+      const readerViewport = viewportRef.current.closest('.reader-text') as HTMLElement | null;
+      if (readerViewport) {
+        const styles = window.getComputedStyle(readerViewport);
+        const paddingTop = parseFloat(styles.paddingTop || '0') || 0;
+        const paddingBottom = parseFloat(styles.paddingBottom || '0') || 0;
+        viewportHeight = Math.max(0, readerViewport.clientHeight - paddingTop - paddingBottom);
+      }
+    } else {
+      viewportHeight = zoomViewportHeight;
+    }
     const baseWidth = imageDimensions.width;
     const baseHeight = imageDimensions.height;
 
@@ -121,7 +133,7 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
       x: Math.max(-maxPanX, Math.min(maxPanX, next.x)),
       y: Math.max(-maxPanY, Math.min(0, next.y)),
     };
-  }, [imageDimensions]);
+  }, [imageDimensions, zoomViewportHeight]);
 
   // Track Shift key state
   useEffect(() => {
@@ -160,11 +172,45 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
     setPanOffset(prev => clampPanOffset(prev, zoom));
   }, [zoom, imageDimensions, clampPanOffset]);
 
-  // Disable pan during OCR selection mode.
+  // When zoomed, lock the local viewport height to the reader viewport so pan bounds
+  // are based on the visible area (not the full image height inside the scroll container).
   useEffect(() => {
-    if (!ocrSelectionMode) return;
-    setPanOffset({ x: 0, y: 0 });
-  }, [ocrSelectionMode]);
+    if (zoom <= 1.0) {
+      setZoomViewportHeight(null);
+      return;
+    }
+
+    const container = viewportRef.current;
+    if (!container) return;
+
+    const readerViewport = container.closest('.reader-text') as HTMLElement | null;
+    if (!readerViewport) return;
+
+    const computeHeight = () => {
+      const styles = window.getComputedStyle(readerViewport);
+      const paddingTop = parseFloat(styles.paddingTop || '0') || 0;
+      const paddingBottom = parseFloat(styles.paddingBottom || '0') || 0;
+      const nextHeight = Math.max(0, readerViewport.clientHeight - paddingTop - paddingBottom);
+      setZoomViewportHeight(nextHeight || null);
+    };
+
+    computeHeight();
+
+    window.addEventListener('resize', computeHeight);
+    if (typeof ResizeObserver === 'undefined') {
+      return () => {
+        window.removeEventListener('resize', computeHeight);
+      };
+    }
+
+    const observer = new ResizeObserver(() => computeHeight());
+    observer.observe(readerViewport);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', computeHeight);
+    };
+  }, [zoom]);
 
   // Show a brief zoom indicator whenever zoom changes.
   useEffect(() => {
@@ -822,6 +868,9 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
     <div
       ref={viewportRef}
       className={`manga-page-container ${ocrSelectionMode ? 'ocr-selection-active' : ''} ${className}`}
+      style={{
+        height: zoom > 1.0 && zoomViewportHeight ? `${zoomViewportHeight}px` : undefined,
+      }}
     >
       {/* Comic page image */}
       <div
