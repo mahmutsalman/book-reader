@@ -14,6 +14,8 @@ interface PronunciationButtonProps {
   audioType?: AudioType;
   /** Pre-fetched audio (from preloading) for instant playback */
   cachedAudio?: string;
+  /** Whether repeat mode is enabled (loop continuously) */
+  isRepeatMode?: boolean;
   className?: string;
   size?: 'sm' | 'md';
   title?: string;
@@ -24,19 +26,25 @@ const PronunciationButton: React.FC<PronunciationButtonProps> = ({
   language,
   audioType = AudioType.WORD,
   cachedAudio,
+  isRepeatMode = false,
   className = '',
   size = 'md',
   title = 'Play pronunciation',
 }) => {
-  const { playAudio, stop, isPlaying, isLoading, setIsLoading, error } = useAudioPlayer();
+  const { playAudio, stop, isPlaying, playLooping, stopLooping, isLooping, isLoading, setIsLoading, error } = useAudioPlayer();
   const { getAudio, setAudio } = useAudioCache();
   const theme = useReaderTheme();
   const [serverError, setServerError] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const handleClick = useCallback(async () => {
-    if (isPlaying) {
-      stop();
+    // If currently playing or looping, stop it
+    if (isPlaying || isLooping) {
+      if (isLooping) {
+        stopLooping();
+      } else {
+        stop();
+      }
       return;
     }
 
@@ -48,7 +56,11 @@ const PronunciationButton: React.FC<PronunciationButtonProps> = ({
     try {
       // 1. Check if we have pre-fetched audio (from preloading)
       if (cachedAudio) {
-        await playAudio(cachedAudio);
+        if (isRepeatMode) {
+          await playLooping(cachedAudio);
+        } else {
+          await playAudio(cachedAudio);
+        }
         return;
       }
 
@@ -56,7 +68,11 @@ const PronunciationButton: React.FC<PronunciationButtonProps> = ({
       const cached = await getAudio(text, language, audioType);
       if (cached) {
         console.log('[Pronunciation] Cache hit');
-        await playAudio(cached);
+        if (isRepeatMode) {
+          await playLooping(cached);
+        } else {
+          await playAudio(cached);
+        }
         return;
       }
 
@@ -91,8 +107,12 @@ const PronunciationButton: React.FC<PronunciationButtonProps> = ({
       // 4. Store in cache for future use
       await setAudio(text, language, audioType, response.audio_base64);
 
-      // 5. Play the audio
-      await playAudio(response.audio_base64);
+      // 5. Play the audio (loop or once)
+      if (isRepeatMode) {
+        await playLooping(response.audio_base64);
+      } else {
+        await playAudio(response.audio_base64);
+      }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Unknown error';
       console.error('[Pronunciation] Error:', err);
@@ -101,7 +121,7 @@ const PronunciationButton: React.FC<PronunciationButtonProps> = ({
     } finally {
       setIsLoading(false);
     }
-  }, [text, language, audioType, cachedAudio, isPlaying, isLoading, playAudio, stop, setIsLoading, getAudio, setAudio]);
+  }, [text, language, audioType, cachedAudio, isRepeatMode, isPlaying, isLooping, isLoading, playAudio, playLooping, stop, stopLooping, setIsLoading, getAudio, setAudio]);
 
   // Size classes
   const sizeClasses = size === 'sm'
@@ -155,13 +175,15 @@ const PronunciationButton: React.FC<PronunciationButtonProps> = ({
     );
   }
 
+  const isActive = isPlaying || isLooping;
+
   return (
     <button
       type="button"
       onClick={handleClick}
       className={`${sizeClasses} flex items-center justify-center rounded-full transition-all ${className}`}
       style={
-        isPlaying
+        isActive
           ? {
               color: theme.accent,
               backgroundColor: theme.panel
@@ -171,18 +193,18 @@ const PronunciationButton: React.FC<PronunciationButtonProps> = ({
             }
       }
       onMouseEnter={(e) => {
-        if (!isPlaying) {
+        if (!isActive) {
           e.currentTarget.style.color = theme.accent;
           e.currentTarget.style.backgroundColor = 'rgba(128, 128, 128, 0.1)';
         }
       }}
       onMouseLeave={(e) => {
-        if (!isPlaying) {
+        if (!isActive) {
           e.currentTarget.style.color = theme.textSecondary;
           e.currentTarget.style.backgroundColor = 'transparent';
         }
       }}
-      title={isPlaying ? 'Stop' : title}
+      title={isActive ? 'Stop' : title}
       disabled={isLoading}
     >
       <span className="w-5 h-5">

@@ -2206,6 +2206,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
           selectedWord={selectedWord}
           bookId={book.id}
           bookLanguage={book.language}
+          bookType={book.type}
           onNavigateToPage={goToOriginalPage}
           preloadedData={preloadedData}
           preloadedGrammarData={selectedWord ? grammarCache.get(selectedWord.word) : undefined}

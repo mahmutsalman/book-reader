@@ -16,6 +16,8 @@ interface SlowLoopPlayButtonProps {
   audioType?: AudioType;
   /** Pre-fetched audio (from preloading) for instant playback */
   cachedAudio?: string;
+  /** Whether repeat mode is enabled (loop continuously) */
+  isRepeatMode?: boolean;
   className?: string;
   size?: 'sm' | 'md';
   title?: string;
@@ -26,6 +28,7 @@ const SlowLoopPlayButton: React.FC<SlowLoopPlayButtonProps> = ({
   language,
   audioType = AudioType.WORD,
   cachedAudio,
+  isRepeatMode = false,
   className = '',
   size = 'md',
   title,
@@ -33,7 +36,7 @@ const SlowLoopPlayButton: React.FC<SlowLoopPlayButtonProps> = ({
   const { settings } = useSettings();
   const slowPlaybackSpeed = settings.slow_playback_speed;
   const defaultTitle = `Play slow (${slowPlaybackSpeed}x)`;
-  const { playLooping, stopLooping, isLooping } = useAudioPlayer();
+  const { playAudio, stop, isPlaying, playLooping, stopLooping, isLooping } = useAudioPlayer();
   const { getAudio, setAudio } = useAudioCache();
   const theme = useReaderTheme();
   const [serverError, setServerError] = useState(false);
@@ -47,9 +50,13 @@ const SlowLoopPlayButton: React.FC<SlowLoopPlayButtonProps> = ({
   }, [text, stopLooping]);
 
   const handleClick = useCallback(async () => {
-    // If currently looping, stop it
-    if (isLooping) {
-      stopLooping();
+    // If currently playing or looping, stop it
+    if (isLooping || isPlaying) {
+      if (isLooping) {
+        stopLooping();
+      } else {
+        stop();
+      }
       return;
     }
 
@@ -61,7 +68,15 @@ const SlowLoopPlayButton: React.FC<SlowLoopPlayButtonProps> = ({
     try {
       // 1. Check if we have pre-fetched audio (from preloading)
       if (cachedAudio) {
-        await playLooping(cachedAudio, slowPlaybackSpeed);
+        if (isRepeatMode) {
+          await playLooping(cachedAudio, slowPlaybackSpeed);
+        } else {
+          // Create a temporary audio element to play once at slow speed
+          const audio = new Audio(`data:audio/mp3;base64,${cachedAudio}`);
+          audio.playbackRate = slowPlaybackSpeed;
+          audio.preservesPitch = true;
+          await audio.play();
+        }
         return;
       }
 
@@ -69,7 +84,14 @@ const SlowLoopPlayButton: React.FC<SlowLoopPlayButtonProps> = ({
       const cached = await getAudio(text, language, audioType);
       if (cached) {
         console.log('[SlowLoop] Cache hit');
-        await playLooping(cached, slowPlaybackSpeed);
+        if (isRepeatMode) {
+          await playLooping(cached, slowPlaybackSpeed);
+        } else {
+          const audio = new Audio(`data:audio/mp3;base64,${cached}`);
+          audio.playbackRate = slowPlaybackSpeed;
+          audio.preservesPitch = true;
+          await audio.play();
+        }
         return;
       }
 
@@ -88,15 +110,22 @@ const SlowLoopPlayButton: React.FC<SlowLoopPlayButtonProps> = ({
       // 4. Store in cache for future use
       await setAudio(text, language, audioType, response.audio_base64);
 
-      // 5. Play the audio in slow loop
-      await playLooping(response.audio_base64, slowPlaybackSpeed);
+      // 5. Play the audio in slow mode (loop or once)
+      if (isRepeatMode) {
+        await playLooping(response.audio_base64, slowPlaybackSpeed);
+      } else {
+        const audio = new Audio(`data:audio/mp3;base64,${response.audio_base64}`);
+        audio.playbackRate = slowPlaybackSpeed;
+        audio.preservesPitch = true;
+        await audio.play();
+      }
     } catch (err) {
       console.error('[SlowLoop] Error:', err);
       setServerError(true);
     } finally {
       setIsLoadingAudio(false);
     }
-  }, [text, language, audioType, cachedAudio, isLooping, isLoadingAudio, playLooping, stopLooping, getAudio, setAudio, slowPlaybackSpeed]);
+  }, [text, language, audioType, cachedAudio, isRepeatMode, isLooping, isPlaying, isLoadingAudio, playAudio, playLooping, stop, stopLooping, getAudio, setAudio, slowPlaybackSpeed]);
 
   // Size classes
   const sizeClasses = size === 'sm'
@@ -152,15 +181,17 @@ const SlowLoopPlayButton: React.FC<SlowLoopPlayButtonProps> = ({
     );
   }
 
+  const isActive = isLooping || isPlaying;
+
   return (
     <button
       type="button"
       onClick={handleClick}
       className={`${sizeClasses} flex items-center justify-center rounded-full transition-all ${
-        isLooping ? 'animate-pulse' : ''
+        isActive ? 'animate-pulse' : ''
       } ${className}`}
       style={
-        isLooping
+        isActive
           ? {
               color: theme.accent,
               backgroundColor: theme.panel
@@ -170,18 +201,18 @@ const SlowLoopPlayButton: React.FC<SlowLoopPlayButtonProps> = ({
             }
       }
       onMouseEnter={(e) => {
-        if (!isLooping) {
+        if (!isActive) {
           e.currentTarget.style.color = theme.accent;
           e.currentTarget.style.backgroundColor = 'rgba(128, 128, 128, 0.1)';
         }
       }}
       onMouseLeave={(e) => {
-        if (!isLooping) {
+        if (!isActive) {
           e.currentTarget.style.color = theme.textSecondary;
           e.currentTarget.style.backgroundColor = 'transparent';
         }
       }}
-      title={isLooping ? 'Stop slow loop' : (title || defaultTitle)}
+      title={isActive ? 'Stop' : (title || defaultTitle)}
       disabled={isLoadingAudio}
     >
       <span className="w-4 h-4">

@@ -342,6 +342,7 @@ const ReaderView: React.FC<ReaderViewProps> = ({ book, bookData, initialProgress
         onClose={() => setIsPanelOpen(false)}
         selectedWord={selectedWord}
         bookId={book.id}
+        bookType={book.type}
         onNavigateToPage={goToPage}
       />
     </div>

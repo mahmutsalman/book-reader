@@ -29,6 +29,7 @@ interface WordPanelProps {
   selectedWord: SelectedWord | null;
   bookId: number;
   bookLanguage?: BookLanguage;
+  bookType?: 'text' | 'manga';  // Book type to conditionally show/hide sections
   onNavigateToPage?: (page: number) => void;
   preloadedData?: CachedWordData | null;
   preloadedGrammarData?: GrammarAnalysis;
@@ -110,6 +111,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
   selectedWord,
   bookId,
   bookLanguage = 'en',
+  bookType = 'text',  // Default to 'text' for backward compatibility
   onNavigateToPage,
   preloadedData,
   preloadedGrammarData,
@@ -163,6 +165,9 @@ const WordPanel: React.FC<WordPanelProps> = ({
   // Retry trigger for rate limit errors
   const [retryTrigger, setRetryTrigger] = useState(0);
   const [retryingModel, setRetryingModel] = useState<string | null>(null);
+
+  // Repeat mode state for audio playback
+  const [isRepeatMode, setIsRepeatMode] = useState(false);
   const simplerLines = simplerAnalysis?.simplerVersion
     ? simplerAnalysis.simplerVersion.split('\n').map(line => line.trim()).filter(Boolean)
     : [];
@@ -708,17 +713,15 @@ const WordPanel: React.FC<WordPanelProps> = ({
                         : selectedWord.word}
                       language={bookLanguage}
                       audioType={AudioType.WORD}
+                      isRepeatMode={isRepeatMode}
                       size="sm"
                       title="Pronounce word"
                     />
                     <LoopPlayButton
-                      text={wordData.germanArticle
-                        ? `${wordData.germanArticle} ${capitalizeGermanNoun(selectedWord.word)}`
-                        : selectedWord.word}
-                      language={bookLanguage}
-                      audioType={AudioType.WORD}
+                      isRepeatMode={isRepeatMode}
+                      onToggle={() => setIsRepeatMode(!isRepeatMode)}
                       size="sm"
-                      title="Loop pronunciation"
+                      title="Toggle repeat mode"
                     />
                     <SlowLoopPlayButton
                       text={wordData.germanArticle
@@ -726,6 +729,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
                         : selectedWord.word}
                       language={bookLanguage}
                       audioType={AudioType.WORD}
+                      isRepeatMode={isRepeatMode}
                       size="sm"
                     />
                   </div>
@@ -1703,7 +1707,8 @@ const WordPanel: React.FC<WordPanelProps> = ({
                 )}
               </section>
 
-              {/* Original Sentence */}
+              {/* Original Sentence - hidden for manga/comic books */}
+              {bookType === 'text' && (
               <section>
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="font-semibold" style={{ color: theme.text }}>📝 Original Sentence</h3>
@@ -1712,20 +1717,21 @@ const WordPanel: React.FC<WordPanelProps> = ({
                       text={normalizeForTTS(selectedWord.sentence)}
                       language={bookLanguage}
                       audioType={AudioType.SENTENCE}
+                      isRepeatMode={isRepeatMode}
                       size="sm"
                       title="Pronounce sentence"
                     />
                     <LoopPlayButton
-                      text={normalizeForTTS(selectedWord.sentence)}
-                      language={bookLanguage}
-                      audioType={AudioType.SENTENCE}
+                      isRepeatMode={isRepeatMode}
+                      onToggle={() => setIsRepeatMode(!isRepeatMode)}
                       size="sm"
-                      title="Loop sentence"
+                      title="Toggle repeat mode"
                     />
                     <SlowLoopPlayButton
                       text={normalizeForTTS(selectedWord.sentence)}
                       language={bookLanguage}
                       audioType={AudioType.SENTENCE}
+                      isRepeatMode={isRepeatMode}
                       size="sm"
                     />
                     {/* Syllable mode button */}
@@ -1835,9 +1841,10 @@ const WordPanel: React.FC<WordPanelProps> = ({
                   </p>
                 )}
               </section>
+              )}
 
-              {/* Simplified Sentence - only for single words */}
-              {!selectedWord.isPhrase && wordData.simplifiedSentence && (
+              {/* Simplified Sentence - only for single words, hidden for manga/comic books */}
+              {bookType === 'text' && !selectedWord.isPhrase && wordData.simplifiedSentence && (
                 <section>
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="font-semibold" style={{ color: theme.text }}>✨ Simplified</h3>
@@ -1846,22 +1853,23 @@ const WordPanel: React.FC<WordPanelProps> = ({
                         text={wordData.simplifiedSentence}
                         language={bookLanguage}
                         audioType={AudioType.SIMPLIFIED}
+                        isRepeatMode={isRepeatMode}
                         size="sm"
                         title="Pronounce simplified sentence"
                       />
                       <LoopPlayButton
-                        text={wordData.simplifiedSentence}
-                        language={bookLanguage}
-                        audioType={AudioType.SIMPLIFIED}
+                        isRepeatMode={isRepeatMode}
+                        onToggle={() => setIsRepeatMode(!isRepeatMode)}
                         size="sm"
-                        title="Loop simplified sentence"
+                        title="Toggle repeat mode"
                       />
                       <SlowLoopPlayButton
                         text={wordData.simplifiedSentence}
                         language={bookLanguage}
                         audioType={AudioType.SIMPLIFIED}
+                        isRepeatMode={isRepeatMode}
                         size="sm"
-                        />
+                      />
                     </div>
                   </div>
                   <p
@@ -1882,8 +1890,8 @@ const WordPanel: React.FC<WordPanelProps> = ({
                 </section>
               )}
 
-              {/* Other Occurrences - only for single words */}
-              {!selectedWord.isPhrase && wordData.occurrences && wordData.occurrences.length > 1 && (
+              {/* Other Occurrences - only for single words, hidden for manga/comic books */}
+              {bookType === 'text' && !selectedWord.isPhrase && wordData.occurrences && wordData.occurrences.length > 1 && (
                 <section>
                   <h3 className="font-semibold mb-2" style={{ color: theme.text }}>
                     📍 Other Occurrences ({wordData.occurrences.length})
