@@ -12,12 +12,14 @@ import asyncio
 import subprocess
 import sys
 import shutil
+import inspect
 from typing import Optional, List, Dict
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from datetime import datetime
 
 from generators.tts import generate_audio, MODELS_DIR, VOICE_MODELS
 from generators.ipa import generate_ipa
@@ -34,9 +36,8 @@ except ImportError:
 
 try:
     import pytesseract
-    from PIL import Image, ImageEnhance, ImageFilter
+    from PIL import Image, ImageEnhance, ImageFilter, ImageOps
     import numpy as np
-    from scipy.ndimage import gaussian_filter
     OCR_AVAILABLE = True
 except ImportError:
     OCR_AVAILABLE = False
@@ -44,8 +45,8 @@ except ImportError:
     Image = None
     ImageEnhance = None
     ImageFilter = None
+    ImageOps = None
     np = None
-    gaussian_filter = None
 
 # PaddleOCR support (optional, installed by default)
 # Using lazy initialization to avoid blocking server startup with model downloads
@@ -56,6 +57,14 @@ try:
 except ImportError:
     PADDLEOCR_AVAILABLE = False
     PaddleOCR_class = None
+
+# PaddleOCR/PaddleX may try to check remote model hosters even when local models are cached.
+# BookReader runs locally and may not have network access, so disable by default.
+os.environ.setdefault("DISABLE_MODEL_SOURCE_CHECK", "True")
+
+# Limit native thread fan-out to reduce RAM spikes on some systems.
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("MKL_NUM_THREADS", "1")
 
 # PaddleOCR instances (initialized lazily on first use, per language)
 paddle_ocr_instances = {}
@@ -97,7 +106,23 @@ def get_paddle_ocr(language: str = "en"):
             # Double-check after acquiring lock
             if paddle_lang not in paddle_ocr_instances:
                 print(f"[PaddleOCR] Initializing PaddleOCR (first use - downloading models if needed)... lang={paddle_lang}")
-                paddle_ocr_instances[paddle_lang] = PaddleOCR_class(use_textline_orientation=False, lang=paddle_lang)
+                # Newer PaddleOCR builds route through PaddleX and enable doc pre-processing by default,
+                # which is heavier than we need for manga crops. Pass only supported kwargs.
+                kwargs = {
+                    "use_textline_orientation": False,
+                    "lang": paddle_lang,
+                    "use_doc_preprocessor": False,
+                    "use_doc_orientation_classify": False,
+                    "use_doc_unwarping": False,
+                }
+                try:
+                    sig = inspect.signature(PaddleOCR_class.__init__)
+                    supported = set(sig.parameters.keys())
+                    filtered_kwargs = {k: v for k, v in kwargs.items() if k in supported}
+                except Exception:
+                    filtered_kwargs = {"use_textline_orientation": False, "lang": paddle_lang}
+
+                paddle_ocr_instances[paddle_lang] = PaddleOCR_class(**filtered_kwargs)
                 print(f"[PaddleOCR] Initialization complete! lang={paddle_lang}")
 
     return paddle_ocr_instances[paddle_lang]
@@ -106,10 +131,46 @@ def get_paddle_ocr(language: str = "en"):
 VERSION = "1.0.0"
 DEFAULT_PORT = 8766
 
-#
-# NOTE: Debug image/log artifact generation is intentionally kept out of the
-# feature commit so it can stay debug-branch-only when cherry-picking to `main`.
-#
+# Debug configuration (debug branch only)
+# ⚠️ SET TO FALSE FOR MAIN BRANCH MERGE ⚠️
+# Main branch does not have a 'debugging' folder and may not have write permissions.
+# When testing OCR improvements on the debug branch, set this to True to enable:
+#   - Debug image saves (original crops, preprocessed images)
+#   - Detailed OCR logs (confidence stats, all detections)
+#   - Output location: BookReader/debugging/{images,logs}/
+DEBUG_BRANCH_ENABLED = False
+
+DEBUG_ENABLED = DEBUG_BRANCH_ENABLED and os.environ.get("BOOKREADER_OCR_DEBUG", "1").lower() in ("1", "true", "yes")
+DEBUG_DIR = Path(os.environ.get("BOOKREADER_DEBUG_DIR", str(Path(__file__).resolve().parents[2] / "debugging")))
+DEBUG_IMAGES_DIR = DEBUG_DIR / "images"
+DEBUG_LOGS_DIR = DEBUG_DIR / "logs"
+
+
+def cleanup_debug_directories():
+    """Clean up debug directories on startup for fresh logs."""
+    if not DEBUG_ENABLED:
+        return
+    if os.environ.get("BOOKREADER_OCR_DEBUG_CLEAN", "1").lower() in ("0", "false", "no"):
+        return
+
+    try:
+        # Remove and recreate images directory
+        if DEBUG_IMAGES_DIR.exists():
+            shutil.rmtree(DEBUG_IMAGES_DIR)
+        DEBUG_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
+
+        # Remove and recreate logs directory
+        if DEBUG_LOGS_DIR.exists():
+            shutil.rmtree(DEBUG_LOGS_DIR)
+        DEBUG_LOGS_DIR.mkdir(parents=True, exist_ok=True)
+
+        print(f"[Debug] Cleaned up debug directories: {DEBUG_DIR}")
+    except Exception as e:
+        print(f"[Debug] Failed to cleanup debug directories: {e}")
+
+
+# Clean debug folders on startup
+cleanup_debug_directories()
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -237,8 +298,9 @@ class MangaOCRRegionRequest(BaseModel):
     image_path: str
     region: List[float]  # [x, y, width, height] in pixels
     language: str = "en"
-    preprocessing_profile: str = "default"  # 'default' | 'adaptive' | 'high_contrast' | 'low_contrast' | 'denoised'
-    psm_mode: str = "sparse"  # 'sparse' | 'dense' | 'auto' | 'vertical'
+    # For small user-selected crops, aggressive binarization + sparse PSM often hurts OCR.
+    preprocessing_profile: str = "minimal"  # 'none' | 'minimal' | 'default' | 'adaptive' | 'high_contrast' | 'low_contrast' | 'denoised'
+    psm_mode: str = "dense"  # 'sparse' | 'dense' | 'auto' | 'vertical'
     ocr_engine: str = "paddleocr"  # 'tesseract' | 'paddleocr' | 'trocr' | 'easyocr' | 'hybrid'
 
 
@@ -1051,9 +1113,60 @@ def calculate_confidence_stats(regions: List[OCRTextRegion]) -> dict:
     }
 
 
-#
-# Debug helpers removed from feature commit.
-#
+def save_debug_image(image, prefix: str, suffix: str = ""):
+    """
+    Save debug image with timestamp for visual inspection.
+    """
+    if not DEBUG_ENABLED:
+        return None
+
+    try:
+        DEBUG_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]  # milliseconds
+        filename = f"{prefix}_{timestamp}"
+        if suffix:
+            filename += f"_{suffix}"
+        filename += ".png"
+
+        filepath = DEBUG_IMAGES_DIR / filename
+        image.save(filepath)
+
+        print(f"[DEBUG] Saved image: {filepath}")
+        return str(filepath)
+    except Exception as e:
+        print(f"[DEBUG] Failed to save image: {e}")
+        return None
+
+
+def log_debug_info(message: str, data: dict = None):
+    """
+    Log debug information to file with timestamp.
+    """
+    if not DEBUG_ENABLED:
+        return
+
+    try:
+        DEBUG_LOGS_DIR.mkdir(parents=True, exist_ok=True)
+
+        # Generate log filename (one per day)
+        log_date = datetime.now().strftime("%Y%m%d")
+        log_file = DEBUG_LOGS_DIR / f"ocr_debug_{log_date}.log"
+
+        # Format log entry
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+        log_entry = f"[{timestamp}] {message}\n"
+
+        if data:
+            for key, value in data.items():
+                log_entry += f"  {key}: {value}\n"
+
+        log_entry += "\n"
+
+        with open(log_file, 'a', encoding='utf-8') as f:
+            f.write(log_entry)
+
+    except Exception as e:
+        print(f"[DEBUG] Failed to write log: {e}")
 
 
 def preprocess_comic_image(img, profile: str = "default"):
@@ -1063,10 +1176,10 @@ def preprocess_comic_image(img, profile: str = "default"):
     Profiles:
     - none: No preprocessing (best for clean handwritten/printed text)
     - minimal: Light grayscale + slight contrast (1.2x) only
-    - default: Current implementation (grayscale → 2.0x contrast → sharpen → binary(180))
+    - default: Preserve edges (autocontrast → ~1.4x contrast → unsharp mask; no hard binarization)
     - adaptive: Auto-adjusting threshold for varying lighting (Otsu-like approach)
     - high_contrast: Enhanced contrast (2.5x) for faded/scanned pages
-    - low_contrast: Gentler contrast (1.5x) for high-contrast digital manga
+    - low_contrast: Gentler contrast + unsharp mask for high-contrast digital manga (no binarization)
     - denoised: Extra median filtering for noisy/compressed scans
     """
     # Handle "none" profile - return original with just grayscale
@@ -1090,10 +1203,20 @@ def preprocess_comic_image(img, profile: str = "default"):
         # Convert to numpy array for adaptive processing
         img_array = np.array(img)
 
-        # Simple adaptive threshold: use local mean
-        from scipy.ndimage import uniform_filter
-        local_mean = uniform_filter(img_array.astype(float), size=15)
-        threshold_map = local_mean - 10  # Offset for better text detection
+        # Simple adaptive threshold: local mean (box filter) with a small offset.
+        # Implemented without SciPy to keep OCR working in minimal environments.
+        window = 15
+        pad = window // 2
+        padded = np.pad(img_array.astype(np.float32), ((pad, pad), (pad, pad)), mode="reflect")
+        integral = np.pad(padded, ((1, 0), (1, 0)), mode="constant", constant_values=0).cumsum(0).cumsum(1)
+        sums = (
+            integral[window:, window:]
+            - integral[:-window, window:]
+            - integral[window:, :-window]
+            + integral[:-window, :-window]
+        )
+        local_mean = sums / float(window * window)
+        threshold_map = local_mean - 10.0  # Offset for better text detection
         img_array = (img_array > threshold_map).astype(np.uint8) * 255
 
         img = Image.fromarray(img_array)
@@ -1110,9 +1233,8 @@ def preprocess_comic_image(img, profile: str = "default"):
     elif profile == "low_contrast":
         # For crisp digital manga
         enhancer = ImageEnhance.Contrast(img)
-        img = enhancer.enhance(1.5)
-        img = img.filter(ImageFilter.SHARPEN)
-        img = img.point(lambda p: 255 if p > 190 else 0)
+        img = enhancer.enhance(1.25)
+        img = img.filter(ImageFilter.UnsharpMask(radius=1.2, percent=150, threshold=3))
 
     elif profile == "denoised":
         # Extra denoising for compressed/artifacted images
@@ -1123,13 +1245,11 @@ def preprocess_comic_image(img, profile: str = "default"):
         img = img.point(lambda p: 255 if p > 180 else 0)
 
     else:  # "default"
-        # Current implementation (unchanged)
+        # Default: preserve anti-aliased edges; avoid hard binarization unless explicitly requested.
+        img = ImageOps.autocontrast(img, cutoff=1)
         enhancer = ImageEnhance.Contrast(img)
-        img = enhancer.enhance(2.0)
-        img = img.filter(ImageFilter.SHARPEN)
-        threshold = 180
-        img = img.point(lambda p: 255 if p > threshold else 0)
-        img = img.filter(ImageFilter.MedianFilter(size=3))
+        img = enhancer.enhance(1.4)
+        img = img.filter(ImageFilter.UnsharpMask(radius=1.5, percent=160, threshold=3))
 
     return img
 
@@ -1144,6 +1264,13 @@ def _parse_paddle_bbox(bbox_points):
     """
     if bbox_points is None:
         return None
+
+    # Normalize numpy arrays to plain Python lists
+    try:
+        if np is not None and isinstance(bbox_points, np.ndarray):
+            bbox_points = bbox_points.tolist()
+    except Exception:
+        pass
 
     if isinstance(bbox_points, (list, tuple)) and len(bbox_points) == 4 and all(isinstance(v, (int, float)) for v in bbox_points):
         x1, y1, x2, y2 = bbox_points
@@ -1197,6 +1324,41 @@ def _paddle_lines_from_result(result):
     return result
 
 
+def _iter_paddle_entries(result):
+    """
+    Yield PaddleOCR detections as (bbox_points, text, confidence).
+
+    Supports both:
+      - legacy PaddleOCR format: [ [bbox_points, (text, conf)], ... ]
+      - PaddleX OCRResult format: [{'rec_texts': [...], 'rec_scores': [...], 'rec_polys': [...]}, ...]
+    """
+    if result is None:
+        return
+
+    if isinstance(result, list) and result:
+        first = result[0]
+        if hasattr(first, "get") and callable(getattr(first, "get")):
+            rec_texts = first.get("rec_texts")
+            rec_scores = first.get("rec_scores")
+            rec_polys = first.get("rec_polys") or first.get("dt_polys")
+            if isinstance(rec_texts, list) and isinstance(rec_scores, list) and isinstance(rec_polys, list):
+                for bbox_points, text, confidence in zip(rec_polys, rec_texts, rec_scores):
+                    yield bbox_points, text, confidence
+                return
+
+    for line in _paddle_lines_from_result(result):
+        if not isinstance(line, (list, tuple)) or len(line) < 2:
+            continue
+
+        bbox_points = line[0]
+        text_info = line[1]
+
+        if not isinstance(text_info, (list, tuple)) or len(text_info) < 2:
+            continue
+
+        yield bbox_points, text_info[0], text_info[1]
+
+
 def perform_paddleocr_with_stats(img, x_offset=0, y_offset=0, language: str = "en"):
     """
     Perform OCR using PaddleOCR and convert results to OCRTextRegion format.
@@ -1213,7 +1375,10 @@ def perform_paddleocr_with_stats(img, x_offset=0, y_offset=0, language: str = "e
     # Get PaddleOCR instance (lazy initialization on first use)
     ocr_instance = get_paddle_ocr(language)
 
-    # Convert PIL image to numpy array for PaddleOCR
+    # Convert PIL image to numpy array for PaddleOCR.
+    # PaddleOCR can crash on images with alpha channels (e.g. RGBA PNGs), so normalize to RGB.
+    if getattr(img, "mode", None) != "RGB":
+        img = img.convert("RGB")
     img_np = np.array(img)
 
     # Run PaddleOCR (text orientation handled by use_textline_orientation init parameter)
@@ -1221,26 +1386,10 @@ def perform_paddleocr_with_stats(img, x_offset=0, y_offset=0, language: str = "e
 
     regions: List[OCRTextRegion] = []
 
-    lines = _paddle_lines_from_result(result)
-    if not lines:
-        return regions, 0
-
     MIN_CONFIDENCE = 0.15  # Keep consistent with Tesseract's 15% threshold
     total_extracted = 0
 
-    # PaddleOCR returns lines like: [[[x1,y1], [x2,y2], [x3,y3], [x4,y4]], (text, confidence)]
-    for line in lines:
-        if not isinstance(line, (list, tuple)) or len(line) < 2:
-            continue
-
-        bbox_points = line[0]
-        text_info = line[1]
-
-        if not isinstance(text_info, (list, tuple)) or len(text_info) < 2:
-            continue
-
-        text = text_info[0]
-        confidence = text_info[1]
+    for bbox_points, text, confidence in _iter_paddle_entries(result):
 
         if not isinstance(text, str):
             continue
@@ -1352,7 +1501,7 @@ async def extract_manga_text(request: MangaOCRRequest):
             try:
                 regions, total_extracted = perform_paddleocr_with_stats(img, x_offset=0, y_offset=0, language=request.language)
             except Exception as e:
-                print(f"[PaddleOCR] Full-page OCR exception (falling back): {e}")
+                log_debug_info("[PaddleOCR] Full-page OCR exception (falling back)", {"error": str(e)})
                 if not OCR_AVAILABLE:
                     raise
                 engine_used = "tesseract"
@@ -1524,7 +1673,17 @@ async def extract_manga_text_region(request: MangaOCRRegionRequest):
 
         cropped = img.crop((x, y, x + w, y + h))
 
-        # (debug artifact generation removed from feature commit)
+        # DEBUG: Save original cropped region
+        log_debug_info("OCR Rectangle Selection", {
+            "image_path": os.path.basename(image_path),
+            "region": f"x={x}, y={y}, w={w}, h={h}",
+            "cropped_size": f"{cropped.size[0]}x{cropped.size[1]}",
+            "ocr_engine": request.ocr_engine,
+            "preprocessing_profile": request.preprocessing_profile,
+            "psm_mode": request.psm_mode,
+            "language": request.language
+        })
+        save_debug_image(cropped, "01_original_crop")
 
         regions: List[OCRTextRegion] = []
         total_extracted = 0
@@ -1536,7 +1695,7 @@ async def extract_manga_text_region(request: MangaOCRRegionRequest):
             try:
                 regions, total_extracted = perform_paddleocr_with_stats(cropped, x_offset=x, y_offset=y, language=request.language)
             except Exception as e:
-                print(f"[PaddleOCR] Region OCR exception (falling back): {e}")
+                log_debug_info("[PaddleOCR] Region OCR exception (falling back)", {"error": str(e)})
                 if not OCR_AVAILABLE:
                     raise
                 engine_used = "tesseract"
@@ -1546,7 +1705,8 @@ async def extract_manga_text_region(request: MangaOCRRegionRequest):
             tess_lang = TESSERACT_LANGS.get(request.language, "eng")
             preprocessed = preprocess_comic_image(cropped, request.preprocessing_profile)
 
-            # (debug artifact generation removed from feature commit)
+            # DEBUG: Save preprocessed image (what Tesseract sees)
+            save_debug_image(preprocessed, "02_preprocessed", request.preprocessing_profile)
 
             # PSM mode mapping for Tesseract
             PSM_MODES = {
@@ -1608,7 +1768,38 @@ async def extract_manga_text_region(request: MangaOCRRegionRequest):
             'filtered_out': filtered_out
         }
 
-        # (debug artifact generation removed from feature commit)
+        # DEBUG: Log detailed OCR results
+        all_detections = []
+        if engine_used == "tesseract" and ocr_data:
+            for i in range(total_extracted):
+                text = ocr_data["text"][i].strip()
+                try:
+                    conf = float(ocr_data["conf"][i])
+                except (TypeError, ValueError):
+                    conf = -1
+
+                if text:  # Log all text detections, even filtered ones
+                    status = "✅ KEPT" if conf >= MIN_CONFIDENCE else "❌ FILTERED"
+                    tier = classify_confidence_tier(conf / 100.0) if conf >= 0 else "invalid"
+                    all_detections.append(f"{status} [{tier:6s}] {conf:5.1f}% | {text}")
+        elif engine_used == "paddleocr":
+            for r in regions:
+                conf_pct = r.confidence * 100.0
+                tier = r.confidence_tier or classify_confidence_tier(r.confidence)
+                all_detections.append(f"✅ KEPT [{tier:6s}] {conf_pct:5.1f}% | {r.text}")
+
+        log_debug_info("OCR Results", {
+            "total_detections": total_extracted,
+            "kept": filtered_count,
+            "filtered_out": filtered_out,
+            "confidence_min": f"{confidence_stats['min']*100:.1f}%" if regions else "N/A",
+            "confidence_max": f"{confidence_stats['max']*100:.1f}%" if regions else "N/A",
+            "confidence_avg": f"{confidence_stats['avg']*100:.1f}%" if regions else "N/A",
+            "distribution_high": confidence_stats['distribution']['high'] if regions else 0,
+            "distribution_medium": confidence_stats['distribution']['medium'] if regions else 0,
+            "distribution_low": confidence_stats['distribution']['low'] if regions else 0,
+            "all_text_detections": "\n    " + "\n    ".join(all_detections) if all_detections else "None"
+        })
 
         print(f"[Manga OCR] Region OCR extracted {total_extracted} regions, kept {filtered_count} (filtered {filtered_out})")
         return MangaOCRResponse(success=True, regions=regions, metadata=metadata)
