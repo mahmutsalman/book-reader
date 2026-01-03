@@ -13,6 +13,9 @@ A smart book reader application with dynamic text wrapping, AI-powered word look
 - **Vocabulary Tracking**: Track learned words and build your vocabulary.
 - **Multi-Format Support**: EPUB, PDF, and text files.
 - **Adaptive Themes**: Multiple reading themes with automatic adjustment.
+- **Manga OCR (In-Reader)**: Draw a rectangle to OCR only the selected area for better precision.
+
+> Current limitation: OCR regions are typically returned as **lines/phrases**, not individual words (word-level segmentation is not implemented yet).
 
 ## Screenshots
 

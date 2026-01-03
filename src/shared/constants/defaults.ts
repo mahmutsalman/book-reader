@@ -31,6 +31,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
   google_api_key: '',            // Empty by default - user must set up
   google_model: 'gemini-2.5-flash-lite', // Default Google model (best free tier: 15 RPM, 1000/day)
   contextualMeaningMaxTokens: 1000, // Default: 1000 tokens for contextual meaning analysis
+  // OCR settings
+  ocr_engine: 'paddleocr',
+  ocr_confidence_threshold: 15,
+  ocr_preprocessing_profile: 'default',
   // Reader mode persistence
   is_grammar_mode: false,        // Default: grammar mode off
   is_meaning_mode: false,        // Default: meaning mode off
