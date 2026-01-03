@@ -831,14 +831,21 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
   }, [selectedIndices, phraseRanges, loadingPositions]);
 
   // Handle word click with deferred lookup behavior and phrase selection
-  const handleWordClick = useCallback((word: string, wordIndex: number, event: React.MouseEvent) => {
+  const handleWordClick = useCallback((
+    word: string,
+    wordIndex: number,
+    event?: React.MouseEvent,
+    sentenceOverride?: string
+  ) => {
     const cleanedWord = cleanWord(word);
 
     // Store word in map for phrase construction
-    wordIndexMapRef.current.set(wordIndex, cleanedWord);
+    if (wordIndex >= 0) {
+      wordIndexMapRef.current.set(wordIndex, cleanedWord);
+    }
 
     // Handle Shift+click for phrase selection
-    if (event.shiftKey) {
+    if (event?.shiftKey) {
       // PREVENT browser's native text selection when Shift is held
       event.preventDefault();
 
@@ -891,7 +898,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
       setSelectedIndices([]);
     }
 
-    const fullSentence = extractSentenceFromCurrentView(word);
+    const fullSentence = sentenceOverride || extractSentenceFromCurrentView(word);
 
     // Check if word is ready (has cached data for this sentence context)
     if (isWordReady(cleanedWord, fullSentence, book.id)) {
@@ -1874,13 +1881,13 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
             <MangaImageView
               page={bookData.pages[reflowState.currentPageIndex] as MangaPage}
               zoom={zoom}
-              onWordClick={(word, sentence, regionIndex) => {
-                // Reuse existing word click handler
-                handleWordClick(word, regionIndex, null as any, sentence);
+              onWordClick={(word, sentence, regionIndex, event) => {
+                // Reuse existing word click handler with OCR sentence context.
+                handleWordClick(word, regionIndex, event, sentence);
               }}
               onPhraseSelect={(phrase, sentence) => {
                 // Handle phrase selection for manga
-                handleWordClick(phrase, -1, null as any, sentence);
+                handleWordClick(phrase, -1, undefined, sentence);
               }}
             />
           ) : (

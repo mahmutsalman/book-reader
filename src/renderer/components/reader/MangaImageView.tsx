@@ -15,7 +15,7 @@ import type { MangaPage, OCRTextRegion } from '../../../shared/types';
 interface MangaImageViewProps {
   page: MangaPage;
   zoom: number;
-  onWordClick: (word: string, sentence: string, regionIndex: number) => void;
+  onWordClick: (word: string, sentence: string, regionIndex: number, event?: React.MouseEvent) => void;
   onPhraseSelect?: (phrase: string, sentence: string) => void;
   className?: string;
 }
@@ -111,7 +111,7 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
     } else {
       // Single word click
       const sentence = extractSentenceContext(region, page.ocr_regions);
-      onWordClick(region.text, sentence, index);
+      onWordClick(region.text, sentence, index, event);
 
       // Clear any previous multi-selection
       setSelectedRegions([]);
@@ -260,6 +260,22 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
       window.removeEventListener('resize', handleResize);
     };
   }, [handleImageLoad]);
+
+  // Observe image size changes to keep OCR overlay aligned on viewport changes.
+  useEffect(() => {
+    if (!imageRef.current || typeof ResizeObserver === 'undefined') {
+      return;
+    }
+
+    const observer = new ResizeObserver(() => {
+      requestAnimationFrame(() => {
+        handleImageLoad();
+      });
+    });
+
+    observer.observe(imageRef.current);
+    return () => observer.disconnect();
+  }, [handleImageLoad, imagePath]);
 
   const hasOCRRegions = page.has_text && page.ocr_regions.length > 0;
 
