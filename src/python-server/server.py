@@ -13,6 +13,7 @@ import subprocess
 import sys
 import shutil
 import inspect
+import gc
 from typing import Optional, List, Dict
 from pathlib import Path
 
@@ -1377,12 +1378,25 @@ def perform_paddleocr_with_stats(img, x_offset=0, y_offset=0, language: str = "e
 
     # Convert PIL image to numpy array for PaddleOCR.
     # PaddleOCR can crash on images with alpha channels (e.g. RGBA PNGs), so normalize to RGB.
-    if getattr(img, "mode", None) != "RGB":
-        img = img.convert("RGB")
-    img_np = np.array(img)
+    # MEMORY FIX: Use temporary variable and explicit cleanup to prevent memory leaks
+    img_for_ocr = None
+    try:
+        if getattr(img, "mode", None) != "RGB":
+            img_for_ocr = img.convert("RGB")
+            img_np = np.array(img_for_ocr)
+        else:
+            img_np = np.array(img)
 
-    # Run PaddleOCR (text orientation handled by use_textline_orientation init parameter)
-    result = ocr_instance.ocr(img_np)
+        # Run PaddleOCR (text orientation handled by use_textline_orientation init parameter)
+        result = ocr_instance.ocr(img_np)
+    finally:
+        # MEMORY FIX: Explicitly delete temporary RGB image and numpy array
+        if img_for_ocr is not None:
+            img_for_ocr.close()
+            del img_for_ocr
+        del img_np
+        # Force garbage collection to reclaim memory immediately
+        gc.collect()
 
     regions: List[OCRTextRegion] = []
 
@@ -1491,102 +1505,115 @@ async def extract_manga_text(request: MangaOCRRequest):
     try:
         print(f"[Manga OCR] Processing: {os.path.basename(image_path)} (requested={requested_engine}, using={engine_used})")
 
-        # Load image with PIL
-        img = Image.open(image_path)
+        # MEMORY FIX: Use context manager to ensure image is properly closed
+        img = None
+        preprocessed = None
+        try:
+            img = Image.open(image_path)
 
-        regions: List[OCRTextRegion] = []
-        total_extracted = 0
+            regions: List[OCRTextRegion] = []
+            total_extracted = 0
 
-        if engine_used == "paddleocr":
-            try:
-                regions, total_extracted = perform_paddleocr_with_stats(img, x_offset=0, y_offset=0, language=request.language)
-            except Exception as e:
-                log_debug_info("[PaddleOCR] Full-page OCR exception (falling back)", {"error": str(e)})
-                if not OCR_AVAILABLE:
-                    raise
-                engine_used = "tesseract"
-                fallback_reason = f"PaddleOCR failed: {str(e)}; using tesseract"
-
-        if engine_used == "tesseract":
-            # Get Tesseract language code
-            tess_lang = TESSERACT_LANGS.get(request.language, "eng")
-
-            # Preprocess image with selected profile
-            preprocessed = preprocess_comic_image(img, request.preprocessing_profile)
-
-            # PSM mode mapping for Tesseract
-            PSM_MODES = {
-                'sparse': 11,   # Sparse text with OSD (current default)
-                'dense': 6,     # Uniform block of text
-                'auto': 3,      # Fully automatic
-                'vertical': 4   # Single column (for vertical manga)
-            }
-            psm_value = PSM_MODES.get(request.psm_mode, 11)
-
-            # Run OCR with dynamic PSM mode
-            ocr_data = pytesseract.image_to_data(
-                preprocessed,
-                lang=tess_lang,
-                output_type=pytesseract.Output.DICT,
-                config=f'--psm {psm_value} --oem 3'
-            )
-
-            MIN_CONFIDENCE = 15  # Lowered from 30 to capture more partial text
-            total_extracted = len(ocr_data["text"])
-
-            for i in range(total_extracted):
-                text = ocr_data["text"][i].strip()
+            if engine_used == "paddleocr":
                 try:
-                    conf = float(ocr_data["conf"][i])
-                except (TypeError, ValueError):
-                    conf = -1
+                    regions, total_extracted = perform_paddleocr_with_stats(img, x_offset=0, y_offset=0, language=request.language)
+                except Exception as e:
+                    log_debug_info("[PaddleOCR] Full-page OCR exception (falling back)", {"error": str(e)})
+                    if not OCR_AVAILABLE:
+                        raise
+                    engine_used = "tesseract"
+                    fallback_reason = f"PaddleOCR failed: {str(e)}; using tesseract"
 
-                # Skip empty text or very low confidence
-                if not text or conf < MIN_CONFIDENCE:
-                    continue
+            if engine_used == "tesseract":
+                # Get Tesseract language code
+                tess_lang = TESSERACT_LANGS.get(request.language, "eng")
 
-                # Extract bounding box coordinates
-                x = float(ocr_data["left"][i])
-                y = float(ocr_data["top"][i])
-                w = float(ocr_data["width"][i])
-                h = float(ocr_data["height"][i])
+                # Preprocess image with selected profile
+                preprocessed = preprocess_comic_image(img, request.preprocessing_profile)
 
-                # Normalize confidence to 0-1 range
-                confidence = conf / 100.0
+                # PSM mode mapping for Tesseract
+                PSM_MODES = {
+                    'sparse': 11,   # Sparse text with OSD (current default)
+                    'dense': 6,     # Uniform block of text
+                    'auto': 3,      # Fully automatic
+                    'vertical': 4   # Single column (for vertical manga)
+                }
+                psm_value = PSM_MODES.get(request.psm_mode, 11)
 
-                regions.append(OCRTextRegion(
-                    text=text,
-                    bbox=[x, y, w, h],
-                    confidence=confidence,
-                    confidence_tier=classify_confidence_tier(confidence)
-                ))
+                # Run OCR with dynamic PSM mode
+                ocr_data = pytesseract.image_to_data(
+                    preprocessed,
+                    lang=tess_lang,
+                    output_type=pytesseract.Output.DICT,
+                    config=f'--psm {psm_value} --oem 3'
+                )
 
-        # Calculate metadata
-        filtered_count = len(regions)
-        filtered_out = total_extracted - filtered_count
-        confidence_stats = calculate_confidence_stats(regions)
+                MIN_CONFIDENCE = 15  # Lowered from 30 to capture more partial text
+                total_extracted = len(ocr_data["text"])
 
-        metadata = {
-            'confidence_stats': confidence_stats,
-            'ocr_engine': engine_used,
-            'ocr_engine_requested': requested_engine,
-            'ocr_engine_used': engine_used,
-            'fallback_reason': fallback_reason,
-            'preprocessing_profile': request.preprocessing_profile,
-            'psm_mode': request.psm_mode,
-            'total_extracted': total_extracted,
-            'filtered_count': filtered_count,
-            'filtered_out': filtered_out
-        }
+                for i in range(total_extracted):
+                    text = ocr_data["text"][i].strip()
+                    try:
+                        conf = float(ocr_data["conf"][i])
+                    except (TypeError, ValueError):
+                        conf = -1
 
-        print(f"[Manga OCR] Extracted {total_extracted} regions, kept {filtered_count} (filtered {filtered_out})")
-        print(f"[Manga OCR] Confidence: avg={confidence_stats['avg']:.2f}, range={confidence_stats['min']:.2f}-{confidence_stats['max']:.2f}")
+                    # Skip empty text or very low confidence
+                    if not text or conf < MIN_CONFIDENCE:
+                        continue
 
-        return MangaOCRResponse(
-            success=True,
-            regions=regions,
-            metadata=metadata
-        )
+                    # Extract bounding box coordinates
+                    x = float(ocr_data["left"][i])
+                    y = float(ocr_data["top"][i])
+                    w = float(ocr_data["width"][i])
+                    h = float(ocr_data["height"][i])
+
+                    # Normalize confidence to 0-1 range
+                    confidence = conf / 100.0
+
+                    regions.append(OCRTextRegion(
+                        text=text,
+                        bbox=[x, y, w, h],
+                        confidence=confidence,
+                        confidence_tier=classify_confidence_tier(confidence)
+                    ))
+
+            # Calculate metadata
+            filtered_count = len(regions)
+            filtered_out = total_extracted - filtered_count
+            confidence_stats = calculate_confidence_stats(regions)
+
+            metadata = {
+                'confidence_stats': confidence_stats,
+                'ocr_engine': engine_used,
+                'ocr_engine_requested': requested_engine,
+                'ocr_engine_used': engine_used,
+                'fallback_reason': fallback_reason,
+                'preprocessing_profile': request.preprocessing_profile,
+                'psm_mode': request.psm_mode,
+                'total_extracted': total_extracted,
+                'filtered_count': filtered_count,
+                'filtered_out': filtered_out
+            }
+
+            print(f"[Manga OCR] Extracted {total_extracted} regions, kept {filtered_count} (filtered {filtered_out})")
+            print(f"[Manga OCR] Confidence: avg={confidence_stats['avg']:.2f}, range={confidence_stats['min']:.2f}-{confidence_stats['max']:.2f}")
+
+            return MangaOCRResponse(
+                success=True,
+                regions=regions,
+                metadata=metadata
+            )
+        finally:
+            # MEMORY FIX: Explicitly close and delete image objects
+            if preprocessed is not None:
+                preprocessed.close()
+                del preprocessed
+            if img is not None:
+                img.close()
+                del img
+            # Force garbage collection to reclaim memory immediately
+            gc.collect()
 
     except Exception as e:
         print(f"[Manga OCR] Failed: {e}")
@@ -1653,156 +1680,174 @@ async def extract_manga_text_region(request: MangaOCRRegionRequest):
         )
 
     try:
-        img = Image.open(image_path)
-        img_width, img_height = img.size
+        # MEMORY FIX: Explicit cleanup of all image objects
+        img = None
+        cropped = None
+        preprocessed = None
+        try:
+            img = Image.open(image_path)
+            img_width, img_height = img.size
 
-        x, y, w, h = request.region
-        x = int(max(0, x))
-        y = int(max(0, y))
-        w = int(w)
-        h = int(h)
+            x, y, w, h = request.region
+            x = int(max(0, x))
+            y = int(max(0, y))
+            w = int(w)
+            h = int(h)
 
-        if x >= img_width or y >= img_height:
-            return MangaOCRResponse(success=True, regions=[])
+            if x >= img_width or y >= img_height:
+                return MangaOCRResponse(success=True, regions=[])
 
-        w = max(1, min(w, img_width - x))
-        h = max(1, min(h, img_height - y))
+            w = max(1, min(w, img_width - x))
+            h = max(1, min(h, img_height - y))
 
-        if w <= 1 or h <= 1:
-            return MangaOCRResponse(success=True, regions=[])
+            if w <= 1 or h <= 1:
+                return MangaOCRResponse(success=True, regions=[])
 
-        cropped = img.crop((x, y, x + w, y + h))
+            cropped = img.crop((x, y, x + w, y + h))
 
-        # DEBUG: Save original cropped region
-        log_debug_info("OCR Rectangle Selection", {
-            "image_path": os.path.basename(image_path),
-            "region": f"x={x}, y={y}, w={w}, h={h}",
-            "cropped_size": f"{cropped.size[0]}x{cropped.size[1]}",
-            "ocr_engine": request.ocr_engine,
-            "preprocessing_profile": request.preprocessing_profile,
-            "psm_mode": request.psm_mode,
-            "language": request.language
-        })
-        save_debug_image(cropped, "01_original_crop")
+            # DEBUG: Save original cropped region
+            log_debug_info("OCR Rectangle Selection", {
+                "image_path": os.path.basename(image_path),
+                "region": f"x={x}, y={y}, w={w}, h={h}",
+                "cropped_size": f"{cropped.size[0]}x{cropped.size[1]}",
+                "ocr_engine": request.ocr_engine,
+                "preprocessing_profile": request.preprocessing_profile,
+                "psm_mode": request.psm_mode,
+                "language": request.language
+            })
+            save_debug_image(cropped, "01_original_crop")
 
-        regions: List[OCRTextRegion] = []
-        total_extracted = 0
-        MIN_CONFIDENCE = 15  # Only used for Tesseract debug filtering below
-        ocr_data = None
+            regions: List[OCRTextRegion] = []
+            total_extracted = 0
+            MIN_CONFIDENCE = 15  # Only used for Tesseract debug filtering below
+            ocr_data = None
 
-        # Route to the selected OCR engine
-        if engine_used == "paddleocr":
-            try:
-                regions, total_extracted = perform_paddleocr_with_stats(cropped, x_offset=x, y_offset=y, language=request.language)
-            except Exception as e:
-                log_debug_info("[PaddleOCR] Region OCR exception (falling back)", {"error": str(e)})
-                if not OCR_AVAILABLE:
-                    raise
-                engine_used = "tesseract"
-                fallback_reason = f"PaddleOCR failed: {str(e)}; using tesseract"
+            # Route to the selected OCR engine
+            if engine_used == "paddleocr":
+                try:
+                    regions, total_extracted = perform_paddleocr_with_stats(cropped, x_offset=x, y_offset=y, language=request.language)
+                except Exception as e:
+                    log_debug_info("[PaddleOCR] Region OCR exception (falling back)", {"error": str(e)})
+                    if not OCR_AVAILABLE:
+                        raise
+                    engine_used = "tesseract"
+                    fallback_reason = f"PaddleOCR failed: {str(e)}; using tesseract"
 
-        if engine_used == "tesseract":
-            tess_lang = TESSERACT_LANGS.get(request.language, "eng")
-            preprocessed = preprocess_comic_image(cropped, request.preprocessing_profile)
+            if engine_used == "tesseract":
+                tess_lang = TESSERACT_LANGS.get(request.language, "eng")
+                preprocessed = preprocess_comic_image(cropped, request.preprocessing_profile)
 
-            # DEBUG: Save preprocessed image (what Tesseract sees)
-            save_debug_image(preprocessed, "02_preprocessed", request.preprocessing_profile)
+                # DEBUG: Save preprocessed image (what Tesseract sees)
+                save_debug_image(preprocessed, "02_preprocessed", request.preprocessing_profile)
 
-            # PSM mode mapping for Tesseract
-            PSM_MODES = {
-                'sparse': 11,   # Sparse text with OSD
-                'dense': 6,     # Uniform block of text
-                'auto': 3,      # Fully automatic
-                'vertical': 4   # Single column (for vertical manga)
+                # PSM mode mapping for Tesseract
+                PSM_MODES = {
+                    'sparse': 11,   # Sparse text with OSD
+                    'dense': 6,     # Uniform block of text
+                    'auto': 3,      # Fully automatic
+                    'vertical': 4   # Single column (for vertical manga)
+                }
+                psm_value = PSM_MODES.get(request.psm_mode, 11)
+
+                ocr_data = pytesseract.image_to_data(
+                    preprocessed,
+                    lang=tess_lang,
+                    output_type=pytesseract.Output.DICT,
+                    config=f'--psm {psm_value} --oem 3'
+                )
+
+                MIN_CONFIDENCE = 15  # Lowered from 30 to capture more partial text
+                total_extracted = len(ocr_data["text"])
+
+                for i in range(total_extracted):
+                    text = ocr_data["text"][i].strip()
+                    try:
+                        conf = float(ocr_data["conf"][i])
+                    except (TypeError, ValueError):
+                        conf = -1
+
+                    if not text or conf < MIN_CONFIDENCE:
+                        continue
+
+                    region_x = float(ocr_data["left"][i]) + x
+                    region_y = float(ocr_data["top"][i]) + y
+                    region_w = float(ocr_data["width"][i])
+                    region_h = float(ocr_data["height"][i])
+                    confidence = conf / 100.0
+
+                    regions.append(OCRTextRegion(
+                        text=text,
+                        bbox=[region_x, region_y, region_w, region_h],
+                        confidence=confidence,
+                        confidence_tier=classify_confidence_tier(confidence)
+                    ))
+
+            # Calculate metadata
+            filtered_count = len(regions)
+            filtered_out = total_extracted - filtered_count
+            confidence_stats = calculate_confidence_stats(regions)
+
+            metadata = {
+                'confidence_stats': confidence_stats,
+                'ocr_engine': engine_used,
+                'ocr_engine_requested': requested_engine,
+                'ocr_engine_used': engine_used,
+                'fallback_reason': fallback_reason,
+                'preprocessing_profile': request.preprocessing_profile,
+                'psm_mode': request.psm_mode,
+                'total_extracted': total_extracted,
+                'filtered_count': filtered_count,
+                'filtered_out': filtered_out
             }
-            psm_value = PSM_MODES.get(request.psm_mode, 11)
 
-            ocr_data = pytesseract.image_to_data(
-                preprocessed,
-                lang=tess_lang,
-                output_type=pytesseract.Output.DICT,
-                config=f'--psm {psm_value} --oem 3'
-            )
+            # DEBUG: Log detailed OCR results
+            all_detections = []
+            if engine_used == "tesseract" and ocr_data:
+                for i in range(total_extracted):
+                    text = ocr_data["text"][i].strip()
+                    try:
+                        conf = float(ocr_data["conf"][i])
+                    except (TypeError, ValueError):
+                        conf = -1
 
-            MIN_CONFIDENCE = 15  # Lowered from 30 to capture more partial text
-            total_extracted = len(ocr_data["text"])
+                    if text:  # Log all text detections, even filtered ones
+                        status = "✅ KEPT" if conf >= MIN_CONFIDENCE else "❌ FILTERED"
+                        tier = classify_confidence_tier(conf / 100.0) if conf >= 0 else "invalid"
+                        all_detections.append(f"{status} [{tier:6s}] {conf:5.1f}% | {text}")
+            elif engine_used == "paddleocr":
+                for r in regions:
+                    conf_pct = r.confidence * 100.0
+                    tier = r.confidence_tier or classify_confidence_tier(r.confidence)
+                    all_detections.append(f"✅ KEPT [{tier:6s}] {conf_pct:5.1f}% | {r.text}")
 
-            for i in range(total_extracted):
-                text = ocr_data["text"][i].strip()
-                try:
-                    conf = float(ocr_data["conf"][i])
-                except (TypeError, ValueError):
-                    conf = -1
+            log_debug_info("OCR Results", {
+                "total_detections": total_extracted,
+                "kept": filtered_count,
+                "filtered_out": filtered_out,
+                "confidence_min": f"{confidence_stats['min']*100:.1f}%" if regions else "N/A",
+                "confidence_max": f"{confidence_stats['max']*100:.1f}%" if regions else "N/A",
+                "confidence_avg": f"{confidence_stats['avg']*100:.1f}%" if regions else "N/A",
+                "distribution_high": confidence_stats['distribution']['high'] if regions else 0,
+                "distribution_medium": confidence_stats['distribution']['medium'] if regions else 0,
+                "distribution_low": confidence_stats['distribution']['low'] if regions else 0,
+                "all_text_detections": "\n    " + "\n    ".join(all_detections) if all_detections else "None"
+            })
 
-                if not text or conf < MIN_CONFIDENCE:
-                    continue
-
-                region_x = float(ocr_data["left"][i]) + x
-                region_y = float(ocr_data["top"][i]) + y
-                region_w = float(ocr_data["width"][i])
-                region_h = float(ocr_data["height"][i])
-                confidence = conf / 100.0
-
-                regions.append(OCRTextRegion(
-                    text=text,
-                    bbox=[region_x, region_y, region_w, region_h],
-                    confidence=confidence,
-                    confidence_tier=classify_confidence_tier(confidence)
-                ))
-
-        # Calculate metadata
-        filtered_count = len(regions)
-        filtered_out = total_extracted - filtered_count
-        confidence_stats = calculate_confidence_stats(regions)
-
-        metadata = {
-            'confidence_stats': confidence_stats,
-            'ocr_engine': engine_used,
-            'ocr_engine_requested': requested_engine,
-            'ocr_engine_used': engine_used,
-            'fallback_reason': fallback_reason,
-            'preprocessing_profile': request.preprocessing_profile,
-            'psm_mode': request.psm_mode,
-            'total_extracted': total_extracted,
-            'filtered_count': filtered_count,
-            'filtered_out': filtered_out
-        }
-
-        # DEBUG: Log detailed OCR results
-        all_detections = []
-        if engine_used == "tesseract" and ocr_data:
-            for i in range(total_extracted):
-                text = ocr_data["text"][i].strip()
-                try:
-                    conf = float(ocr_data["conf"][i])
-                except (TypeError, ValueError):
-                    conf = -1
-
-                if text:  # Log all text detections, even filtered ones
-                    status = "✅ KEPT" if conf >= MIN_CONFIDENCE else "❌ FILTERED"
-                    tier = classify_confidence_tier(conf / 100.0) if conf >= 0 else "invalid"
-                    all_detections.append(f"{status} [{tier:6s}] {conf:5.1f}% | {text}")
-        elif engine_used == "paddleocr":
-            for r in regions:
-                conf_pct = r.confidence * 100.0
-                tier = r.confidence_tier or classify_confidence_tier(r.confidence)
-                all_detections.append(f"✅ KEPT [{tier:6s}] {conf_pct:5.1f}% | {r.text}")
-
-        log_debug_info("OCR Results", {
-            "total_detections": total_extracted,
-            "kept": filtered_count,
-            "filtered_out": filtered_out,
-            "confidence_min": f"{confidence_stats['min']*100:.1f}%" if regions else "N/A",
-            "confidence_max": f"{confidence_stats['max']*100:.1f}%" if regions else "N/A",
-            "confidence_avg": f"{confidence_stats['avg']*100:.1f}%" if regions else "N/A",
-            "distribution_high": confidence_stats['distribution']['high'] if regions else 0,
-            "distribution_medium": confidence_stats['distribution']['medium'] if regions else 0,
-            "distribution_low": confidence_stats['distribution']['low'] if regions else 0,
-            "all_text_detections": "\n    " + "\n    ".join(all_detections) if all_detections else "None"
-        })
-
-        print(f"[Manga OCR] Region OCR extracted {total_extracted} regions, kept {filtered_count} (filtered {filtered_out})")
-        return MangaOCRResponse(success=True, regions=regions, metadata=metadata)
+            print(f"[Manga OCR] Region OCR extracted {total_extracted} regions, kept {filtered_count} (filtered {filtered_out})")
+            return MangaOCRResponse(success=True, regions=regions, metadata=metadata)
+        finally:
+            # MEMORY FIX: Explicitly close and delete all image objects
+            if preprocessed is not None:
+                preprocessed.close()
+                del preprocessed
+            if cropped is not None:
+                cropped.close()
+                del cropped
+            if img is not None:
+                img.close()
+                del img
+            # Force garbage collection to reclaim memory immediately
+            gc.collect()
 
     except Exception as e:
         print(f"[Manga OCR] Region OCR failed: {e}")
