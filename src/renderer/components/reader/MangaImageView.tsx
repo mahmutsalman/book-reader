@@ -10,6 +10,7 @@
  * - Hover visual feedback
  */
 import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { ZOOM_LEVELS } from '../../../shared/constants';
 import type { BookLanguage, MangaPage, OCRTextRegion } from '../../../shared/types';
 import type { OCREngine } from '../../../shared/types/settings.types';
 
@@ -68,11 +69,17 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [showZoomIndicator, setShowZoomIndicator] = useState(false);
   const imageRef = useRef<HTMLImageElement>(null);
   const selectionStartRef = useRef<{ x: number; y: number } | null>(null);
   const selectionTransformRef = useRef<{ rect: DOMRect; zoom: number; imageScale: number } | null>(null);
   const ocrOverridesRef = useRef<Map<number, OCRTextRegion[]>>(new Map());
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const zoomIndicatorTimerRef = useRef<number | null>(null);
+  const previousZoomRef = useRef<number>(zoom);
+  const dragRafRef = useRef<number | null>(null);
+  const pendingPanRef = useRef<{ x: number; y: number } | null>(null);
   
   useEffect(() => {
     const overrideRegions = ocrOverridesRef.current.get(page.page);
@@ -93,6 +100,28 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
     selectionStartRef.current = null;
     selectionTransformRef.current = null;
   }, [ocrSelectionMode]);
+
+  const clampZoom = useCallback((nextZoom: number) => {
+    return Math.max(ZOOM_LEVELS.MIN, Math.min(ZOOM_LEVELS.MAX, nextZoom));
+  }, []);
+
+  const clampPanOffset = useCallback((next: { x: number; y: number }, zoomLevel: number) => {
+    if (!imageDimensions || !viewportRef.current) return next;
+    if (zoomLevel <= 1.0) return { x: 0, y: 0 };
+
+    const viewportWidth = viewportRef.current.clientWidth;
+    const viewportHeight = viewportRef.current.clientHeight;
+    const baseWidth = imageDimensions.width;
+    const baseHeight = imageDimensions.height;
+
+    const maxPanX = Math.max(0, (baseWidth * zoomLevel - viewportWidth) / 2);
+    const maxPanY = Math.max(0, (baseHeight * zoomLevel - viewportHeight));
+
+    return {
+      x: Math.max(-maxPanX, Math.min(maxPanX, next.x)),
+      y: Math.max(-maxPanY, Math.min(0, next.y)),
+    };
+  }, [imageDimensions]);
 
   // Track Shift key state
   useEffect(() => {
@@ -121,10 +150,47 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
     };
   }, [selectedRegions, onPhraseSelect]);
 
-  // Reset pan offset when zoom changes or page changes
+  // Reset pan offset on page change.
   useEffect(() => {
     setPanOffset({ x: 0, y: 0 });
-  }, [zoom, page.page]);
+  }, [page.page]);
+
+  // Clamp/disable pan on zoom and viewport changes.
+  useEffect(() => {
+    setPanOffset(prev => clampPanOffset(prev, zoom));
+  }, [zoom, imageDimensions, clampPanOffset]);
+
+  // Disable pan during OCR selection mode.
+  useEffect(() => {
+    if (!ocrSelectionMode) return;
+    setPanOffset({ x: 0, y: 0 });
+  }, [ocrSelectionMode]);
+
+  // Show a brief zoom indicator whenever zoom changes.
+  useEffect(() => {
+    if (previousZoomRef.current === zoom) return;
+    previousZoomRef.current = zoom;
+
+    setShowZoomIndicator(true);
+    if (zoomIndicatorTimerRef.current) {
+      window.clearTimeout(zoomIndicatorTimerRef.current);
+    }
+    zoomIndicatorTimerRef.current = window.setTimeout(() => {
+      setShowZoomIndicator(false);
+      zoomIndicatorTimerRef.current = null;
+    }, 1000);
+  }, [zoom]);
+
+  useEffect(() => {
+    return () => {
+      if (zoomIndicatorTimerRef.current) {
+        window.clearTimeout(zoomIndicatorTimerRef.current);
+      }
+      if (dragRafRef.current) {
+        window.cancelAnimationFrame(dragRafRef.current);
+      }
+    };
+  }, []);
 
   /**
    * Handle mouse wheel for zooming and panning.
@@ -132,35 +198,74 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
    * - Two-finger scroll or regular wheel → pan when zoomed in
    */
   const handleWheel = useCallback((event: WheelEvent) => {
+    if (ocrSelectionMode) return;
+    if (!viewportRef.current) return;
+
     // Pinch-to-zoom gesture (trackpad pinch or Ctrl+wheel)
     if (event.ctrlKey) {
       if (!onZoomChange) return;
       event.preventDefault();
 
-      const delta = event.deltaY;
-      const zoomDelta = delta > 0 ? -0.1 : 0.1;
-      const newZoom = Math.max(0.5, Math.min(3.0, zoom + zoomDelta));
-      onZoomChange(newZoom);
+      const zoomDelta = event.deltaY > 0 ? -ZOOM_LEVELS.STEP : ZOOM_LEVELS.STEP;
+      const nextZoom = clampZoom(zoom + zoomDelta);
+
+      if (!imageDimensions) {
+        onZoomChange(nextZoom);
+        return;
+      }
+
+      const rect = viewportRef.current.getBoundingClientRect();
+      const cursorX = event.clientX - rect.left;
+      const cursorY = event.clientY - rect.top;
+      const baseWidth = imageDimensions.width;
+
+      const imageX = ((cursorX - panOffset.x - baseWidth / 2) / zoom) + baseWidth / 2;
+      const imageY = (cursorY - panOffset.y) / zoom;
+
+      const newPanX = cursorX - ((imageX - baseWidth / 2) * nextZoom + baseWidth / 2);
+      const newPanY = cursorY - (imageY * nextZoom);
+      setPanOffset(clampPanOffset({ x: newPanX, y: newPanY }, nextZoom));
+      onZoomChange(nextZoom);
     }
-    // Two-finger scroll for panning (only when zoomed in)
-    else if (zoom > 1.0 && !ocrSelectionMode) {
+    // Trackpad two-finger scroll for panning (only when zoomed in)
+    else if (zoom > 1.0 && (
+      Math.abs(event.deltaX) > 0 ||
+      (event.deltaMode === WheelEvent.DOM_DELTA_PIXEL && Math.abs(event.deltaY) < 50)
+    )) {
       event.preventDefault();
 
-      setPanOffset(prev => ({
-        x: prev.x - event.deltaX,  // Horizontal pan
-        y: prev.y - event.deltaY,  // Vertical pan
-      }));
+      setPanOffset(prev => clampPanOffset({
+        x: prev.x - event.deltaX,
+        y: prev.y - event.deltaY,
+      }, zoom));
     }
-    // Regular mouse wheel when not zoomed - zoom in/out
-    else if (!ocrSelectionMode && onZoomChange) {
+    // Regular mouse wheel zoom in/out (including when already zoomed).
+    else {
+      if (!onZoomChange) return;
       event.preventDefault();
 
-      const delta = event.deltaY;
-      const zoomDelta = delta > 0 ? -0.1 : 0.1;
-      const newZoom = Math.max(0.5, Math.min(3.0, zoom + zoomDelta));
-      onZoomChange(newZoom);
+      const zoomDelta = event.deltaY > 0 ? -ZOOM_LEVELS.STEP : ZOOM_LEVELS.STEP;
+      const nextZoom = clampZoom(zoom + zoomDelta);
+
+      if (!imageDimensions) {
+        onZoomChange(nextZoom);
+        return;
+      }
+
+      const rect = viewportRef.current.getBoundingClientRect();
+      const cursorX = event.clientX - rect.left;
+      const cursorY = event.clientY - rect.top;
+      const baseWidth = imageDimensions.width;
+
+      const imageX = ((cursorX - panOffset.x - baseWidth / 2) / zoom) + baseWidth / 2;
+      const imageY = (cursorY - panOffset.y) / zoom;
+
+      const newPanX = cursorX - ((imageX - baseWidth / 2) * nextZoom + baseWidth / 2);
+      const newPanY = cursorY - (imageY * nextZoom);
+      setPanOffset(clampPanOffset({ x: newPanX, y: newPanY }, nextZoom));
+      onZoomChange(nextZoom);
     }
-  }, [zoom, onZoomChange, ocrSelectionMode]);
+  }, [zoom, onZoomChange, ocrSelectionMode, clampZoom, clampPanOffset, imageDimensions, panOffset]);
 
   /**
    * Handle drag start for panning when zoomed in.
@@ -196,11 +301,19 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
 
     event.preventDefault();
 
-    setPanOffset({
+    pendingPanRef.current = {
       x: event.clientX - dragStart.x,
       y: event.clientY - dragStart.y,
+    };
+
+    if (dragRafRef.current) return;
+    dragRafRef.current = window.requestAnimationFrame(() => {
+      dragRafRef.current = null;
+      if (!pendingPanRef.current) return;
+      setPanOffset(clampPanOffset(pendingPanRef.current, zoom));
+      pendingPanRef.current = null;
     });
-  }, [isDragging, dragStart]);
+  }, [isDragging, dragStart, clampPanOffset, zoom]);
 
   /**
    * Handle drag end.
@@ -634,14 +747,14 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
   // Attach wheel event listener for zoom
   useEffect(() => {
     const wrapper = wrapperRef.current;
-    if (!wrapper || !onZoomChange) return;
+    if (!wrapper) return;
 
     wrapper.addEventListener('wheel', handleWheel, { passive: false });
 
     return () => {
       wrapper.removeEventListener('wheel', handleWheel);
     };
-  }, [handleWheel, onZoomChange]);
+  }, [handleWheel]);
 
   // Attach drag event listeners for panning
   useEffect(() => {
@@ -706,7 +819,10 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
   const hasOCRRegions = ocrRegions.length > 0;
 
   return (
-    <div className={`manga-page-container ${ocrSelectionMode ? 'ocr-selection-active' : ''} ${className}`}>
+    <div
+      ref={viewportRef}
+      className={`manga-page-container ${ocrSelectionMode ? 'ocr-selection-active' : ''} ${className}`}
+    >
       {/* Comic page image */}
       <div
         ref={wrapperRef}
@@ -850,29 +966,51 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
             )}
           </div>
         )}
-
-        {/* Multi-selection indicator */}
-        {selectedRegions.length > 0 && (
-          <div
-            className="selection-count-badge"
-            style={{
-              position: 'absolute',
-              top: '10px',
-              right: '10px',
-              backgroundColor: 'rgba(251, 191, 36, 0.9)',
-              color: '#fff',
-              padding: '4px 12px',
-              borderRadius: '12px',
-              fontSize: '14px',
-              fontWeight: 'bold',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
-            }}
-          >
-            {selectedRegions.length} selected
-          </div>
-        )}
-
       </div>
+
+      {showZoomIndicator && (
+        <div
+          className="zoom-indicator"
+          style={{
+            position: 'absolute',
+            right: '10px',
+            bottom: '10px',
+            zIndex: 20,
+            backgroundColor: 'rgba(0,0,0,0.65)',
+            color: '#fff',
+            padding: '6px 10px',
+            borderRadius: '10px',
+            fontSize: '12px',
+            fontWeight: 600,
+            pointerEvents: 'none',
+            backdropFilter: 'blur(6px)',
+          }}
+        >
+          {Math.round(zoom * 100)}%
+        </div>
+      )}
+
+      {selectedRegions.length > 0 && (
+        <div
+          className="selection-count-badge"
+          style={{
+            position: 'absolute',
+            top: '10px',
+            right: '10px',
+            backgroundColor: 'rgba(251, 191, 36, 0.9)',
+            color: '#fff',
+            padding: '4px 12px',
+            borderRadius: '12px',
+            fontSize: '14px',
+            fontWeight: 'bold',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+            zIndex: 20,
+            pointerEvents: 'none',
+          }}
+        >
+          {selectedRegions.length} selected
+        </div>
+      )}
     </div>
   );
 };

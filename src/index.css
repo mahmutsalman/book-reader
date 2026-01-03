@@ -422,11 +422,13 @@
 .manga-page-container {
   @apply relative w-full mx-auto;
   max-width: 100%;
+  overflow: hidden;
 }
 
 .manga-image-wrapper {
   @apply relative inline-block;
   width: 100%;
+  will-change: transform;
 }
 
 .manga-image {
