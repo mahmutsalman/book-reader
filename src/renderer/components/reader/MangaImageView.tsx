@@ -102,6 +102,7 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
   const dragActivationTimeoutRef = useRef<number | null>(null);
   const suppressClickUntilRef = useRef<number>(0);
   const selectedRegionsRef = useRef<number[]>([]);
+  const dragHoveredRegionRef = useRef<number | null>(null);
   const ocrOverridesRef = useRef<Map<number, OCRTextRegion[]>>(new Map());
   const wrapperRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -857,6 +858,74 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
     };
   }, [ocrRegions]);
 
+  const findOCRRegionAtPoint = useCallback((point: { x: number; y: number }): number | null => {
+    let bestIndex: number | null = null;
+    let bestArea = Infinity;
+    let bestDistanceSq = Infinity;
+
+    for (let idx = 0; idx < ocrRegions.length; idx++) {
+      const region = ocrRegions[idx];
+      if (!region) continue;
+      const [x, y, w, h] = region.bbox;
+      if (point.x < x || point.x > x + w || point.y < y || point.y > y + h) continue;
+
+      const area = w * h;
+      const cx = x + w / 2;
+      const cy = y + h / 2;
+      const dx = point.x - cx;
+      const dy = point.y - cy;
+      const distanceSq = dx * dx + dy * dy;
+
+      if (area < bestArea || (area === bestArea && distanceSq < bestDistanceSq)) {
+        bestIndex = idx;
+        bestArea = area;
+        bestDistanceSq = distanceSq;
+      }
+    }
+
+    return bestIndex;
+  }, [ocrRegions]);
+
+  const updateDragSelectionFromClientPoint = useCallback((clientX: number, clientY: number) => {
+    if (!isDragSelecting || dragStartOrderRef.current === null) return;
+    if (!imageRef.current) return;
+
+    const rect = imageRef.current.getBoundingClientRect();
+    if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) {
+      if (dragHoveredRegionRef.current !== null) {
+        dragHoveredRegionRef.current = null;
+        setHoveredRegion(null);
+      }
+      return;
+    }
+    const point = screenToImageCoords(clientX, clientY, { rect, zoom, imageScale });
+    if (!point) return;
+
+    const hoveredIndex = findOCRRegionAtPoint(point);
+    if (hoveredIndex === null) {
+      if (dragHoveredRegionRef.current !== null) {
+        dragHoveredRegionRef.current = null;
+        setHoveredRegion(null);
+      }
+      return;
+    }
+
+    if (dragHoveredRegionRef.current === hoveredIndex) return;
+    dragHoveredRegionRef.current = hoveredIndex;
+    setHoveredRegion(hoveredIndex);
+
+    const currentOrder = ocrOrderIndexMap.get(hoveredIndex);
+    if (currentOrder === undefined) return;
+
+    const startOrder = dragStartOrderRef.current;
+    const start = Math.min(startOrder, currentOrder);
+    const end = Math.max(startOrder, currentOrder);
+    const indices = ocrReadingOrder.slice(start, end + 1);
+
+    selectedRegionsRef.current = indices;
+    setSelectedRegions(indices);
+  }, [findOCRRegionAtPoint, imageScale, isDragSelecting, ocrOrderIndexMap, ocrReadingOrder, screenToImageCoords, zoom]);
+
   // Implements Android gallery-style drag-to-select for OCR regions (matches text reader interaction pattern).
   // Behavior: long-press (150ms) to enter drag mode, then hover over regions to extend a continuous range.
   const handleRegionMouseDown = useCallback((index: number, event: React.MouseEvent) => {
@@ -877,6 +946,7 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
 
     dragStartOrderRef.current = startOrder;
     dragStartRegionRef.current = index;
+    dragHoveredRegionRef.current = null;
 
     setDragSelectionRect(null);
     setIsDragSelecting(false);
@@ -893,44 +963,11 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
   }, [ocrSelectionMode, isOcrProcessing, isShiftPressed, ocrOrderIndexMap, getBoundingRectForIndices]);
 
   const handleRegionMouseEnter = useCallback((index: number, event: React.MouseEvent) => {
+    if (isDragSelecting) return;
     setHoveredRegion(index);
 
-    if (!isDragSelecting || dragStartOrderRef.current === null) return;
-
     event.preventDefault();
-
-    // Precise hit detection: verify mouse is actually within the region's bounding box
-    const region = ocrRegions[index];
-    if (!region || !wrapperRef.current) return;
-
-    const containerRect = wrapperRef.current.getBoundingClientRect();
-    // Account for zoom and pan transformations
-    const mouseX = (event.clientX - containerRect.left) / zoom;
-    const mouseY = (event.clientY - containerRect.top) / zoom;
-
-    const regionLeft = region.bbox[0] * imageScale;
-    const regionTop = region.bbox[1] * imageScale;
-    const regionRight = regionLeft + region.bbox[2] * imageScale;
-    const regionBottom = regionTop + region.bbox[3] * imageScale;
-
-    // Only proceed if mouse is actually within the region's bounding box
-    const isMouseInRegion = mouseX >= regionLeft && mouseX <= regionRight &&
-                           mouseY >= regionTop && mouseY <= regionBottom;
-
-    if (!isMouseInRegion) return;
-
-    const currentOrder = ocrOrderIndexMap.get(index);
-    if (currentOrder === undefined) return;
-
-    const startOrder = dragStartOrderRef.current;
-    const start = Math.min(startOrder, currentOrder);
-    const end = Math.max(startOrder, currentOrder);
-    const indices = ocrReadingOrder.slice(start, end + 1);
-
-    selectedRegionsRef.current = indices;
-    setSelectedRegions(indices);
-    setDragSelectionRect(getBoundingRectForIndices(indices));
-  }, [isDragSelecting, ocrOrderIndexMap, ocrReadingOrder, getBoundingRectForIndices, ocrRegions, imageScale, zoom]);
+  }, [isDragSelecting]);
 
   const endDragSelection = useCallback(() => {
     if (!isDragSelecting) return;
@@ -947,6 +984,7 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
     setDragSelectionRect(null);
     dragStartOrderRef.current = null;
     dragStartRegionRef.current = null;
+    dragHoveredRegionRef.current = null;
     suppressClickUntilRef.current = performance.now() + 300;
   }, [isDragSelecting, onPhraseSelect, handlePhraseComplete]);
 
@@ -1174,6 +1212,24 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
     };
   }, [isDragSelecting, endDragSelection]);
 
+  useEffect(() => {
+    if (!isDragSelecting) return;
+
+    const handleMove = (event: MouseEvent) => {
+      if (event.buttons === 0) {
+        endDragSelection();
+        return;
+      }
+      updateDragSelectionFromClientPoint(event.clientX, event.clientY);
+    };
+
+    window.addEventListener('mousemove', handleMove);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMove);
+    };
+  }, [endDragSelection, isDragSelecting, updateDragSelectionFromClientPoint]);
+
   // Always clear pending drag activation on mouseup (prevents post-click activation).
   useEffect(() => {
     const handleGlobalMouseUp = () => {
@@ -1183,6 +1239,7 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
       }
       dragStartOrderRef.current = null;
       dragStartRegionRef.current = null;
+      dragHoveredRegionRef.current = null;
     };
 
     window.addEventListener('mouseup', handleGlobalMouseUp);
@@ -1385,6 +1442,7 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
                     top: `${region.bbox[1] * imageScale}px`,
                     width: `${region.bbox[2] * imageScale}px`,
                     height: `${region.bbox[3] * imageScale}px`,
+                    boxSizing: 'border-box',
                     cursor: 'pointer',
                     pointerEvents: ocrSelectionMode ? 'none' : 'auto',
                     backgroundColor: isSelected
