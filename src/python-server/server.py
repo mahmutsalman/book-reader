@@ -1430,12 +1430,25 @@ def perform_paddleocr_with_stats(img, x_offset=0, y_offset=0, language: str = "e
         x = x + float(x_offset)
         y = y + float(y_offset)
 
-        regions.append(OCRTextRegion(
-            text=text,
-            bbox=[float(x), float(y), float(w), float(h)],
-            confidence=float(confidence),
-            confidence_tier=classify_confidence_tier(float(confidence))
-        ))
+        # Create region dictionary for segmentation
+        region_dict = {
+            'text': text,
+            'bbox': [float(x), float(y), float(w), float(h)],
+            'confidence': float(confidence),
+            'confidence_tier': classify_confidence_tier(float(confidence))
+        }
+
+        # Segment into word-level regions
+        word_regions = segment_region_into_words(region_dict, language)
+
+        # Convert word regions to OCRTextRegion objects
+        for word_region in word_regions:
+            regions.append(OCRTextRegion(
+                text=word_region['text'],
+                bbox=word_region['bbox'],
+                confidence=word_region['confidence'],
+                confidence_tier=word_region['confidence_tier']
+            ))
 
     return regions, total_extracted
 
@@ -1443,6 +1456,69 @@ def perform_paddleocr_with_stats(img, x_offset=0, y_offset=0, language: str = "e
 def perform_paddleocr(img, x_offset=0, y_offset=0, language: str = "en"):
     regions, _total = perform_paddleocr_with_stats(img, x_offset=x_offset, y_offset=y_offset, language=language)
     return regions
+
+
+def segment_region_into_words(region: dict, language: str = 'en') -> List[dict]:
+    """
+    Splits a PaddleOCR text region into individual word-level sub-regions.
+
+    Args:
+        region: OCR region with keys: 'text', 'bbox', 'confidence', 'confidence_tier'
+        language: Language code (currently only uses space-splitting for European languages)
+
+    Returns:
+        List of word-level OCR regions with estimated bboxes
+
+    Example:
+        Input:  {'text': 'NON CREDO CHE', 'bbox': [100, 50, 300, 40], ...}
+        Output: [
+            {'text': 'NON', 'bbox': [100, 50, 100, 40], ...},
+            {'text': 'CREDO', 'bbox': [200, 50, 116.7, 40], ...},
+            {'text': 'CHE', 'bbox': [316.7, 50, 83.3, 40], ...}
+        ]
+    """
+    text = region['text'].strip()
+    bbox = region['bbox']  # [x, y, width, height]
+    confidence = region['confidence']
+    confidence_tier = region.get('confidence_tier', 'unknown')
+
+    # Split by whitespace
+    words = text.split()
+
+    # Handle single-word or empty regions
+    if len(words) <= 1:
+        return [region]  # Return original region unchanged
+
+    # Calculate proportional word widths
+    total_chars = sum(len(word) for word in words)
+    if total_chars == 0:
+        return [region]
+
+    # Generate word-level sub-regions
+    word_regions = []
+    x_offset = bbox[0]  # Start from left edge
+
+    for word in words:
+        # Proportional width allocation based on character count
+        word_char_ratio = len(word) / total_chars
+        word_width = word_char_ratio * bbox[2]
+
+        word_region = {
+            'text': word,
+            'bbox': [
+                x_offset,
+                bbox[1],      # Same Y position
+                word_width,
+                bbox[3]       # Same height
+            ],
+            'confidence': confidence,
+            'confidence_tier': confidence_tier
+        }
+
+        word_regions.append(word_region)
+        x_offset += word_width  # Move to next word position
+
+    return word_regions
 
 
 @app.post("/api/manga/extract-text", response_model=MangaOCRResponse)
