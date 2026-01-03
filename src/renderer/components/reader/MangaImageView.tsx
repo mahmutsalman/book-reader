@@ -116,14 +116,89 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
   }, [selectedRegions]);
 
   const ocrReadingOrder = useMemo(() => {
-    return ocrRegions
-      .map((region, idx) => ({ idx, region }))
-      .sort((a, b) => {
-        const yDiff = a.region.bbox[1] - b.region.bbox[1];
-        if (Math.abs(yDiff) > 20) return yDiff;
-        return a.region.bbox[0] - b.region.bbox[0];
-      })
-      .map(item => item.idx);
+    if (ocrRegions.length === 0) return [];
+
+    const heights = ocrRegions.map(r => r.bbox[3]).filter(h => Number.isFinite(h) && h > 0).sort((a, b) => a - b);
+    const medianHeight = heights.length ? heights[Math.floor(heights.length / 2)] : 20;
+    const lineThreshold = Math.max(10, Math.round(medianHeight * 0.6));
+
+    type Item = {
+      idx: number;
+      left: number;
+      top: number;
+      right: number;
+      bottom: number;
+      centerY: number;
+      height: number;
+    };
+
+    type Line = {
+      items: Item[];
+      centerY: number;
+      minTop: number;
+      maxBottom: number;
+      avgHeight: number;
+    };
+
+    const items: Item[] = ocrRegions.map((region, idx) => {
+      const [x, y, w, h] = region.bbox;
+      return {
+        idx,
+        left: x,
+        top: y,
+        right: x + w,
+        bottom: y + h,
+        centerY: y + h / 2,
+        height: h,
+      };
+    });
+
+    items.sort((a, b) => a.centerY - b.centerY || a.left - b.left);
+
+    const lines: Line[] = [];
+
+    for (const item of items) {
+      let bestLine: Line | null = null;
+      let bestScore = Infinity;
+
+      for (const line of lines) {
+        const centerDiff = Math.abs(item.centerY - line.centerY);
+        const overlap = Math.min(item.bottom, line.maxBottom) - Math.max(item.top, line.minTop);
+        const overlapRatio = overlap > 0 ? overlap / Math.min(item.height, line.avgHeight) : 0;
+
+        const isSameLine = centerDiff <= lineThreshold || overlapRatio >= 0.35;
+        if (!isSameLine) continue;
+
+        if (centerDiff < bestScore) {
+          bestScore = centerDiff;
+          bestLine = line;
+        }
+      }
+
+      if (!bestLine) {
+        lines.push({
+          items: [item],
+          centerY: item.centerY,
+          minTop: item.top,
+          maxBottom: item.bottom,
+          avgHeight: item.height,
+        });
+        continue;
+      }
+
+      bestLine.items.push(item);
+      bestLine.minTop = Math.min(bestLine.minTop, item.top);
+      bestLine.maxBottom = Math.max(bestLine.maxBottom, item.bottom);
+      bestLine.centerY = (bestLine.centerY * (bestLine.items.length - 1) + item.centerY) / bestLine.items.length;
+      bestLine.avgHeight = (bestLine.avgHeight * (bestLine.items.length - 1) + item.height) / bestLine.items.length;
+    }
+
+    lines.sort((a, b) => a.centerY - b.centerY);
+    for (const line of lines) {
+      line.items.sort((a, b) => a.left - b.left);
+    }
+
+    return lines.flatMap(line => line.items.map(i => i.idx));
   }, [ocrRegions]);
 
   const ocrOrderIndexMap = useMemo(() => {
@@ -659,14 +734,14 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
     const indicesToUse = indicesOverride ?? selectedRegions;
     if (indicesToUse.length === 0) return;
 
-    // Get selected regions and sort by position (top to bottom, left to right)
+    // Sort selected indices by the computed OCR reading order to keep phrase order stable.
     const regions = indicesToUse
       .map(idx => ({ region: ocrRegions[idx], idx }))
+      .filter(item => Boolean(item.region))
       .sort((a, b) => {
-        // Sort by Y first (top to bottom), then X (left to right)
-        const yDiff = a.region.bbox[1] - b.region.bbox[1];
-        if (Math.abs(yDiff) > 20) return yDiff;
-        return a.region.bbox[0] - b.region.bbox[0];
+        const aOrder = ocrOrderIndexMap.get(a.idx) ?? 0;
+        const bOrder = ocrOrderIndexMap.get(b.idx) ?? 0;
+        return aOrder - bOrder;
       });
 
     // Build phrase from selected regions
