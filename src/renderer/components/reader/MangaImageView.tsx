@@ -26,6 +26,10 @@ interface MangaImageViewProps {
   onPhraseSelect?: (phrase: string, sentence: string) => void;
   onZoomChange?: (zoom: number) => void;
   className?: string;
+  // Translation tracking props
+  knownWords?: Set<string>;
+  isWordReady?: (word: string, sentence: string, bookId: number) => boolean;
+  onTranslationStatusChange?: (regionIndex: number, status: 'loading' | 'ready') => void;
 }
 
 export const MangaImageView: React.FC<MangaImageViewProps> = ({
@@ -40,6 +44,9 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
   onPhraseSelect,
   onZoomChange,
   className = '',
+  knownWords,
+  isWordReady,
+  onTranslationStatusChange,
 }) => {
   const [selectedRegions, setSelectedRegions] = useState<number[]>([]);
   const [isShiftPressed, setIsShiftPressed] = useState(false);
@@ -65,6 +72,15 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
     };
   } | null>(null);
   const [showOcrFeedback, setShowOcrFeedback] = useState(false);
+  // Translation status tracking for OCR regions
+  const [regionTranslationStatus, setRegionTranslationStatus] = useState<Map<number, 'loading' | 'ready'>>(new Map());
+  // Phrase ranges for multi-word selections
+  const [mangaPhraseRanges, setMangaPhraseRanges] = useState<Map<string, {
+    indices: number[];
+    middleIndex: number;
+    phrase: string;
+    status: 'loading' | 'ready';
+  }>>(new Map());
   // Pan and zoom state
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -426,12 +442,99 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
     } else {
       // Single word click
       const sentence = extractSentenceContext(region, ocrRegions);
+
+      // Set loading status immediately
+      setRegionTranslationStatus(prev => {
+        const newMap = new Map(prev);
+        newMap.set(index, 'loading');
+        return newMap;
+      });
+
       onWordClick(region.text, sentence, index, event);
+
+      // Callback to parent for tracking
+      onTranslationStatusChange?.(index, 'loading');
 
       // Clear any previous multi-selection
       setSelectedRegions([]);
     }
-  }, [ocrSelectionMode, isShiftPressed, ocrRegions, extractSentenceContext, onWordClick]);
+  }, [ocrSelectionMode, isShiftPressed, ocrRegions, extractSentenceContext, onWordClick, onTranslationStatusChange]);
+
+  /**
+   * Calculate the spatial middle index for phrase dot placement.
+   * Sorts regions by position (Y first, then X) and returns the middle index.
+   */
+  const calculateSpatialMiddleIndex = useCallback((
+    indices: number[],
+    regions: OCRTextRegion[]
+  ): number => {
+    if (indices.length === 0) return -1;
+
+    // Sort indices by region position (top-to-bottom, left-to-right)
+    const sortedIndices = indices
+      .map(idx => ({ idx, region: regions[idx] }))
+      .sort((a, b) => {
+        const yDiff = a.region.bbox[1] - b.region.bbox[1];
+        if (Math.abs(yDiff) > 20) return yDiff;
+        return a.region.bbox[0] - b.region.bbox[0];
+      })
+      .map(item => item.idx);
+
+    return sortedIndices[Math.floor(sortedIndices.length / 2)];
+  }, []);
+
+  /**
+   * Determine which dot indicator to show for a region.
+   * Returns flags for red (ready), yellow (loading), and gray (known) dots.
+   */
+  const getDotIndicator = useCallback((
+    region: OCRTextRegion,
+    index: number
+  ): { showRed: boolean; showYellow: boolean; showGray: boolean } => {
+    const cleanedWord = region.text.trim().toLowerCase();
+
+    // Check if region is part of a phrase
+    let isInPhrase = false;
+    let isMiddleOfPhrase = false;
+    let phraseStatus: 'loading' | 'ready' | null = null;
+
+    for (const [phrase, range] of mangaPhraseRanges) {
+      if (range.indices.includes(index)) {
+        isInPhrase = true;
+        isMiddleOfPhrase = index === range.middleIndex;
+        phraseStatus = range.status;
+        break;
+      }
+    }
+
+    // For phrases, only middle region gets the dot
+    if (isInPhrase) {
+      if (isMiddleOfPhrase) {
+        return {
+          showRed: phraseStatus === 'ready',
+          showYellow: phraseStatus === 'loading',
+          showGray: false
+        };
+      }
+      return { showRed: false, showYellow: false, showGray: false };
+    }
+
+    // Single word logic
+    const sentence = extractSentenceContext(region, ocrRegions);
+    const wordIsReady = isWordReady?.(cleanedWord, sentence, bookId) || false;
+    const isLoading = regionTranslationStatus.get(index) === 'loading';
+    const isKnown = knownWords?.has(cleanedWord) || false;
+
+    if (wordIsReady || regionTranslationStatus.get(index) === 'ready') {
+      return { showRed: true, showYellow: false, showGray: false };
+    } else if (isLoading) {
+      return { showRed: false, showYellow: true, showGray: false };
+    } else if (isKnown) {
+      return { showRed: false, showYellow: false, showGray: true };
+    }
+
+    return { showRed: false, showYellow: false, showGray: false };
+  }, [mangaPhraseRanges, regionTranslationStatus, knownWords, isWordReady, bookId, ocrRegions, extractSentenceContext]);
 
   /**
    * Complete phrase selection and trigger callback.
@@ -439,7 +542,7 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
   const handlePhraseComplete = useCallback(() => {
     if (selectedRegions.length === 0) return;
 
-    // Get selected regions and sort by position (left to right, top to bottom)
+    // Get selected regions and sort by position (top to bottom, left to right)
     const regions = selectedRegions
       .map(idx => ({ region: ocrRegions[idx], idx }))
       .sort((a, b) => {
@@ -451,6 +554,22 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
 
     // Build phrase from selected regions
     const phrase = regions.map(r => r.region.text).join(' ');
+    const indices = regions.map(r => r.idx);
+
+    // Calculate middle index for dot placement
+    const middleIndex = calculateSpatialMiddleIndex(indices, ocrRegions);
+
+    // Create phrase range with loading status
+    setMangaPhraseRanges(prev => {
+      const newMap = new Map(prev);
+      newMap.set(phrase, {
+        indices,
+        middleIndex,
+        phrase,
+        status: 'loading'
+      });
+      return newMap;
+    });
 
     // Extract expanded sentence context
     const allSelectedRegions = regions.map(r => r.region);
@@ -462,7 +581,7 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
 
     // Clear selection
     setSelectedRegions([]);
-  }, [selectedRegions, ocrRegions, onPhraseSelect]);
+  }, [selectedRegions, ocrRegions, onPhraseSelect, calculateSpatialMiddleIndex]);
 
   /**
    * Extract expanded context for multi-word selection.
@@ -819,12 +938,27 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
    * Get color scheme for OCR region based on confidence tier.
    * Returns background and border colors for different confidence levels.
    */
-  const getConfidenceColor = useCallback((confidence: number, tier?: string): {
+  const getConfidenceColor = useCallback((
+    confidence: number,
+    tier?: string,
+    invisibleMode: boolean = true
+  ): {
     bg: string;
     border: string;
     bgHover: string;
     borderHover: string;
   } => {
+    // Invisible mode: transparent regions with subtle hover effect
+    if (invisibleMode) {
+      return {
+        bg: 'transparent',
+        border: '1px solid transparent',
+        bgHover: 'rgba(59, 130, 246, 0.05)',
+        borderHover: '1px solid rgba(59, 130, 246, 0.15)'
+      };
+    }
+
+    // Original confidence-based colors (preserved for debugging)
     const effectiveTier = tier || (
       confidence >= 0.60 ? 'high' :
       confidence >= 0.30 ? 'medium' : 'low'
@@ -940,9 +1074,10 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
             }}
           >
             {ocrRegions.map((region, idx) => {
-              const colors = getConfidenceColor(region.confidence, region.confidence_tier);
+              const colors = getConfidenceColor(region.confidence, region.confidence_tier, true);
               const isSelected = selectedRegions.includes(idx);
               const isHovered = hoveredRegion === idx;
+              const { showRed, showYellow, showGray } = getDotIndicator(region, idx);
               const tierLabel = region.confidence_tier || (
                 region.confidence >= 0.60 ? 'high' :
                 region.confidence >= 0.30 ? 'medium' : 'low'
@@ -951,7 +1086,7 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
               return (
                 <span
                   key={idx}
-                  className={getRegionClassName(idx)}
+                  className={`${getRegionClassName(idx)} ocr-region-invisible`}
                   data-word-index={idx}
                   data-text={region.text}
                   title={`${region.text}\nConfidence: ${Math.round(region.confidence * 100)}% (${tierLabel})`}
@@ -978,7 +1113,12 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
                   onClick={(e) => handleRegionClick(region, idx, e)}
                   onMouseEnter={() => setHoveredRegion(idx)}
                   onMouseLeave={() => setHoveredRegion(null)}
-                />
+                >
+                  {/* Dot indicators */}
+                  {showRed && <span className="manga-word-ready-dot" />}
+                  {showYellow && <span className="manga-word-loading-dot" />}
+                  {showGray && <span className="manga-word-gray-dot" />}
+                </span>
               );
             })}
           </div>

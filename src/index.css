@@ -175,6 +175,67 @@
   }
 }
 
+/* Manga OCR Region Dot Indicators */
+.manga-word-ready-dot {
+  position: absolute;
+  bottom: 0px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 5px;
+  height: 5px;
+  background-color: #ef4444; /* red-500 */
+  border-radius: 50%;
+  pointer-events: none;
+  animation: dot-appear 0.3s ease-out;
+  z-index: 10;
+}
+
+.manga-word-loading-dot {
+  position: absolute;
+  bottom: 0px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 5px;
+  height: 5px;
+  background-color: #eab308; /* yellow-500 */
+  border-radius: 50%;
+  pointer-events: none;
+  animation: loading-dot-pulse 1s ease-in-out infinite;
+  z-index: 10;
+}
+
+.manga-word-gray-dot {
+  position: absolute;
+  bottom: 0px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 5px;
+  height: 5px;
+  background-color: #9ca3af; /* gray-400 */
+  border-radius: 50%;
+  pointer-events: none;
+  animation: dot-appear 0.3s ease-out;
+  z-index: 10;
+}
+
+/* Invisible OCR regions with subtle hover */
+.ocr-region-invisible {
+  background-color: transparent !important;
+  border: 1px solid transparent !important;
+  transition: background-color 150ms ease, border 150ms ease;
+}
+
+.ocr-region-invisible:hover {
+  background-color: rgba(59, 130, 246, 0.05) !important;
+  border: 1px solid rgba(59, 130, 246, 0.15) !important;
+}
+
+/* Keep selection visible */
+.ocr-region-invisible.word-phrase-selected {
+  background-color: rgba(59, 130, 246, 0.3) !important;
+  border: 2px solid rgba(59, 130, 246, 0.8) !important;
+}
+
 /* Pulse animation when word is queued */
 @keyframes word-queued-pulse {
   0% {

@@ -120,6 +120,9 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
   // Used to show gray dots for known words that haven't been fetched for current page
   const [knownWords, setKnownWords] = useState<Set<string>>(new Set());
 
+  // Manga translation status tracking
+  const [mangaRegionStatus, setMangaRegionStatus] = useState<Map<number, 'loading' | 'ready'>>(new Map());
+
   // Pre-study notes state
   const [isGeneratingNotes, setIsGeneratingNotes] = useState(false);
   const [notesProgress, setNotesProgress] = useState<PreStudyProgress | null>(null);
@@ -191,6 +194,14 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
   const handleViewChange = useCallback((viewIndex: number) => {
     goToPageIndex(viewIndex - 1);
   }, [goToPageIndex]);
+
+  const handleMangaTranslationStatusChange = useCallback((regionIndex: number, status: 'loading' | 'ready') => {
+    setMangaRegionStatus(prev => {
+      const newMap = new Map(prev);
+      newMap.set(regionIndex, status);
+      return newMap;
+    });
+  }, []);
 
   // Extract unique chapters with their starting pages
   const chapters = useMemo(() => {
@@ -1977,6 +1988,9 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
                 // Handle phrase selection for manga
                 handleWordClick(phrase, -1, undefined, sentence);
               }}
+              knownWords={knownWords}
+              isWordReady={isWordReady}
+              onTranslationStatusChange={handleMangaTranslationStatusChange}
             />
           ) : (
             renderText(reflowState.currentText)
