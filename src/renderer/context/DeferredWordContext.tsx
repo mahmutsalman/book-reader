@@ -155,6 +155,13 @@ export const DeferredWordProvider: React.FC<DeferredWordProviderProps> = ({ chil
       const isPhraseEntry = isPhrase(entry.word);
 
       if (isPhraseEntry) {
+        console.log('[DeferredWord][Phrase] getPhraseMeaning request', {
+          key,
+          word: entry.word,
+          sentence: entry.sentence,
+          language: entry.language,
+          bookId: entry.bookId,
+        });
         // Phrase handling: get phrase meaning instead of word definition
         try {
           const phraseMeaningResult = await window.electronAPI.ai.getPhraseMeaning(
@@ -162,6 +169,13 @@ export const DeferredWordProvider: React.FC<DeferredWordProviderProps> = ({ chil
             entry.sentence,
             entry.language
           );
+          console.log('[DeferredWord][Phrase] getPhraseMeaning response', {
+            key,
+            hasShortMeaning: phraseMeaningResult.shortMeaning !== undefined,
+            hasMeaning: Boolean(phraseMeaningResult.meaning),
+            hasPhraseTranslation: Boolean(phraseMeaningResult.phraseTranslation),
+            isPhrasalVerb: phraseMeaningResult.isPhrasalVerb,
+          });
           if (phraseMeaningResult.shortMeaning !== undefined) {
             results.shortMeaning = phraseMeaningResult.shortMeaning;
           }
@@ -314,6 +328,10 @@ export const DeferredWordProvider: React.FC<DeferredWordProviderProps> = ({ chil
         }
         return newMap;
       });
+
+      if (isPhraseEntry) {
+        console.log('[DeferredWord][Phrase] cached', { key, word: entry.word, bookId: entry.bookId });
+      }
 
     } catch (error) {
       console.error('[DeferredWord] Fetch error:', error);

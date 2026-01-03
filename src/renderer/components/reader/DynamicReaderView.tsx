@@ -1985,8 +1985,38 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
                 handleWordClick(word, regionIndex, event, sentence);
               }}
               onPhraseSelect={(phrase, sentence) => {
-                // Handle phrase selection for manga
-                handleWordClick(phrase, -1, undefined, sentence);
+                // Handle phrase selection for manga (preserve spaces; queue as phrase).
+                const phraseReady = isWordReady(phrase, sentence, book.id);
+                console.log('[Manga][PhraseSelect]', {
+                  phrase,
+                  sentence,
+                  phraseReady,
+                  bookId: book.id,
+                  language: book.language,
+                });
+
+                if (!phraseReady) {
+                  queueWord(phrase, sentence, book.id, book.language);
+                }
+              }}
+              onPhraseClick={(phrase, sentence, indices) => {
+                const phraseReady = isWordReady(phrase, sentence, book.id);
+                console.log('[Manga][PhraseClick]', { phrase, sentence, indices, phraseReady, bookId: book.id });
+
+                if (!phraseReady) {
+                  queueWord(phrase, sentence, book.id, book.language);
+                  return;
+                }
+
+                setSelectedWord({
+                  word: phrase,
+                  sentence,
+                  pageNumber: reflowState.originalPage,
+                  isPhrase: true,
+                  wordIndices: indices,
+                });
+                setPreloadedData(getWordData(phrase, sentence, book.id));
+                setIsPanelOpen(true);
               }}
               knownWords={knownWords}
               isWordReady={isWordReady}

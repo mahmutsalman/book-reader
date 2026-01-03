@@ -9,10 +9,12 @@
  * - Multi-word selection (Shift+click)
  * - Hover visual feedback
  */
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { ZOOM_LEVELS } from '../../../shared/constants';
 import type { BookLanguage, MangaPage, OCRTextRegion } from '../../../shared/types';
 import type { OCREngine } from '../../../shared/types/settings.types';
+
+type Rect = { x: number; y: number; width: number; height: number };
 
 interface MangaImageViewProps {
   page: MangaPage;
@@ -24,6 +26,7 @@ interface MangaImageViewProps {
   onOcrSelectionModeChange: (active: boolean) => void;
   onWordClick: (word: string, sentence: string, regionIndex: number, event?: React.MouseEvent) => void;
   onPhraseSelect?: (phrase: string, sentence: string) => void;
+  onPhraseClick?: (phrase: string, sentence: string, indices: number[]) => void;
   onZoomChange?: (zoom: number) => void;
   className?: string;
   // Translation tracking props
@@ -42,6 +45,7 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
   onOcrSelectionModeChange,
   onWordClick,
   onPhraseSelect,
+  onPhraseClick,
   onZoomChange,
   className = '',
   knownWords,
@@ -52,7 +56,7 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
   const [isShiftPressed, setIsShiftPressed] = useState(false);
   const [hoveredRegion, setHoveredRegion] = useState<number | null>(null);
   const [ocrRegions, setOcrRegions] = useState<OCRTextRegion[]>(page.ocr_regions || []);
-  const [selectionRect, setSelectionRect] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const [selectionRect, setSelectionRect] = useState<Rect | null>(null);
   const [isSelecting, setIsSelecting] = useState(false);
   const [isOcrProcessing, setIsOcrProcessing] = useState(false);
   const [imagePath, setImagePath] = useState<string>('');
@@ -80,7 +84,10 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
     middleIndex: number;
     phrase: string;
     status: 'loading' | 'ready';
+    sentence: string;
   }>>(new Map());
+  const [isDragSelecting, setIsDragSelecting] = useState(false);
+  const [dragSelectionRect, setDragSelectionRect] = useState<Rect | null>(null);
   // Pan and zoom state
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -90,6 +97,11 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
   const imageRef = useRef<HTMLImageElement>(null);
   const selectionStartRef = useRef<{ x: number; y: number } | null>(null);
   const selectionTransformRef = useRef<{ rect: DOMRect; zoom: number; imageScale: number } | null>(null);
+  const dragStartOrderRef = useRef<number | null>(null);
+  const dragStartRegionRef = useRef<number | null>(null);
+  const dragActivationTimeoutRef = useRef<number | null>(null);
+  const suppressClickUntilRef = useRef<number>(0);
+  const selectedRegionsRef = useRef<number[]>([]);
   const ocrOverridesRef = useRef<Map<number, OCRTextRegion[]>>(new Map());
   const wrapperRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -99,17 +111,69 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
   const pendingPanRef = useRef<{ x: number; y: number } | null>(null);
   
   useEffect(() => {
+    selectedRegionsRef.current = selectedRegions;
+  }, [selectedRegions]);
+
+  const ocrReadingOrder = useMemo(() => {
+    return ocrRegions
+      .map((region, idx) => ({ idx, region }))
+      .sort((a, b) => {
+        const yDiff = a.region.bbox[1] - b.region.bbox[1];
+        if (Math.abs(yDiff) > 20) return yDiff;
+        return a.region.bbox[0] - b.region.bbox[0];
+      })
+      .map(item => item.idx);
+  }, [ocrRegions]);
+
+  const ocrOrderIndexMap = useMemo(() => {
+    const map = new Map<number, number>();
+    ocrReadingOrder.forEach((idx, order) => map.set(idx, order));
+    return map;
+  }, [ocrReadingOrder]);
+
+  const phraseInfoByIndex = useMemo(() => {
+    const map = new Map<number, { phrase: string; sentence: string; status: 'loading' | 'ready'; indices: number[] }>();
+    for (const [, range] of mangaPhraseRanges) {
+      for (const idx of range.indices) {
+        map.set(idx, {
+          phrase: range.phrase,
+          sentence: range.sentence,
+          status: range.status,
+          indices: range.indices,
+        });
+      }
+    }
+    return map;
+  }, [mangaPhraseRanges]);
+
+  useEffect(() => {
     const overrideRegions = ocrOverridesRef.current.get(page.page);
     const regions = overrideRegions || page.ocr_regions || [];
     setOcrRegions(regions);
     setSelectedRegions([]);
     setHoveredRegion(null);
+    setIsDragSelecting(false);
+    setDragSelectionRect(null);
+    dragStartOrderRef.current = null;
+    dragStartRegionRef.current = null;
+    if (dragActivationTimeoutRef.current) {
+      window.clearTimeout(dragActivationTimeoutRef.current);
+      dragActivationTimeoutRef.current = null;
+    }
   }, [page.page, page.ocr_regions]);
 
   useEffect(() => {
     if (ocrSelectionMode) {
       setSelectedRegions([]);
       setHoveredRegion(null);
+      setIsDragSelecting(false);
+      setDragSelectionRect(null);
+      dragStartOrderRef.current = null;
+      dragStartRegionRef.current = null;
+      if (dragActivationTimeoutRef.current) {
+        window.clearTimeout(dragActivationTimeoutRef.current);
+        dragActivationTimeoutRef.current = null;
+      }
       return;
     }
     setSelectionRect(null);
@@ -428,6 +492,29 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
 
     event.stopPropagation();
 
+    if (performance.now() < suppressClickUntilRef.current) {
+      event.preventDefault();
+      return;
+    }
+
+    const phraseInfo = phraseInfoByIndex.get(index);
+    if (phraseInfo) {
+      event.preventDefault();
+      const phraseIsReady = isWordReady?.(phraseInfo.phrase, phraseInfo.sentence, bookId) || phraseInfo.status === 'ready';
+      console.log('[MangaImageView][PhraseClick]', {
+        phrase: phraseInfo.phrase,
+        sentence: phraseInfo.sentence,
+        phraseIsReady,
+        indices: phraseInfo.indices,
+      });
+      if (phraseIsReady) {
+        onPhraseClick?.(phraseInfo.phrase, phraseInfo.sentence, phraseInfo.indices);
+      } else {
+        onPhraseSelect?.(phraseInfo.phrase, phraseInfo.sentence);
+      }
+      return;
+    }
+
     if (isShiftPressed) {
       // Multi-select mode
       setSelectedRegions(prev => {
@@ -458,7 +545,7 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
       // Clear any previous multi-selection
       setSelectedRegions([]);
     }
-  }, [ocrSelectionMode, isShiftPressed, ocrRegions, extractSentenceContext, onWordClick, onTranslationStatusChange]);
+  }, [ocrSelectionMode, isShiftPressed, ocrRegions, extractSentenceContext, onWordClick, onTranslationStatusChange, phraseInfoByIndex, onPhraseClick, onPhraseSelect, isWordReady, bookId]);
 
   /**
    * Calculate the spatial middle index for phrase dot placement.
@@ -493,26 +580,22 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
   ): { showRed: boolean; showYellow: boolean; showGray: boolean } => {
     const cleanedWord = region.text.trim().toLowerCase();
 
-    // Check if region is part of a phrase
-    let isInPhrase = false;
-    let isMiddleOfPhrase = false;
-    let phraseStatus: 'loading' | 'ready' | null = null;
-
-    for (const [phrase, range] of mangaPhraseRanges) {
-      if (range.indices.includes(index)) {
-        isInPhrase = true;
-        isMiddleOfPhrase = index === range.middleIndex;
-        phraseStatus = range.status;
-        break;
+    const phraseInfo = phraseInfoByIndex.get(index);
+    if (phraseInfo) {
+      // For phrases, only show dot on spatial middle region.
+      let isMiddle = false;
+      for (const [, range] of mangaPhraseRanges) {
+        if (range.phrase === phraseInfo.phrase && range.indices.includes(index)) {
+          isMiddle = index === range.middleIndex;
+          break;
+        }
       }
-    }
 
-    // For phrases, only middle region gets the dot
-    if (isInPhrase) {
-      if (isMiddleOfPhrase) {
+      if (isMiddle) {
+        const phraseIsReady = isWordReady?.(phraseInfo.phrase, phraseInfo.sentence, bookId) || phraseInfo.status === 'ready';
         return {
-          showRed: phraseStatus === 'ready',
-          showYellow: phraseStatus === 'loading',
+          showRed: phraseIsReady,
+          showYellow: !phraseIsReady && phraseInfo.status === 'loading',
           showGray: false
         };
       }
@@ -534,54 +617,7 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
     }
 
     return { showRed: false, showYellow: false, showGray: false };
-  }, [mangaPhraseRanges, regionTranslationStatus, knownWords, isWordReady, bookId, ocrRegions, extractSentenceContext]);
-
-  /**
-   * Complete phrase selection and trigger callback.
-   */
-  const handlePhraseComplete = useCallback(() => {
-    if (selectedRegions.length === 0) return;
-
-    // Get selected regions and sort by position (top to bottom, left to right)
-    const regions = selectedRegions
-      .map(idx => ({ region: ocrRegions[idx], idx }))
-      .sort((a, b) => {
-        // Sort by Y first (top to bottom), then X (left to right)
-        const yDiff = a.region.bbox[1] - b.region.bbox[1];
-        if (Math.abs(yDiff) > 20) return yDiff;
-        return a.region.bbox[0] - b.region.bbox[0];
-      });
-
-    // Build phrase from selected regions
-    const phrase = regions.map(r => r.region.text).join(' ');
-    const indices = regions.map(r => r.idx);
-
-    // Calculate middle index for dot placement
-    const middleIndex = calculateSpatialMiddleIndex(indices, ocrRegions);
-
-    // Create phrase range with loading status
-    setMangaPhraseRanges(prev => {
-      const newMap = new Map(prev);
-      newMap.set(phrase, {
-        indices,
-        middleIndex,
-        phrase,
-        status: 'loading'
-      });
-      return newMap;
-    });
-
-    // Extract expanded sentence context
-    const allSelectedRegions = regions.map(r => r.region);
-    const expandedContext = extractExpandedContext(allSelectedRegions, ocrRegions);
-
-    if (onPhraseSelect) {
-      onPhraseSelect(phrase, expandedContext);
-    }
-
-    // Clear selection
-    setSelectedRegions([]);
-  }, [selectedRegions, ocrRegions, onPhraseSelect, calculateSpatialMiddleIndex]);
+  }, [phraseInfoByIndex, mangaPhraseRanges, regionTranslationStatus, knownWords, isWordReady, bookId, ocrRegions, extractSentenceContext]);
 
   /**
    * Extract expanded context for multi-word selection.
@@ -616,6 +652,87 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
   }, []);
 
   /**
+   * Complete phrase selection and trigger callback.
+   */
+  const handlePhraseComplete = useCallback((indicesOverride?: number[]) => {
+    const indicesToUse = indicesOverride ?? selectedRegions;
+    if (indicesToUse.length === 0) return;
+
+    // Get selected regions and sort by position (top to bottom, left to right)
+    const regions = indicesToUse
+      .map(idx => ({ region: ocrRegions[idx], idx }))
+      .sort((a, b) => {
+        // Sort by Y first (top to bottom), then X (left to right)
+        const yDiff = a.region.bbox[1] - b.region.bbox[1];
+        if (Math.abs(yDiff) > 20) return yDiff;
+        return a.region.bbox[0] - b.region.bbox[0];
+      });
+
+    // Build phrase from selected regions
+    const phrase = regions.map(r => r.region.text).join(' ');
+    const indices = regions.map(r => r.idx);
+
+    // Calculate middle index for dot placement
+    const middleIndex = calculateSpatialMiddleIndex(indices, ocrRegions);
+
+    // Extract expanded sentence context
+    const allSelectedRegions = regions.map(r => r.region);
+    const expandedContext = extractExpandedContext(allSelectedRegions, ocrRegions);
+    const initialStatus: 'loading' | 'ready' =
+      isWordReady?.(phrase, expandedContext, bookId) ? 'ready' : 'loading';
+
+    console.log('[MangaImageView][PhraseComplete]', {
+      indices,
+      phrase,
+      sentence: expandedContext,
+      middleIndex,
+      initialStatus,
+    });
+
+    // Create phrase range with loading status
+    setMangaPhraseRanges(prev => {
+      const newMap = new Map(prev);
+      newMap.set(phrase, {
+        indices,
+        middleIndex,
+        phrase,
+        status: initialStatus,
+        sentence: expandedContext,
+      });
+      return newMap;
+    });
+
+    if (onPhraseSelect) {
+      onPhraseSelect(phrase, expandedContext);
+    }
+
+    // Clear selection
+    setSelectedRegions([]);
+  }, [selectedRegions, ocrRegions, onPhraseSelect, calculateSpatialMiddleIndex, extractExpandedContext, isWordReady, bookId]);
+
+  // Update phrase status to 'ready' when the phrase becomes available in the translation cache.
+  useEffect(() => {
+    if (!isWordReady || mangaPhraseRanges.size === 0) return;
+
+    const updated = new Map(mangaPhraseRanges);
+    let hasChanges = false;
+
+    mangaPhraseRanges.forEach((range, phrase) => {
+      if (range.status !== 'loading') return;
+      if (!range.sentence) return;
+      if (isWordReady(phrase, range.sentence, bookId)) {
+        console.log('[MangaImageView][PhraseReady]', { phrase, sentence: range.sentence, bookId });
+        updated.set(phrase, { ...range, status: 'ready' });
+        hasChanges = true;
+      }
+    });
+
+    if (hasChanges) {
+      setMangaPhraseRanges(updated);
+    }
+  }, [mangaPhraseRanges, isWordReady, bookId]);
+
+  /**
    * Calculate scale factor when image loads.
    * This ensures OCR coordinates (from original image) match the displayed image size.
    */
@@ -642,7 +759,7 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
     console.log(`[MangaImageView] Image dimensions: ${displayedWidth.toFixed(0)}px x ${displayedHeight.toFixed(0)}px`);
   }, []);
 
-  const screenToImageCoords = (
+  const screenToImageCoords = useCallback((
     clientX: number,
     clientY: number,
     transform: { rect: DOMRect; zoom: number; imageScale: number }
@@ -666,7 +783,7 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
       x: Math.max(0, Math.min(originalX, naturalWidth)),
       y: Math.max(0, Math.min(originalY, naturalHeight)),
     };
-  };
+  }, []);
 
   const normalizeRect = (start: { x: number; y: number }, end: { x: number; y: number }) => {
     const x = Math.min(start.x, end.x);
@@ -676,7 +793,7 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
     return { x, y, width, height };
   };
 
-  const clampRectToImageBounds = (rect: { x: number; y: number; width: number; height: number }) => {
+  const clampRectToImageBounds = (rect: Rect) => {
     if (!imageRef.current) return rect;
 
     const maxWidth = imageRef.current.naturalWidth;
@@ -709,6 +826,109 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
       y2 + h2 < y1
     );
   }, []);
+
+  const getBoundingRectForIndices = useCallback((indices: number[]): Rect | null => {
+    if (indices.length === 0) return null;
+
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+
+    for (const idx of indices) {
+      const region = ocrRegions[idx];
+      if (!region) continue;
+      const [x, y, w, h] = region.bbox;
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x + w);
+      maxY = Math.max(maxY, y + h);
+    }
+
+    if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
+      return null;
+    }
+
+    return {
+      x: minX,
+      y: minY,
+      width: Math.max(0, maxX - minX),
+      height: Math.max(0, maxY - minY),
+    };
+  }, [ocrRegions]);
+
+  // Implements Android gallery-style drag-to-select for OCR regions (matches text reader interaction pattern).
+  // Behavior: long-press (150ms) to enter drag mode, then hover over regions to extend a continuous range.
+  const handleRegionMouseDown = useCallback((index: number, event: React.MouseEvent) => {
+    if (ocrSelectionMode || isOcrProcessing) return;
+    if (isShiftPressed) return;
+    if (event.button !== 0) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (dragActivationTimeoutRef.current) {
+      window.clearTimeout(dragActivationTimeoutRef.current);
+      dragActivationTimeoutRef.current = null;
+    }
+
+    const startOrder = ocrOrderIndexMap.get(index);
+    if (startOrder === undefined) return;
+
+    dragStartOrderRef.current = startOrder;
+    dragStartRegionRef.current = index;
+
+    setDragSelectionRect(null);
+    setIsDragSelecting(false);
+
+    const startRect = getBoundingRectForIndices([index]);
+
+    // Set timeout for drag detection (150ms)
+    dragActivationTimeoutRef.current = window.setTimeout(() => {
+      setIsDragSelecting(true);
+      selectedRegionsRef.current = [index];
+      setSelectedRegions([index]);
+      setDragSelectionRect(startRect);
+    }, 150);
+  }, [ocrSelectionMode, isOcrProcessing, isShiftPressed, ocrOrderIndexMap, getBoundingRectForIndices]);
+
+  const handleRegionMouseEnter = useCallback((index: number, event: React.MouseEvent) => {
+    setHoveredRegion(index);
+
+    if (!isDragSelecting || dragStartOrderRef.current === null) return;
+
+    event.preventDefault();
+
+    const currentOrder = ocrOrderIndexMap.get(index);
+    if (currentOrder === undefined) return;
+
+    const startOrder = dragStartOrderRef.current;
+    const start = Math.min(startOrder, currentOrder);
+    const end = Math.max(startOrder, currentOrder);
+    const indices = ocrReadingOrder.slice(start, end + 1);
+
+    selectedRegionsRef.current = indices;
+    setSelectedRegions(indices);
+    setDragSelectionRect(getBoundingRectForIndices(indices));
+  }, [isDragSelecting, ocrOrderIndexMap, ocrReadingOrder, getBoundingRectForIndices]);
+
+  const endDragSelection = useCallback(() => {
+    if (!isDragSelecting) return;
+
+    const indices = selectedRegionsRef.current;
+    if (indices.length > 1 && onPhraseSelect) {
+      handlePhraseComplete(indices);
+    } else {
+      selectedRegionsRef.current = [];
+      setSelectedRegions([]);
+    }
+
+    setIsDragSelecting(false);
+    setDragSelectionRect(null);
+    dragStartOrderRef.current = null;
+    dragStartRegionRef.current = null;
+    suppressClickUntilRef.current = performance.now() + 300;
+  }, [isDragSelecting, onPhraseSelect, handlePhraseComplete]);
 
   const performInReadingOCR = useCallback(async (rect: { x: number; y: number; width: number; height: number }) => {
     if (!window.electronAPI) {
@@ -831,14 +1051,27 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
 
     if (selectedRegions.includes(index)) {
       classes.push('word-phrase-selected');
+      if (isDragSelecting) {
+        classes.push('word-phrase-selecting');
+      }
+    }
+
+    const phraseInfo = phraseInfoByIndex.get(index);
+    if (phraseInfo) {
+      classes.push('manga-phrase-group');
+      classes.push(phraseInfo.status === 'ready' ? 'manga-phrase-group-ready' : 'manga-phrase-group-loading');
     }
 
     if (hoveredRegion === index) {
       classes.push('ocr-region-hover');
     }
 
+    if (isDragSelecting) {
+      classes.push('word-drag-mode');
+    }
+
     return classes.join(' ');
-  }, [selectedRegions, hoveredRegion]);
+  }, [selectedRegions, hoveredRegion, isDragSelecting, phraseInfoByIndex]);
 
   // Load absolute image path from relative path
   useEffect(() => {
@@ -909,6 +1142,42 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
     };
   }, [isSelecting, handleSelectionMove, handleSelectionEnd]);
 
+  useEffect(() => {
+    if (!isDragSelecting) return;
+
+    const handleUp = () => endDragSelection();
+
+    window.addEventListener('mouseup', handleUp);
+
+    return () => {
+      window.removeEventListener('mouseup', handleUp);
+    };
+  }, [isDragSelecting, endDragSelection]);
+
+  // Always clear pending drag activation on mouseup (prevents post-click activation).
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      if (dragActivationTimeoutRef.current) {
+        window.clearTimeout(dragActivationTimeoutRef.current);
+        dragActivationTimeoutRef.current = null;
+      }
+      dragStartOrderRef.current = null;
+      dragStartRegionRef.current = null;
+    };
+
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+    return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (dragActivationTimeoutRef.current) {
+        window.clearTimeout(dragActivationTimeoutRef.current);
+        dragActivationTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
   // Attach wheel event listener for zoom
   useEffect(() => {
     const wrapper = wrapperRef.current;
@@ -941,7 +1210,7 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
   const getConfidenceColor = useCallback((
     confidence: number,
     tier?: string,
-    invisibleMode: boolean = true
+    invisibleMode = true
   ): {
     bg: string;
     border: string;
@@ -1001,7 +1270,7 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
   return (
     <div
       ref={viewportRef}
-      className={`manga-page-container ${ocrSelectionMode ? 'ocr-selection-active' : ''} ${className}`}
+      className={`manga-page-container ${ocrSelectionMode ? 'ocr-selection-active' : ''} ${isDragSelecting ? 'manga-drag-selecting' : ''} ${className}`}
       style={{
         height: zoom > 1.0 && zoomViewportHeight ? `${zoomViewportHeight}px` : undefined,
       }}
@@ -1014,7 +1283,7 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
           transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoom})`,
           transformOrigin: 'top center',
           transition: isDragging ? 'none' : 'transform 200ms ease-out',
-          cursor: zoom > 1.0 && !ocrSelectionMode ? 'grab' : 'default',
+          cursor: ocrSelectionMode || isDragSelecting ? 'crosshair' : (zoom > 1.0 ? 'grab' : 'default'),
           userSelect: 'none',
           WebkitUserSelect: 'none',
         }}
@@ -1108,10 +1377,11 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
                       : isHovered
                       ? colors.borderHover
                       : colors.border,
-                    transition: 'all 150ms ease',
+                    transition: isDragSelecting ? 'none' : 'all 150ms ease',
                   }}
+                  onMouseDown={(e) => handleRegionMouseDown(idx, e)}
                   onClick={(e) => handleRegionClick(region, idx, e)}
-                  onMouseEnter={() => setHoveredRegion(idx)}
+                  onMouseEnter={(e) => handleRegionMouseEnter(idx, e)}
                   onMouseLeave={() => setHoveredRegion(null)}
                 >
                   {/* Dot indicators */}
@@ -1154,6 +1424,18 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
               <div className="spinner" style={{ width: '22px', height: '22px' }} />
             )}
           </div>
+        )}
+
+        {dragSelectionRect && imageDimensions && (
+          <div
+            className="manga-drag-selection-rectangle"
+            style={{
+              left: `${dragSelectionRect.x * imageScale}px`,
+              top: `${dragSelectionRect.y * imageScale}px`,
+              width: `${dragSelectionRect.width * imageScale}px`,
+              height: `${dragSelectionRect.height * imageScale}px`,
+            }}
+          />
         )}
       </div>
 
