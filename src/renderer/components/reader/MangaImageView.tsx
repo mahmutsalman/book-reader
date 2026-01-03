@@ -899,6 +899,26 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
 
     event.preventDefault();
 
+    // Precise hit detection: verify mouse is actually within the region's bounding box
+    const region = ocrRegions[index];
+    if (!region || !wrapperRef.current) return;
+
+    const containerRect = wrapperRef.current.getBoundingClientRect();
+    // Account for zoom and pan transformations
+    const mouseX = (event.clientX - containerRect.left) / zoom;
+    const mouseY = (event.clientY - containerRect.top) / zoom;
+
+    const regionLeft = region.bbox[0] * imageScale;
+    const regionTop = region.bbox[1] * imageScale;
+    const regionRight = regionLeft + region.bbox[2] * imageScale;
+    const regionBottom = regionTop + region.bbox[3] * imageScale;
+
+    // Only proceed if mouse is actually within the region's bounding box
+    const isMouseInRegion = mouseX >= regionLeft && mouseX <= regionRight &&
+                           mouseY >= regionTop && mouseY <= regionBottom;
+
+    if (!isMouseInRegion) return;
+
     const currentOrder = ocrOrderIndexMap.get(index);
     if (currentOrder === undefined) return;
 
@@ -910,7 +930,7 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
     selectedRegionsRef.current = indices;
     setSelectedRegions(indices);
     setDragSelectionRect(getBoundingRectForIndices(indices));
-  }, [isDragSelecting, ocrOrderIndexMap, ocrReadingOrder, getBoundingRectForIndices]);
+  }, [isDragSelecting, ocrOrderIndexMap, ocrReadingOrder, getBoundingRectForIndices, ocrRegions, imageScale, zoom]);
 
   const endDragSelection = useCallback(() => {
     if (!isDragSelecting) return;
@@ -1424,18 +1444,6 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
               <div className="spinner" style={{ width: '22px', height: '22px' }} />
             )}
           </div>
-        )}
-
-        {dragSelectionRect && imageDimensions && (
-          <div
-            className="manga-drag-selection-rectangle"
-            style={{
-              left: `${dragSelectionRect.x * imageScale}px`,
-              top: `${dragSelectionRect.y * imageScale}px`,
-              width: `${dragSelectionRect.width * imageScale}px`,
-              height: `${dragSelectionRect.height * imageScale}px`,
-            }}
-          />
         )}
       </div>
 
