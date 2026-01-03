@@ -165,6 +165,12 @@ class MangaOCRRequest(BaseModel):
     language: str = "en"
 
 
+class MangaOCRRegionRequest(BaseModel):
+    image_path: str
+    region: List[float]  # [x, y, width, height] in pixels
+    language: str = "en"
+
+
 class MangaOCRResponse(BaseModel):
     success: bool
     regions: List[OCRTextRegion] = []
@@ -1041,6 +1047,97 @@ async def extract_manga_text(request: MangaOCRRequest):
             error=f"OCR extraction failed: {str(e)}"
         )
 
+
+@app.post("/api/manga/extract-text-region", response_model=MangaOCRResponse)
+async def extract_manga_text_region(request: MangaOCRRegionRequest):
+    """
+    Extract text from a specific region of a manga/comic page image.
+    """
+    if not OCR_AVAILABLE:
+        return MangaOCRResponse(
+            success=False,
+            error="OCR not available. pytesseract is not installed."
+        )
+
+    image_path = request.image_path
+
+    if not os.path.exists(image_path):
+        return MangaOCRResponse(
+            success=False,
+            error=f"Image file not found: {image_path}"
+        )
+
+    if not request.region or len(request.region) != 4:
+        return MangaOCRResponse(
+            success=False,
+            error="Invalid region. Expected [x, y, width, height]."
+        )
+
+    try:
+        img = Image.open(image_path)
+        img_width, img_height = img.size
+
+        x, y, w, h = request.region
+        x = int(max(0, x))
+        y = int(max(0, y))
+        w = int(w)
+        h = int(h)
+
+        if x >= img_width or y >= img_height:
+            return MangaOCRResponse(success=True, regions=[])
+
+        w = max(1, min(w, img_width - x))
+        h = max(1, min(h, img_height - y))
+
+        if w <= 1 or h <= 1:
+            return MangaOCRResponse(success=True, regions=[])
+
+        cropped = img.crop((x, y, x + w, y + h))
+
+        tess_lang = TESSERACT_LANGS.get(request.language, "eng")
+        preprocessed = preprocess_comic_image(cropped)
+
+        ocr_data = pytesseract.image_to_data(
+            preprocessed,
+            lang=tess_lang,
+            output_type=pytesseract.Output.DICT,
+            config='--psm 11 --oem 3'
+        )
+
+        regions: List[OCRTextRegion] = []
+        MIN_CONFIDENCE = 30
+        total_extracted = len(ocr_data["text"])
+
+        for i in range(total_extracted):
+            text = ocr_data["text"][i].strip()
+            try:
+                conf = float(ocr_data["conf"][i])
+            except (TypeError, ValueError):
+                conf = -1
+
+            if not text or conf < MIN_CONFIDENCE:
+                continue
+
+            region_x = float(ocr_data["left"][i]) + x
+            region_y = float(ocr_data["top"][i]) + y
+            region_w = float(ocr_data["width"][i])
+            region_h = float(ocr_data["height"][i])
+
+            regions.append(OCRTextRegion(
+                text=text,
+                bbox=[region_x, region_y, region_w, region_h],
+                confidence=conf / 100.0
+            ))
+
+        print(f"[Manga OCR] Region OCR extracted {len(regions)} regions from selection")
+        return MangaOCRResponse(success=True, regions=regions)
+
+    except Exception as e:
+        print(f"[Manga OCR] Region OCR failed: {e}")
+        return MangaOCRResponse(
+            success=False,
+            error=f"OCR region extraction failed: {str(e)}"
+        )
 
 # Main entry point
 if __name__ == "__main__":

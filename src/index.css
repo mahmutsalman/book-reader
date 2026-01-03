@@ -454,6 +454,33 @@
   border: 1px solid rgba(251, 191, 36, 0.7);
 }
 
+.manga-page-container.ocr-selection-active .manga-image-wrapper {
+  cursor: crosshair;
+}
+
+.manga-page-container.ocr-selection-active .ocr-region {
+  pointer-events: none;
+  opacity: 0.2;
+}
+
+.ocr-selection-rectangle {
+  position: absolute;
+  border: 2px dashed rgba(251, 191, 36, 0.8);
+  background-color: rgba(251, 191, 36, 0.2);
+  pointer-events: none;
+  z-index: 5;
+  box-sizing: border-box;
+}
+
+.ocr-selection-rectangle.ocr-selection-processing {
+  border-style: solid;
+  background-color: rgba(251, 191, 36, 0.12);
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 /* Dark mode manga styles */
 :is(html.dark .ocr-region:hover),
 :is(html.dark .ocr-region-hover) {

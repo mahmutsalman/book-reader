@@ -81,6 +81,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
   }, [settings.theme]);
 
   const [zoom, setZoom] = useState(initialProgress?.zoom_level || ZOOM_LEVELS.DEFAULT);
+  const [ocrSelectionMode, setOcrSelectionMode] = useState(false);
   const [selectedWord, setSelectedWord] = useState<SelectedWord | null>(null);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [showChapterMenu, setShowChapterMenu] = useState(false);
@@ -196,6 +197,12 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
       startPage,
     }));
   }, [bookData.pages]);
+
+  useEffect(() => {
+    if (bookData.type !== 'manga' && ocrSelectionMode) {
+      setOcrSelectionMode(false);
+    }
+  }, [bookData.type, ocrSelectionMode]);
 
   // Set CSS custom properties for theme colors (for use in CSS animations and global styles)
   useEffect(() => {
@@ -1025,6 +1032,13 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
         setIsShiftHeld(true);
         return;
       }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'o') {
+        if (bookData.type === 'manga') {
+          e.preventDefault();
+          setOcrSelectionMode(prev => !prev);
+        }
+        return;
+      }
       if (e.key === 'ArrowRight' || e.key === ' ') {
         e.preventDefault();
         goToNextPage();
@@ -1032,8 +1046,9 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
         e.preventDefault();
         goToPrevPage();
       } else if (e.key === 'Escape') {
-        // Priority: Close panel first, then exit focus mode
-        if (isPanelOpen) {
+        if (ocrSelectionMode) {
+          setOcrSelectionMode(false);
+        } else if (isPanelOpen) {
           setIsPanelOpen(false);
         } else if (isFocusMode) {
           setIsFocusMode(false);
@@ -1088,7 +1103,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [goToNextPage, goToPrevPage, selectedIndices, finalizePhrase, extractSentenceFromCurrentView, reflowState.originalPage, book.id, isWordReady, getWordData, getWordStatus, queueWord, isPanelOpen, isFocusMode]);
+  }, [bookData.type, goToNextPage, goToPrevPage, selectedIndices, finalizePhrase, extractSentenceFromCurrentView, reflowState.originalPage, book.id, isWordReady, getWordData, getWordStatus, queueWord, isPanelOpen, isFocusMode, ocrSelectionMode]);
 
   // Global mouseup listener for drag selection cleanup
   useEffect(() => {
@@ -1762,6 +1777,35 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
             </svg>
           </button>
 
+          {bookData.type === 'manga' && (
+            <button
+              onClick={() => setOcrSelectionMode(prev => !prev)}
+              className="w-8 h-8 rounded-lg flex items-center justify-center transition-all duration-200"
+              style={{
+                backgroundColor: ocrSelectionMode ? theme.accent : theme.panelBorder,
+                color: ocrSelectionMode ? accentTextColor : theme.textSecondary,
+                boxShadow: ocrSelectionMode ? `0 8px 16px ${addAlpha(theme.accent, 0.25)}` : 'none',
+                border: ocrSelectionMode ? `1px solid ${addAlpha(theme.accent, 0.6)}` : `1px solid ${theme.border}`,
+              }}
+              onMouseEnter={(event) => {
+                if (!ocrSelectionMode) {
+                  event.currentTarget.style.backgroundColor = hoverFill;
+                }
+              }}
+              onMouseLeave={(event) => {
+                if (!ocrSelectionMode) {
+                  event.currentTarget.style.backgroundColor = theme.panelBorder;
+                }
+              }}
+              title={ocrSelectionMode ? 'Exit OCR Selection Mode (Ctrl+O)' : 'OCR Selection Mode (Ctrl+O)'}
+              aria-pressed={ocrSelectionMode}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+                <rect x="4" y="4" width="16" height="16" rx="2" ry="2" />
+              </svg>
+            </button>
+          )}
+
           {/* Queue indicator - always reserve space to prevent layout shift */}
           <span
             className="text-xs flex items-center gap-1 px-2 py-1 rounded min-w-[90px]"
@@ -1881,6 +1925,10 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
             <MangaImageView
               page={bookData.pages[reflowState.currentPageIndex] as MangaPage}
               zoom={zoom}
+              bookId={book.id}
+              bookLanguage={book.language}
+              ocrSelectionMode={ocrSelectionMode}
+              onOcrSelectionModeChange={setOcrSelectionMode}
               onWordClick={(word, sentence, regionIndex, event) => {
                 // Reuse existing word click handler with OCR sentence context.
                 handleWordClick(word, regionIndex, event, sentence);

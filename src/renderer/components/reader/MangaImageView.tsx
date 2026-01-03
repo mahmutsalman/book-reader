@@ -10,11 +10,15 @@
  * - Hover visual feedback
  */
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import type { MangaPage, OCRTextRegion } from '../../../shared/types';
+import type { BookLanguage, MangaPage, OCRTextRegion } from '../../../shared/types';
 
 interface MangaImageViewProps {
   page: MangaPage;
   zoom: number;
+  bookId: number;
+  bookLanguage: BookLanguage;
+  ocrSelectionMode: boolean;
+  onOcrSelectionModeChange: (active: boolean) => void;
   onWordClick: (word: string, sentence: string, regionIndex: number, event?: React.MouseEvent) => void;
   onPhraseSelect?: (phrase: string, sentence: string) => void;
   className?: string;
@@ -23,6 +27,10 @@ interface MangaImageViewProps {
 export const MangaImageView: React.FC<MangaImageViewProps> = ({
   page,
   zoom,
+  bookId,
+  bookLanguage,
+  ocrSelectionMode,
+  onOcrSelectionModeChange,
   onWordClick,
   onPhraseSelect,
   className = '',
@@ -30,10 +38,37 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
   const [selectedRegions, setSelectedRegions] = useState<number[]>([]);
   const [isShiftPressed, setIsShiftPressed] = useState(false);
   const [hoveredRegion, setHoveredRegion] = useState<number | null>(null);
+  const [ocrRegions, setOcrRegions] = useState<OCRTextRegion[]>(page.ocr_regions || []);
+  const [selectionRect, setSelectionRect] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const [isSelecting, setIsSelecting] = useState(false);
+  const [isOcrProcessing, setIsOcrProcessing] = useState(false);
   const [imagePath, setImagePath] = useState<string>('');
   const [imageScale, setImageScale] = useState<number>(1);
   const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
   const imageRef = useRef<HTMLImageElement>(null);
+  const selectionStartRef = useRef<{ x: number; y: number } | null>(null);
+  const selectionTransformRef = useRef<{ rect: DOMRect; zoom: number; imageScale: number } | null>(null);
+  const ocrOverridesRef = useRef<Map<number, OCRTextRegion[]>>(new Map());
+  
+  useEffect(() => {
+    const overrideRegions = ocrOverridesRef.current.get(page.page);
+    const regions = overrideRegions || page.ocr_regions || [];
+    setOcrRegions(regions);
+    setSelectedRegions([]);
+    setHoveredRegion(null);
+  }, [page.page, page.ocr_regions]);
+
+  useEffect(() => {
+    if (ocrSelectionMode) {
+      setSelectedRegions([]);
+      setHoveredRegion(null);
+      return;
+    }
+    setSelectionRect(null);
+    setIsSelecting(false);
+    selectionStartRef.current = null;
+    selectionTransformRef.current = null;
+  }, [ocrSelectionMode]);
 
   // Track Shift key state
   useEffect(() => {
@@ -95,6 +130,10 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
    * Handle single region click or multi-selection.
    */
   const handleRegionClick = useCallback((region: OCRTextRegion, index: number, event: React.MouseEvent) => {
+    if (ocrSelectionMode) {
+      return;
+    }
+
     event.stopPropagation();
 
     if (isShiftPressed) {
@@ -110,13 +149,13 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
       });
     } else {
       // Single word click
-      const sentence = extractSentenceContext(region, page.ocr_regions);
+      const sentence = extractSentenceContext(region, ocrRegions);
       onWordClick(region.text, sentence, index, event);
 
       // Clear any previous multi-selection
       setSelectedRegions([]);
     }
-  }, [isShiftPressed, page.ocr_regions, extractSentenceContext, onWordClick]);
+  }, [ocrSelectionMode, isShiftPressed, ocrRegions, extractSentenceContext, onWordClick]);
 
   /**
    * Complete phrase selection and trigger callback.
@@ -126,7 +165,7 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
 
     // Get selected regions and sort by position (left to right, top to bottom)
     const regions = selectedRegions
-      .map(idx => ({ region: page.ocr_regions[idx], idx }))
+      .map(idx => ({ region: ocrRegions[idx], idx }))
       .sort((a, b) => {
         // Sort by Y first (top to bottom), then X (left to right)
         const yDiff = a.region.bbox[1] - b.region.bbox[1];
@@ -139,7 +178,7 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
 
     // Extract expanded sentence context
     const allSelectedRegions = regions.map(r => r.region);
-    const expandedContext = extractExpandedContext(allSelectedRegions, page.ocr_regions);
+    const expandedContext = extractExpandedContext(allSelectedRegions, ocrRegions);
 
     if (onPhraseSelect) {
       onPhraseSelect(phrase, expandedContext);
@@ -147,7 +186,7 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
 
     // Clear selection
     setSelectedRegions([]);
-  }, [selectedRegions, page.ocr_regions, onPhraseSelect]);
+  }, [selectedRegions, ocrRegions, onPhraseSelect]);
 
   /**
    * Extract expanded context for multi-word selection.
@@ -188,22 +227,192 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
   const handleImageLoad = useCallback(() => {
     if (!imageRef.current) return;
 
-    const displayed = imageRef.current.getBoundingClientRect();
+    const displayedWidth = imageRef.current.clientWidth;
+    const displayedHeight = imageRef.current.clientHeight;
     const natural = {
       width: imageRef.current.naturalWidth,
       height: imageRef.current.naturalHeight,
     };
 
-    const scale = displayed.width / natural.width;
+    if (!displayedWidth || !natural.width) return;
+
+    const scale = displayedWidth / natural.width;
     setImageScale(scale);
     setImageDimensions({
-      width: displayed.width,
-      height: displayed.height,
+      width: displayedWidth,
+      height: displayedHeight,
     });
 
-    console.log(`[MangaImageView] Image scale: ${scale.toFixed(3)} (${natural.width}px → ${displayed.width.toFixed(0)}px)`);
-    console.log(`[MangaImageView] Image dimensions: ${displayed.width.toFixed(0)}px x ${displayed.height.toFixed(0)}px`);
+    console.log(`[MangaImageView] Image scale: ${scale.toFixed(3)} (${natural.width}px → ${displayedWidth.toFixed(0)}px)`);
+    console.log(`[MangaImageView] Image dimensions: ${displayedWidth.toFixed(0)}px x ${displayedHeight.toFixed(0)}px`);
   }, []);
+
+  const screenToImageCoords = (
+    clientX: number,
+    clientY: number,
+    transform: { rect: DOMRect; zoom: number; imageScale: number }
+  ): { x: number; y: number } | null => {
+    if (!imageRef.current) return null;
+
+    const { rect, zoom: zoomAtStart, imageScale: scaleAtStart } = transform;
+    if (zoomAtStart <= 0 || scaleAtStart <= 0) return null;
+
+    const relativeX = clientX - rect.left;
+    const relativeY = clientY - rect.top;
+    const unzoomedX = relativeX / zoomAtStart;
+    const unzoomedY = relativeY / zoomAtStart;
+    const originalX = unzoomedX / scaleAtStart;
+    const originalY = unzoomedY / scaleAtStart;
+
+    const naturalWidth = imageRef.current.naturalWidth;
+    const naturalHeight = imageRef.current.naturalHeight;
+
+    return {
+      x: Math.max(0, Math.min(originalX, naturalWidth)),
+      y: Math.max(0, Math.min(originalY, naturalHeight)),
+    };
+  };
+
+  const normalizeRect = (start: { x: number; y: number }, end: { x: number; y: number }) => {
+    const x = Math.min(start.x, end.x);
+    const y = Math.min(start.y, end.y);
+    const width = Math.abs(end.x - start.x);
+    const height = Math.abs(end.y - start.y);
+    return { x, y, width, height };
+  };
+
+  const clampRectToImageBounds = (rect: { x: number; y: number; width: number; height: number }) => {
+    if (!imageRef.current) return rect;
+
+    const maxWidth = imageRef.current.naturalWidth;
+    const maxHeight = imageRef.current.naturalHeight;
+
+    const x = Math.max(0, Math.min(rect.x, maxWidth));
+    const y = Math.max(0, Math.min(rect.y, maxHeight));
+    const right = Math.max(x, Math.min(rect.x + rect.width, maxWidth));
+    const bottom = Math.max(y, Math.min(rect.y + rect.height, maxHeight));
+
+    return {
+      x,
+      y,
+      width: Math.max(0, right - x),
+      height: Math.max(0, bottom - y),
+    };
+  };
+
+  const rectanglesOverlap = (
+    bbox1: [number, number, number, number],
+    bbox2: [number, number, number, number]
+  ): boolean => {
+    const [x1, y1, w1, h1] = bbox1;
+    const [x2, y2, w2, h2] = bbox2;
+
+    return !(
+      x1 + w1 < x2 ||
+      x2 + w2 < x1 ||
+      y1 + h1 < y2 ||
+      y2 + h2 < y1
+    );
+  };
+
+  const performInReadingOCR = useCallback(async (rect: { x: number; y: number; width: number; height: number }) => {
+    if (!window.electronAPI) {
+      alert('OCR is not available in this environment.');
+      return;
+    }
+
+    setIsOcrProcessing(true);
+
+    try {
+      const newRegions = await window.electronAPI.book.ocrMangaRegion(
+        page.image_path,
+        rect,
+        bookLanguage
+      );
+
+      const filteredRegions = ocrRegions.filter(region => !rectanglesOverlap(
+        region.bbox,
+        [rect.x, rect.y, rect.width, rect.height]
+      ));
+      const updatedRegions = [...filteredRegions, ...newRegions];
+
+      const persistedPage = await window.electronAPI.book.updateMangaPageOCR(
+        bookId,
+        page.page,
+        updatedRegions
+      );
+
+      const finalRegions = persistedPage?.ocr_regions || updatedRegions;
+      ocrOverridesRef.current.set(page.page, finalRegions);
+      setOcrRegions(finalRegions);
+      setSelectedRegions([]);
+      setHoveredRegion(null);
+    } catch (error) {
+      console.error('[MangaImageView] In-reading OCR failed:', error);
+      alert('Failed to process OCR for the selected region.');
+    } finally {
+      setIsOcrProcessing(false);
+    }
+  }, [bookId, bookLanguage, ocrRegions, page.image_path, page.page]);
+
+  const handleSelectionStart = useCallback((event: React.MouseEvent) => {
+    if (!ocrSelectionMode || isOcrProcessing) return;
+    if (!imageRef.current || !imageDimensions) return;
+    if (event.button !== 0) return;
+
+    event.preventDefault();
+
+    const rect = imageRef.current.getBoundingClientRect();
+    selectionTransformRef.current = { rect, zoom, imageScale };
+
+    const start = screenToImageCoords(event.clientX, event.clientY, selectionTransformRef.current);
+    if (!start) return;
+
+    selectionStartRef.current = start;
+    setSelectionRect({ x: start.x, y: start.y, width: 0, height: 0 });
+    setIsSelecting(true);
+  }, [ocrSelectionMode, isOcrProcessing, imageDimensions, zoom, imageScale]);
+
+  const handleSelectionMove = useCallback((event: MouseEvent) => {
+    if (!isSelecting || !selectionStartRef.current || !selectionTransformRef.current) return;
+
+    const current = screenToImageCoords(event.clientX, event.clientY, selectionTransformRef.current);
+    if (!current) return;
+
+    const rect = normalizeRect(selectionStartRef.current, current);
+    setSelectionRect(rect);
+  }, [isSelecting]);
+
+  const handleSelectionEnd = useCallback(async (event: MouseEvent) => {
+    if (!isSelecting || !selectionStartRef.current || !selectionTransformRef.current) return;
+
+    const start = selectionStartRef.current;
+    const current = screenToImageCoords(event.clientX, event.clientY, selectionTransformRef.current);
+
+    setIsSelecting(false);
+    selectionStartRef.current = null;
+    selectionTransformRef.current = null;
+
+    if (!current || !imageRef.current) {
+      setSelectionRect(null);
+      return;
+    }
+
+    const rect = normalizeRect(start, current);
+    const clamped = clampRectToImageBounds(rect);
+
+    const minSize = 20;
+    if (clamped.width < minSize || clamped.height < minSize) {
+      setSelectionRect(null);
+      alert('Selection too small. Please select a larger area.');
+      return;
+    }
+
+    setSelectionRect(clamped);
+    await performInReadingOCR(clamped);
+    setSelectionRect(null);
+    onOcrSelectionModeChange(false);
+  }, [isSelecting, performInReadingOCR, onOcrSelectionModeChange]);
 
   /**
    * Get CSS class for region based on state.
@@ -277,10 +486,25 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
     return () => observer.disconnect();
   }, [handleImageLoad, imagePath]);
 
-  const hasOCRRegions = page.has_text && page.ocr_regions.length > 0;
+  useEffect(() => {
+    if (!isSelecting) return;
+
+    const handleMove = (event: MouseEvent) => handleSelectionMove(event);
+    const handleUp = (event: MouseEvent) => handleSelectionEnd(event);
+
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleUp);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleUp);
+    };
+  }, [isSelecting, handleSelectionMove, handleSelectionEnd]);
+
+  const hasOCRRegions = ocrRegions.length > 0;
 
   return (
-    <div className={`manga-page-container ${className}`}>
+    <div className={`manga-page-container ${ocrSelectionMode ? 'ocr-selection-active' : ''} ${className}`}>
       {/* Comic page image */}
       <div
         className="manga-image-wrapper"
@@ -289,6 +513,7 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
           transformOrigin: 'top center',
           transition: 'transform 200ms ease-out',
         }}
+        onMouseDown={handleSelectionStart}
       >
         {imagePath ? (
           <img
@@ -333,7 +558,7 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
               border: '2px solid rgba(255, 0, 0, 0.3)',
             }}
           >
-            {page.ocr_regions.map((region, idx) => (
+            {ocrRegions.map((region, idx) => (
               <span
                 key={idx}
                 className={getRegionClassName(idx)}
@@ -347,7 +572,7 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
                   width: `${region.bbox[2] * imageScale}px`,
                   height: `${region.bbox[3] * imageScale}px`,
                   cursor: 'pointer',
-                  pointerEvents: 'auto',
+                  pointerEvents: ocrSelectionMode ? 'none' : 'auto',
                   // DEBUG: Show all OCR regions with visible highlights
                   backgroundColor: selectedRegions.includes(idx)
                     ? 'rgba(251, 191, 36, 0.3)' // Yellow for selected
@@ -397,7 +622,23 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
               zIndex: 1000,
             }}
           >
-            No OCR regions found (has_text: {String(page.has_text)}, regions: {page.ocr_regions?.length || 0})
+            No OCR regions found (has_text: {String(page.has_text)}, regions: {ocrRegions.length})
+          </div>
+        )}
+
+        {selectionRect && imageDimensions && (
+          <div
+            className={`ocr-selection-rectangle ${isOcrProcessing ? 'ocr-selection-processing' : ''}`}
+            style={{
+              left: `${selectionRect.x * imageScale}px`,
+              top: `${selectionRect.y * imageScale}px`,
+              width: `${selectionRect.width * imageScale}px`,
+              height: `${selectionRect.height * imageScale}px`,
+            }}
+          >
+            {isOcrProcessing && (
+              <div className="spinner" style={{ width: '22px', height: '22px' }} />
+            )}
           </div>
         )}
 

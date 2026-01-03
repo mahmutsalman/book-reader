@@ -5,7 +5,7 @@ import { pdfImportService } from '../services/pdf-import.service';
 import { txtImportService } from '../services/txt-import.service';
 import { epubImportService } from '../services/epub-import.service';
 import { mangaImportService } from '../services/manga-import.service';
-import type { BookLanguage } from '../../shared/types';
+import type { BookLanguage, OCRTextRegion } from '../../shared/types';
 
 export function registerBookHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.BOOK_IMPORT, async (_, filePath: string, language: BookLanguage = 'en') => {
@@ -68,6 +68,25 @@ export function registerBookHandlers(): void {
       throw error;
     }
   });
+
+  ipcMain.handle(
+    IPC_CHANNELS.BOOK_MANGA_OCR_REGION,
+    async (
+      _,
+      imagePath: string,
+      region: { x: number; y: number; width: number; height: number },
+      language: BookLanguage = 'en'
+    ) => {
+      return mangaImportService.ocrPartialRegion(imagePath, region, language);
+    }
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.BOOK_UPDATE_MANGA_PAGE_OCR,
+    async (_, bookId: number, pageNumber: number, regions: OCRTextRegion[]) => {
+      return bookRepository.updateMangaPageOCR(bookId, pageNumber, regions);
+    }
+  );
 
   ipcMain.handle(IPC_CHANNELS.BOOK_GET_ALL, async () => {
     return bookRepository.getAll();

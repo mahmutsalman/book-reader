@@ -258,6 +258,52 @@ class MangaImportService {
   }
 
   /**
+   * Perform OCR on a specific region of a manga page image.
+   */
+  async ocrPartialRegion(
+    imagePath: string,
+    region: { x: number; y: number; width: number; height: number },
+    language: BookLanguage = 'en'
+  ): Promise<OCRTextRegion[]> {
+    try {
+      if (!pythonManager.ready) {
+        console.warn('[MangaImportService] Python server not ready, skipping partial OCR');
+        throw new Error('Python server not ready');
+      }
+
+      const absolutePath = path.isAbsolute(imagePath)
+        ? imagePath
+        : path.join(app.getPath('userData'), imagePath);
+
+      const response = await fetch(`${pythonManager.baseUrl}/api/manga/extract-text-region`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          image_path: absolutePath,
+          region: [region.x, region.y, region.width, region.height],
+          language,
+        }),
+        signal: AbortSignal.timeout(30000),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Partial OCR request failed: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json() as { success: boolean; regions?: OCRTextRegion[]; error?: string };
+
+      if (!data.success) {
+        throw new Error(data.error || 'Partial OCR failed');
+      }
+
+      return data.regions || [];
+    } catch (error) {
+      console.error('[MangaImportService] Partial OCR failed:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Batch OCR processing with progress tracking.
    */
   private async batchOCR(
