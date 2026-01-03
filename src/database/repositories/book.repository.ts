@@ -1,6 +1,6 @@
 import fs from 'fs';
 import { getDatabase } from '../index';
-import type { Book, BookData, BookLanguage } from '../../shared/types';
+import type { Book, BookData, BookLanguage, MangaPage, OCRTextRegion } from '../../shared/types';
 import { createWordBoundaryRegex } from '../../shared/utils/text-utils';
 
 export class BookRepository {
@@ -19,16 +19,20 @@ export class BookRepository {
     const totalChars = bookData.total_chars ||
       bookData.pages.reduce((sum, p) => sum + p.char_count, 0);
 
+    // Get book type (default to 'text' for backward compatibility)
+    const bookType = bookData.type || 'text';
+
     // Insert book into database
     const result = this.db.prepare(`
-      INSERT INTO books (title, json_path, total_pages, total_words, total_chars, language)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO books (title, json_path, total_pages, total_words, total_chars, type, language)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `).run(
       bookData.title,
       jsonPath,
       bookData.total_pages,
       totalWords,
       totalChars,
+      bookType,
       language
     );
 
@@ -111,6 +115,60 @@ export class BookRepository {
     }
 
     return results;
+  }
+
+  async updateMangaPageOCR(
+    bookId: number,
+    pageNumber: number,
+    regions: OCRTextRegion[]
+  ): Promise<MangaPage | null> {
+    const book = await this.getById(bookId);
+    if (!book) return null;
+
+    if (!fs.existsSync(book.json_path)) {
+      console.error(`Book content file not found: ${book.json_path}.`);
+      return null;
+    }
+
+    const content = fs.readFileSync(book.json_path, 'utf-8');
+    const bookData: BookData = JSON.parse(content);
+
+    if (bookData.type !== 'manga') {
+      console.warn(`[BookRepository] updateMangaPageOCR called for non-manga book: ${bookId}`);
+      return null;
+    }
+
+    const pages = bookData.pages as MangaPage[];
+    const pageIndex = pages.findIndex(p => p.page === pageNumber);
+    if (pageIndex === -1) {
+      console.warn(`[BookRepository] Page ${pageNumber} not found for book: ${bookId}`);
+      return null;
+    }
+
+    const text = regions.map(r => r.text).join(' ');
+    const updatedPage: MangaPage = {
+      ...pages[pageIndex],
+      ocr_regions: regions,
+      text,
+      word_count: regions.length,
+      char_count: text.length,
+      has_text: regions.length > 0,
+    };
+
+    pages[pageIndex] = updatedPage;
+
+    bookData.total_words = pages.reduce((sum, p) => sum + p.word_count, 0);
+    bookData.total_chars = pages.reduce((sum, p) => sum + p.char_count, 0);
+
+    fs.writeFileSync(book.json_path, JSON.stringify(bookData, null, 2), 'utf-8');
+
+    this.db.prepare(`
+      UPDATE books
+      SET total_words = ?, total_chars = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(bookData.total_words || 0, bookData.total_chars || 0, bookId);
+
+    return updatedPage;
   }
 }
 

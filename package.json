@@ -45,6 +45,9 @@
     "@types/electron-squirrel-startup": "^1.0.2",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
+    "@types/uuid": "^9.0.8",
+    "@types/xml2js": "^0.4.14",
+    "@types/yauzl": "^2.10.3",
     "@typescript-eslint/eslint-plugin": "^5.62.0",
     "@typescript-eslint/parser": "^5.62.0",
     "@vitejs/plugin-react": "^5.1.1",
@@ -61,8 +64,12 @@
     "better-sqlite3": "^12.5.0",
     "electron-squirrel-startup": "^1.0.1",
     "epub2": "^3.0.2",
+    "node-unrar-js": "^2.0.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "react-router-dom": "^7.10.0"
+    "react-router-dom": "^7.10.0",
+    "uuid": "^9.0.1",
+    "xml2js": "^0.6.2",
+    "yauzl": "^3.2.0"
   }
 }

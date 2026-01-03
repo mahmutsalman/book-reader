@@ -15,6 +15,24 @@ const electronAPI: ElectronAPI = {
       ipcRenderer.invoke(IPC_CHANNELS.BOOK_IMPORT_TXT, txtPath, language || 'en'),
     importEpub: (epubPath: string, language?: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.BOOK_IMPORT_EPUB, epubPath, language || 'en'),
+    importManga: (mangaPath: string, language?: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BOOK_IMPORT_MANGA, mangaPath, language || 'en'),
+    importPng: (pngPath: string, language?: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BOOK_IMPORT_PNG, pngPath, language || 'en'),
+    getMangaImagePath: (relativePath: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BOOK_GET_MANGA_IMAGE_PATH, relativePath),
+    ocrMangaRegion: (
+      imagePath: string,
+      region: { x: number; y: number; width: number; height: number },
+      language?: string
+    ) => ipcRenderer.invoke(
+      IPC_CHANNELS.BOOK_MANGA_OCR_REGION,
+      imagePath,
+      region,
+      language || 'en'
+    ),
+    updateMangaPageOCR: (bookId: number, pageNumber: number, regions) =>
+      ipcRenderer.invoke(IPC_CHANNELS.BOOK_UPDATE_MANGA_PAGE_OCR, bookId, pageNumber, regions),
     getPdfStatus: () =>
       ipcRenderer.invoke(IPC_CHANNELS.BOOK_PDF_STATUS),
     getAll: () =>

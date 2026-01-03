@@ -22,6 +22,8 @@ const LibraryPage: React.FC = () => {
   const [isPdfFile, setIsPdfFile] = useState(false);
   const [isTxtFile, setIsTxtFile] = useState(false);
   const [isEpubFile, setIsEpubFile] = useState(false);
+  const [isMangaFile, setIsMangaFile] = useState(false);
+  const [isPngFile, setIsPngFile] = useState(false);
   const [showFormatDialog, setShowFormatDialog] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState<BookLanguage>('en');
   const [collapsedSections, setCollapsedSections] = useState<Set<BookLanguage>>(new Set());
@@ -60,7 +62,7 @@ const LibraryPage: React.FC = () => {
     setShowFormatDialog(true);
   };
 
-  const handleFormatSelect = async (format: 'pdf' | 'txt' | 'epub') => {
+  const handleFormatSelect = async (format: 'pdf' | 'txt' | 'epub' | 'manga' | 'png') => {
     setShowFormatDialog(false);
 
     if (!window.electronAPI) {
@@ -73,7 +75,11 @@ const LibraryPage: React.FC = () => {
         ? [{ name: 'PDF Documents', extensions: ['pdf'] }]
         : format === 'txt'
         ? [{ name: 'Text Files', extensions: ['txt'] }]
-        : [{ name: 'EPUB Documents', extensions: ['epub'] }];
+        : format === 'epub'
+        ? [{ name: 'EPUB Documents', extensions: ['epub'] }]
+        : format === 'manga'
+        ? [{ name: 'Comic Archives', extensions: ['cbz', 'cbr'] }]
+        : [{ name: 'PNG Images', extensions: ['png'] }];
 
       const filePath = await window.electronAPI.dialog.openFile({ filters });
 
@@ -81,10 +87,14 @@ const LibraryPage: React.FC = () => {
         const isPdf = format === 'pdf';
         const isTxt = format === 'txt';
         const isEpub = format === 'epub';
+        const isManga = format === 'manga';
+        const isPng = format === 'png';
 
         setIsPdfFile(isPdf);
         setIsTxtFile(isTxt);
         setIsEpubFile(isEpub);
+        setIsMangaFile(isManga);
+        setIsPngFile(isPng);
         setPendingFilePath(filePath);
         setSelectedLanguage('en');
       }
@@ -121,6 +131,20 @@ const LibraryPage: React.FC = () => {
         // Reload books to show the new import
         await loadBooks();
         setImportProgress('');
+      } else if (isMangaFile) {
+        // Manga/Comic import
+        setImportProgress('Extracting comic pages...');
+        await window.electronAPI.book.importManga(pendingFilePath, selectedLanguage);
+        // Reload books to show the new import
+        await loadBooks();
+        setImportProgress('');
+      } else if (isPngFile) {
+        // Single PNG import for testing
+        setImportProgress('Processing PNG with OCR...');
+        await window.electronAPI.book.importPng(pendingFilePath, selectedLanguage);
+        // Reload books to show the new import
+        await loadBooks();
+        setImportProgress('');
       } else {
         // JSON import
         await importBook(pendingFilePath, selectedLanguage);
@@ -129,6 +153,8 @@ const LibraryPage: React.FC = () => {
       setIsPdfFile(false);
       setIsTxtFile(false);
       setIsEpubFile(false);
+      setIsMangaFile(false);
+      setIsPngFile(false);
     } catch (err) {
       console.error('Import failed:', err);
       const message = err instanceof Error ? err.message : 'Failed to import book';
@@ -144,6 +170,8 @@ const LibraryPage: React.FC = () => {
     setIsPdfFile(false);
     setIsTxtFile(false);
     setIsEpubFile(false);
+    setIsMangaFile(false);
+    setIsPngFile(false);
   };
 
   const handleOpenBook = (book: Book) => {
@@ -432,6 +460,58 @@ const LibraryPage: React.FC = () => {
                   </div>
                 </div>
               </button>
+
+              <button
+                onClick={() => handleFormatSelect('manga')}
+                className="w-full p-4 border-2 rounded-lg flex items-center gap-3 transition-colors"
+                style={{
+                  borderColor: theme.accent,
+                  color: theme.text,
+                  backgroundColor: theme.background,
+                }}
+                onMouseEnter={(event) => {
+                  event.currentTarget.style.backgroundColor = cardHoverColor;
+                }}
+                onMouseLeave={(event) => {
+                  event.currentTarget.style.backgroundColor = theme.background;
+                }}
+              >
+                <span className="text-3xl">📖</span>
+                <div className="text-left flex-1">
+                  <div className="font-semibold" style={{ color: theme.text }}>
+                    Import Comic/Manga (CBZ/CBR)
+                  </div>
+                  <div className="text-sm" style={{ color: theme.textSecondary }}>
+                    With OCR text extraction for word lookup
+                  </div>
+                </div>
+              </button>
+
+              <button
+                onClick={() => handleFormatSelect('png')}
+                className="w-full p-4 border-2 rounded-lg flex items-center gap-3 transition-colors"
+                style={{
+                  borderColor: theme.accent,
+                  color: theme.text,
+                  backgroundColor: theme.background,
+                }}
+                onMouseEnter={(event) => {
+                  event.currentTarget.style.backgroundColor = cardHoverColor;
+                }}
+                onMouseLeave={(event) => {
+                  event.currentTarget.style.backgroundColor = theme.background;
+                }}
+              >
+                <span className="text-3xl">🖼️</span>
+                <div className="text-left flex-1">
+                  <div className="font-semibold" style={{ color: theme.text }}>
+                    Test with Single PNG
+                  </div>
+                  <div className="text-sm" style={{ color: theme.textSecondary }}>
+                    For quick testing of OCR and word lookup
+                  </div>
+                </div>
+              </button>
             </div>
 
             <button
@@ -462,7 +542,7 @@ const LibraryPage: React.FC = () => {
             }}
           >
             <h3 className="text-lg font-semibold mb-4">
-              Import {isPdfFile ? 'PDF' : isTxtFile ? 'Text File' : isEpubFile ? 'EPUB' : 'Book'}
+              Import {isPdfFile ? 'PDF' : isTxtFile ? 'Text File' : isEpubFile ? 'EPUB' : isMangaFile ? 'Comic/Manga' : isPngFile ? 'PNG Test Image' : 'Book'}
             </h3>
             {isPdfFile && (
               <div className="bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 p-3 rounded-lg mb-4 text-sm">
@@ -478,6 +558,16 @@ const LibraryPage: React.FC = () => {
             {isEpubFile && (
               <div className="bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 p-3 rounded-lg mb-4 text-sm">
                 <span className="font-medium">EPUB Import:</span> Chapters and metadata will be extracted from the EPUB file.
+              </div>
+            )}
+            {isMangaFile && (
+              <div className="bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 p-3 rounded-lg mb-4 text-sm">
+                <span className="font-medium">Comic/Manga Import:</span> Pages will be extracted from the archive. OCR will extract text from images for word lookup. This may take a few minutes depending on the number of pages.
+              </div>
+            )}
+            {isPngFile && (
+              <div className="bg-cyan-50 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-300 p-3 rounded-lg mb-4 text-sm">
+                <span className="font-medium">PNG Test Import:</span> This will process a single PNG image with OCR and create a one-page manga for testing. Perfect for quickly testing word lookup functionality.
               </div>
             )}
             <p className="text-sm mb-4" style={{ color: theme.textSecondary }}>
