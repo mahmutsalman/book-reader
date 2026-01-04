@@ -211,6 +211,7 @@ jobs:
             out/make/squirrel.windows/x64/*.exe
             out/make/squirrel.windows/x64/RELEASES
             out/make/squirrel.windows/x64/*.nupkg
+            out/make/zip/win32/x64/*.zip
           retention-days: 30
 
   release:
@@ -268,7 +269,9 @@ jobs:
           tag_name: ${{ steps.set_version.outputs.version }}
           files: |
             ./artifacts/macos/**/*.dmg
+            ./artifacts/macos/**/*.zip
             ./artifacts/windows/**/*.exe
+            ./artifacts/windows/**/*.zip
             ./artifacts/windows/**/RELEASES
           prerelease: ${{ github.event.inputs.prerelease == 'true' || contains(steps.set_version.outputs.version, 'beta') || contains(steps.set_version.outputs.version, 'alpha') }}
           generate_release_notes: true
@@ -278,12 +281,17 @@ jobs:
             ## Smart Book Reader ${{ steps.set_version.outputs.version }}
 
             ### Downloads
-            - **Windows**: Download the `.exe` installer
-            - **macOS**: Download the `.dmg` file
+            - **Windows**:
+              - `.exe` installer (Squirrel) - traditional installer
+              - `.zip` portable - extract and run (recommended for testing)
+            - **macOS**:
+              - `.dmg` file - drag to Applications
+              - `.zip` portable - extract and run
 
             ### Installation
-            - **Windows**: Run the installer. You may see "Unknown Publisher" warning (expected without code signing).
-            - **macOS**: Open the DMG and drag to Applications folder.
+            - **Windows Installer**: Run the `.exe`. You may see "Unknown Publisher" warning (expected without code signing). Click "More info" → "Run anyway"
+            - **Windows Portable**: Extract the `.zip` anywhere and run `Smart Book.exe`
+            - **macOS**: Open the DMG and drag to Applications folder
 
             ### What's New
             See release notes below for details.
