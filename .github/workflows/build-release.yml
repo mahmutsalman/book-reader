@@ -157,36 +157,20 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           echo === Verifying binary in packaged app ===
-          echo.
-          echo [Step 1] Searching for pronunciation-server.exe in out directory...
-          if exist "out" (
-            dir /s /b out\pronunciation-server.exe 2>nul
-            if %errorlevel% equ 0 (
-              echo [SUCCESS] Found pronunciation-server.exe somewhere in out directory
-            ) else (
-              echo [WARNING] pronunciation-server.exe not found in out directory tree
-            )
-          )
-          echo.
-          echo [Step 2] Checking expected packaged location...
-          set RESOURCES_PATH=out\BookReader-win32-x64\resources
+          set RESOURCES_PATH=out\Smart Book-win32-x64\resources
           set BINARY_PATH=%RESOURCES_PATH%\pronunciation-server.exe
           if exist "%BINARY_PATH%" (
-            echo [SUCCESS] Binary found at: %BINARY_PATH%
+            echo [SUCCESS] Binary successfully packaged at %BINARY_PATH%
             dir "%BINARY_PATH%"
           ) else (
-            echo [ERROR] Binary NOT found at: %BINARY_PATH%
-            echo.
+            echo [ERROR] Binary NOT found at %BINARY_PATH%
+            echo Searching for pronunciation-server.exe...
+            dir /s /b out\pronunciation-server.exe 2>nul
             if exist "%RESOURCES_PATH%" (
-              echo [INFO] Resources directory exists. Contents:
+              echo Resources directory contents:
               dir "%RESOURCES_PATH%"
             ) else (
-              echo [ERROR] Resources directory not found
-              echo.
-              if exist "out\BookReader-win32-x64" (
-                echo [INFO] BookReader-win32-x64 directory exists. Contents:
-                dir "out\BookReader-win32-x64"
-              )
+              echo Resources directory not found
             )
             exit /b 1
           )
