@@ -23,6 +23,7 @@ jobs:
   build:
     name: Build ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [macos-latest, windows-latest]
 

@@ -12,7 +12,7 @@
     "make:win": "electron-forge make --platform=win32",
     "publish": "electron-forge publish",
     "lint": "eslint --ext .ts,.tsx .",
-    "postinstall": "electron-rebuild",
+    "postinstall": "node scripts/patch-appdmg.js && electron-rebuild",
     "python:setup": "cd src/python-server && ./build.sh --dev",
     "python:build": "cd src/python-server && ./build.sh",
     "python:build:win": "cd src/python-server && build.bat"
