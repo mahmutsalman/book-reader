@@ -151,10 +151,12 @@ echo Creating launcher script...
 (
 echo @echo off
 echo REM Launcher for BookReader Python Server
-echo set PYTHONHOME=%%~dp0python-runtime
-echo set PYTHONPATH=%%APPDATA%%\BookReader\ocr-packages;%%PYTHONPATH%%
+echo set SCRIPT_DIR=%%~dp0
+echo set PYTHONHOME=%%SCRIPT_DIR%%python-runtime
+echo set PYTHONPATH=%%SCRIPT_DIR%%;%%APPDATA%%\BookReader\ocr-packages;%%PYTHONPATH%%
 echo set PATH=%%PYTHONHOME%%;%%PYTHONHOME%%\Scripts;%%PATH%%
-echo "%%PYTHONHOME%%\python.exe" "%%~dp0server.py" %%*
+echo cd /d "%%SCRIPT_DIR%%"
+echo "%%PYTHONHOME%%\python.exe" "%%SCRIPT_DIR%%server.py" %%*
 ) > "%SCRIPT_DIR%launch-server.bat"
 
 echo [OK] Launcher script created: launch-server.bat
