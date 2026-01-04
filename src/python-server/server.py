@@ -32,20 +32,48 @@ if not os.environ.get("MKL_NUM_THREADS"):
 # Windows DLL search path fix for PaddlePaddle in frozen builds (PyInstaller)
 # Fixes: "Can not import paddle core while this file exists: libpaddle.pyd"
 # See: https://github.com/PaddlePaddle/PaddleOCR/discussions/14757
+#
+# CRITICAL: We use MULTIPLE DLL loading strategies simultaneously:
+# 1. Add paddle/libs to PATH (broadest compatibility)
+# 2. Add base temp directory to PATH (ensures all paddle DLLs are findable)
+# 3. Use os.add_dll_directory() on Python 3.8+ (additional safety)
+#
+# This "belt and suspenders" approach is necessary because Windows DLL loading
+# is complex and different methods work in different scenarios.
 if sys.platform == 'win32' and hasattr(sys, '_MEIPASS'):
     # Running as frozen executable (PyInstaller)
-    paddle_libs_path = Path(sys._MEIPASS) / 'paddle' / 'libs'
+    base_path = Path(sys._MEIPASS)
+    paddle_libs_path = base_path / 'paddle' / 'libs'
+
+    # Strategy 1 & 2: Add to PATH (works for all Python versions and loading scenarios)
+    paths_to_add = []
     if paddle_libs_path.exists():
-        # Python 3.8+ requires os.add_dll_directory() to load DLLs from non-system paths
-        if hasattr(os, 'add_dll_directory'):
+        paths_to_add.append(str(paddle_libs_path))
+    paths_to_add.append(str(base_path))  # Add base temp directory too
+
+    if paths_to_add:
+        current_path = os.environ.get('PATH', '')
+        new_path = os.pathsep.join(paths_to_add + [current_path])
+        os.environ['PATH'] = new_path
+        print(f"[Paddle] Added to PATH: {', '.join(paths_to_add)}")
+
+    # Strategy 3: Use add_dll_directory() on Python 3.8+ (additional layer)
+    if paddle_libs_path.exists() and hasattr(os, 'add_dll_directory'):
+        try:
             os.add_dll_directory(str(paddle_libs_path))
-            print(f"[Paddle] Added DLL directory: {paddle_libs_path}")
-        else:
-            # Python <3.8 fallback: modify PATH
-            os.environ['PATH'] = str(paddle_libs_path) + os.pathsep + os.environ.get('PATH', '')
-            print(f"[Paddle] Added to PATH: {paddle_libs_path}")
+            os.add_dll_directory(str(base_path))
+            print(f"[Paddle] Added DLL directories via add_dll_directory()")
+        except Exception as e:
+            print(f"[Paddle] Warning: add_dll_directory failed: {e}")
+
+    # Diagnostic: Check what's in paddle/libs
+    if paddle_libs_path.exists():
+        dll_files = list(paddle_libs_path.glob('*.dll'))
+        print(f"[Paddle] Found {len(dll_files)} DLL files in paddle/libs")
+        if len(dll_files) == 0:
+            print(f"[Paddle] WARNING: No DLL files found in {paddle_libs_path}!")
     else:
-        print(f"[Paddle] WARNING: paddle/libs not found at {paddle_libs_path}")
+        print(f"[Paddle] WARNING: paddle/libs directory not found at {paddle_libs_path}")
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
