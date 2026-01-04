@@ -6,6 +6,10 @@ on:
       - 'v*'  # Trigger on version tags (v1.0.0, v1.0.1, etc.)
   workflow_dispatch:  # Allow manual trigger from GitHub Actions tab
     inputs:
+      version:
+        description: 'Version tag (e.g., v1.0.0) - leave empty for auto-generated'
+        required: false
+        type: string
       prerelease:
         description: 'Create pre-release'
         required: true
@@ -102,6 +106,31 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set version tag
+        id: set_version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            if [ -n "${{ github.event.inputs.version }}" ]; then
+              VERSION="${{ github.event.inputs.version }}"
+            else
+              # Generate version from timestamp
+              VERSION="v$(date +'%Y.%m.%d')-build.${{ github.run_number }}"
+            fi
+            echo "Creating tag $VERSION"
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git tag -a "$VERSION" -m "Auto-generated release $VERSION"
+            git push origin "$VERSION"
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+          else
+            echo "version=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          fi
+
       - name: Download macOS artifacts
         uses: actions/download-artifact@v4
         with:
@@ -122,16 +151,17 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
+          tag_name: ${{ steps.set_version.outputs.version }}
           files: |
             ./artifacts/macos/**/*.dmg
             ./artifacts/windows/**/*.exe
             ./artifacts/windows/**/RELEASES
-          prerelease: ${{ github.event.inputs.prerelease == 'true' || contains(github.ref, 'beta') || contains(github.ref, 'alpha') }}
+          prerelease: ${{ github.event.inputs.prerelease == 'true' || contains(steps.set_version.outputs.version, 'beta') || contains(steps.set_version.outputs.version, 'alpha') }}
           generate_release_notes: true
           draft: false
-          name: Release ${{ github.ref_name }}
+          name: Release ${{ steps.set_version.outputs.version }}
           body: |
-            ## Smart Book Reader ${{ github.ref_name }}
+            ## Smart Book Reader ${{ steps.set_version.outputs.version }}
 
             ### Downloads
             - **Windows**: Download the `.exe` installer
