@@ -20,8 +20,9 @@ paddleocr>=2.7.0
 paddlepaddle>=2.5.0
 
 # PaddleOCR Optional Dependencies (required for full functionality)
-Polygon3>=3.0.9  # Shape manipulation for text detection
-lanms-neo>=1.0.2  # NMS for text detection (modern fork of lanms)
+Polygon3>=3.0.9  # Shape manipulation (imports as 'Polygon' not 'Polygon3')
+lanms-neo>=1.0.2  # NMS for text detection (imports as 'lanms' not 'lanms-neo')
 pyclipper>=1.3.0  # Clipping operations
 imgaug>=0.4.0  # Image augmentation
 lmdb>=1.4.1  # Database for data loading
+scikit-image>=0.20.0  # Image processing (required by PaddleOCR)

@@ -96,13 +96,17 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-echo [Dependencies] Verifying critical packages...
-python -c "import paddleocr; print('[OK] paddleocr installed')" 2>nul || echo [WARNING] paddleocr not found
-python -c "import Polygon; print('[OK] Polygon3 installed')" 2>nul || echo [WARNING] Polygon3 not found
-python -c "import lanms; print('[OK] lanms-neo installed')" 2>nul || echo [WARNING] lanms-neo not found
-python -c "import piper; print('[OK] piper-tts installed')" 2>nul || echo [WARNING] piper-tts not found
+echo [Dependencies] Verifying critical packages (using correct import names)...
+python -c "import paddleocr; print('[OK] paddleocr')" 2>nul || echo [WARNING] paddleocr not found
+python -c "import paddle; print('[OK] paddle (paddlepaddle)')" 2>nul || echo [WARNING] paddle not found
+python -c "import Polygon; print('[OK] Polygon (from Polygon3 package)')" 2>nul || echo [WARNING] Polygon not found
+python -c "import lanms; print('[OK] lanms (from lanms-neo package)')" 2>nul || echo [WARNING] lanms not found
+python -c "import piper; print('[OK] piper-tts')" 2>nul || echo [WARNING] piper-tts not found
+python -c "import cv2; print('[OK] opencv (cv2)')" 2>nul || echo [WARNING] opencv not found
+python -c "import skimage; print('[OK] scikit-image')" 2>nul || echo [WARNING] scikit-image not found
 
 echo [Dependencies] Installation completed.
+echo [INFO] NOTE: Package names != Import names (e.g., Polygon3 pkg imports as 'Polygon')
 exit /b 0
 
 :build_binary

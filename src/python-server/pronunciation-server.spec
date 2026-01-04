@@ -147,11 +147,16 @@ a = Analysis(
         'onnxruntime',
         # PaddleOCR and dependencies
         'paddleocr',
-        'paddlepaddle',
-        'paddle',
+        'paddleocr.ppocr',
+        'paddleocr.ppstructure',
+        'paddle',           # paddlepaddle package imports as 'paddle'
         'paddle.fluid',
+        'paddle.nn',
+        'paddle.optimizer',
+        'paddle.utils',
         'paddlex',
         'cv2',  # OpenCV
+        'skimage',          # scikit-image (used by PaddleOCR)
         'shapely',
         'shapely.geometry',
         'pyclipper',
@@ -160,12 +165,12 @@ a = Analysis(
         'scipy',
         'scipy.special',
         'scipy.ndimage',
-        'Polygon',  # Legacy name (kept for compatibility)
-        'Polygon3',  # Modern package name
-        'lanms',  # Legacy name (kept for compatibility)
-        'lanms.adaptor',  # lanms-neo submodule
+        'Polygon',          # Polygon3 package imports as 'Polygon' (not 'Polygon3'!)
+        'lanms',            # lanms-neo package imports as 'lanms' (not 'lanms-neo'!)
+        'lanms.adaptor',    # lanms-neo submodule for NMS
         'imgaug',
         'imgaug.augmenters',
+        'imgaug.parameters',
         # gruut for IPA
         'gruut',
         'gruut.lang',
