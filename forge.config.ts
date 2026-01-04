@@ -39,7 +39,13 @@ const config: ForgeConfig = {
 
       // Bundle server source files
       'src/python-server/server.py',
-      'src/python-server/generators',
+
+      // Bundle generators directory with all Python files
+      {
+        from: 'src/python-server/generators',
+        to: 'generators',
+        filter: ['**/*.py']
+      },
 
       // Bundle platform-specific launcher
       process.platform === 'win32'
