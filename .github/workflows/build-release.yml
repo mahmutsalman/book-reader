@@ -225,8 +225,7 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           echo "=== Build outputs ==="
-          dir out\make\squirrel.windows\x64\*.exe
-          dir out\make\squirrel.windows\x64\RELEASES
+          dir out\make\zip\win32\x64\*.zip
         shell: cmd
 
       - name: Upload artifacts (macOS)
@@ -245,9 +244,6 @@ jobs:
         with:
           name: windows-build
           path: |
-            out/make/squirrel.windows/x64/*.exe
-            out/make/squirrel.windows/x64/RELEASES
-            out/make/squirrel.windows/x64/*.nupkg
             out/make/zip/win32/x64/*.zip
           retention-days: 30
 
@@ -307,9 +303,7 @@ jobs:
           files: |
             ./artifacts/macos/**/*.dmg
             ./artifacts/macos/**/*.zip
-            ./artifacts/windows/**/*.exe
             ./artifacts/windows/**/*.zip
-            ./artifacts/windows/**/RELEASES
           prerelease: ${{ github.event.inputs.prerelease == 'true' || contains(steps.set_version.outputs.version, 'beta') || contains(steps.set_version.outputs.version, 'alpha') }}
           generate_release_notes: true
           draft: false
