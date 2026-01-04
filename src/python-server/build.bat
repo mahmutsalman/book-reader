@@ -81,10 +81,32 @@ if not exist "python-embed.zip" (
     )
 )
 
-echo Extracting Python...
-powershell -Command "Expand-Archive -Path 'python-embed.zip' -DestinationPath '%RUNTIME_DIR%' -Force"
-if exist "python-embed.zip" del "python-embed.zip"
+REM Verify download succeeded
+if not exist "python-embed.zip" (
+    echo Error: python-embed.zip not found after download attempt
+    exit /b 1
+)
 
+echo Extracting Python...
+REM Ensure runtime directory exists before extraction
+if not exist "%RUNTIME_DIR%" mkdir "%RUNTIME_DIR%"
+
+echo Extracting to: %RUNTIME_DIR%
+powershell -Command "Expand-Archive -Path 'python-embed.zip' -DestinationPath '%RUNTIME_DIR%' -Force"
+if !ERRORLEVEL! NEQ 0 (
+    echo Error: Failed to extract Python embeddable package
+    exit /b 1
+)
+
+REM Verify extraction succeeded by checking for python.exe
+if not exist "%RUNTIME_DIR%\python.exe" (
+    echo Error: python.exe not found in %RUNTIME_DIR% after extraction
+    echo This may indicate an extraction failure or download corruption
+    dir "%RUNTIME_DIR%" 2>nul || echo Runtime directory does not exist
+    exit /b 1
+)
+
+if exist "python-embed.zip" del "python-embed.zip"
 echo [OK] Python extracted to: %RUNTIME_DIR%
 
 REM Configure python311._pth to enable site-packages
@@ -105,6 +127,16 @@ echo.
 echo Installing pip...
 if not exist "get-pip.py" (
     powershell -Command "Invoke-WebRequest -Uri 'https://bootstrap.pypa.io/get-pip.py' -OutFile 'get-pip.py'"
+    if !ERRORLEVEL! NEQ 0 (
+        echo Error: Failed to download get-pip.py
+        exit /b 1
+    )
+)
+
+REM Verify get-pip.py exists
+if not exist "get-pip.py" (
+    echo Error: get-pip.py not found after download attempt
+    exit /b 1
 )
 
 "%RUNTIME_DIR%\python.exe" get-pip.py
