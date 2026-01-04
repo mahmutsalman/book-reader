@@ -319,16 +319,29 @@ jobs:
 
             ### Downloads
             - **Windows**:
-              - `.exe` installer (Squirrel) - traditional installer
-              - `.zip` portable - extract and run (recommended for testing)
+              - `.zip` portable - extract and run
             - **macOS**:
               - `.dmg` file - drag to Applications
               - `.zip` portable - extract and run
 
-            ### Installation
-            - **Windows Installer**: Run the `.exe`. You may see "Unknown Publisher" warning (expected without code signing). Click "More info" → "Run anyway"
-            - **Windows Portable**: Extract the `.zip` anywhere and run `Smart Book.exe`
-            - **macOS**: Open the DMG and drag to Applications folder
+            ### Windows Installation
+            **Note**: Smart Book is not signed with a Windows code signing certificate.
+
+            1. Download `Smart.Book-win32-x64-*.zip`
+            2. Extract to a folder (e.g., `C:\Apps\SmartBook\`)
+            3. Right-click `Smart Book.exe` → Properties
+            4. Check "Unblock" → Apply
+            5. Run `Smart Book.exe`
+
+            **If Windows SmartScreen appears:**
+            - Click "More info"
+            - Click "Run anyway"
+
+            **Why?** Code signing certificates cost $300-500/year. The portable ZIP
+            approach is free and works perfectly - just needs one-time security approval.
+
+            ### macOS Installation
+            - Open the DMG and drag to Applications folder
 
             ### What's New
             See release notes below for details.

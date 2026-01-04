@@ -1,5 +1,4 @@
 import type { ForgeConfig } from '@electron-forge/shared-types';
-import { MakerSquirrel } from '@electron-forge/maker-squirrel';
 import { MakerZIP } from '@electron-forge/maker-zip';
 import { MakerDeb } from '@electron-forge/maker-deb';
 import { MakerRpm } from '@electron-forge/maker-rpm';
@@ -74,20 +73,12 @@ const config: ForgeConfig = {
     },
   },
   makers: [
-    new MakerSquirrel({
-      name: 'SmartBook',
-      authors: 'Mahmut Salman',
-      description: 'A smart book reader with AI-powered word lookup and vocabulary tracking',
-      setupIcon: 'assets/icon.ico',
-      // Note: iconUrl should point to a publicly accessible URL for auto-updates
-      // For now, leaving it undefined. Add when hosting releases on GitHub.
-      // Skip MSI creation (reduces installer complexity and Windows security issues)
-      noMsi: true,
-      // Reduce Windows Application Control issues by skipping desktop shortcuts
-      // Users can still pin to taskbar manually or create shortcuts
-      loadingGif: undefined,
-    }),
-    // Portable ZIP for both platforms (Windows: alternative to problematic Squirrel installer)
+    // Windows: Portable ZIP only (avoids Application Control policies)
+    // The embedded Python approach triggers Windows security policies because:
+    // - Unsigned python.exe inside signed Electron app breaks trust chain
+    // - Batch file execution appears suspicious to Windows Defender
+    // Code signing certificates cost $300-500/year. ZIP distribution works perfectly
+    // with one-time security approval from users.
     new MakerZIP({}, ['darwin', 'win32']),
     new MakerDMG({
       format: 'ULFO',
