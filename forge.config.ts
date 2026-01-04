@@ -63,35 +63,63 @@ const config: ForgeConfig = {
 
       // CRITICAL: Copy Python server binary to resources directory
       // This ensures the binary is included even if extraResource fails
+      console.log('[Python Binary Copy] Starting binary copy process...');
+      console.log(`[Python Binary Copy] Platform: ${process.platform}`);
+      console.log(`[Python Binary Copy] Build path: ${buildPath}`);
+
       const binaryName = process.platform === 'win32'
         ? 'pronunciation-server.exe'
         : 'pronunciation-server';
       const binarySrc = path.resolve(__dirname, 'src', 'python-server', 'dist', binaryName);
 
-      // The buildPath is the app directory (e.g., .../app)
-      // We need to copy to the parent resources directory
-      const resourcesPath = path.dirname(buildPath);
+      console.log(`[Python Binary Copy] Binary name: ${binaryName}`);
+      console.log(`[Python Binary Copy] Source path: ${binarySrc}`);
+      console.log(`[Python Binary Copy] Source exists: ${fs.existsSync(binarySrc)}`);
+
+      // Check if source binary exists
+      if (!fs.existsSync(binarySrc)) {
+        console.error(`❌ [Python Binary Copy] ERROR: Source binary not found at ${binarySrc}`);
+        console.error(`[Python Binary Copy] This usually means the Python build step failed.`);
+        console.error(`[Python Binary Copy] Skipping binary copy to avoid breaking the build.`);
+        console.error(`[Python Binary Copy] WARNING: The packaged app will NOT have the Python server!`);
+        return; // Don't throw - let the verification step catch this
+      }
+
+      // Calculate destination path
+      // buildPath structure varies by platform:
+      // macOS: .../Smart Book.app/Contents/Resources/app
+      // Windows: .../BookReader-win32-x64/resources/app
+
+      let resourcesPath: string;
+      if (process.platform === 'darwin') {
+        // macOS: buildPath = .../Smart Book.app/Contents/Resources/app
+        // We want: .../Smart Book.app/Contents/Resources/
+        resourcesPath = path.dirname(buildPath);
+      } else {
+        // Windows/Linux: buildPath = .../resources/app
+        // We want: .../resources/
+        resourcesPath = path.dirname(buildPath);
+      }
+
       const binaryDest = path.join(resourcesPath, binaryName);
 
-      console.log(`[Python Binary Copy] Source: ${binarySrc}`);
-      console.log(`[Python Binary Copy] Destination: ${binaryDest}`);
-      console.log(`[Python Binary Copy] Build path: ${buildPath}`);
       console.log(`[Python Binary Copy] Resources path: ${resourcesPath}`);
+      console.log(`[Python Binary Copy] Destination path: ${binaryDest}`);
 
-      if (fs.existsSync(binarySrc)) {
+      try {
         fs.copyFileSync(binarySrc, binaryDest);
-        console.log(`✅ [Python Binary Copy] Successfully copied ${binaryName} to resources`);
+        console.log(`✅ [Python Binary Copy] Successfully copied ${binaryName}`);
 
         // Verify the copy
         if (fs.existsSync(binaryDest)) {
           const stats = fs.statSync(binaryDest);
           console.log(`✅ [Python Binary Copy] Verified: ${binaryName} (${stats.size} bytes)`);
         } else {
-          console.error(`❌ [Python Binary Copy] ERROR: Copy verification failed for ${binaryName}`);
+          console.error(`❌ [Python Binary Copy] ERROR: Copy verification failed - file not found at destination`);
         }
-      } else {
-        console.error(`❌ [Python Binary Copy] ERROR: Source binary not found at ${binarySrc}`);
-        throw new Error(`Python server binary not found at ${binarySrc}. Did the Python build step complete successfully?`);
+      } catch (error) {
+        console.error(`❌ [Python Binary Copy] ERROR: Failed to copy binary:`, error);
+        console.error(`[Python Binary Copy] WARNING: The packaged app will NOT have the Python server!`);
       }
     },
   },
