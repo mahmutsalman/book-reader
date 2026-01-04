@@ -100,6 +100,20 @@ jobs:
       - name: Build Electron app
         run: npm run make
 
+      - name: Debug output structure (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          echo "=== Full output directory structure ==="
+          tree /F out || dir /S out
+        shell: cmd
+
+      - name: Debug output structure (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          echo "=== Full output directory structure ==="
+          find out -type f -o -type d | head -n 50
+        shell: bash
+
       - name: Verify binary in packaged app (macOS)
         if: runner.os == 'macOS'
         run: |

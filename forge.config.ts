@@ -60,6 +60,39 @@ const config: ForgeConfig = {
           console.log(`Copied ${mod} to build`);
         }
       }
+
+      // CRITICAL: Copy Python server binary to resources directory
+      // This ensures the binary is included even if extraResource fails
+      const binaryName = process.platform === 'win32'
+        ? 'pronunciation-server.exe'
+        : 'pronunciation-server';
+      const binarySrc = path.resolve(__dirname, 'src', 'python-server', 'dist', binaryName);
+
+      // The buildPath is the app directory (e.g., .../app)
+      // We need to copy to the parent resources directory
+      const resourcesPath = path.dirname(buildPath);
+      const binaryDest = path.join(resourcesPath, binaryName);
+
+      console.log(`[Python Binary Copy] Source: ${binarySrc}`);
+      console.log(`[Python Binary Copy] Destination: ${binaryDest}`);
+      console.log(`[Python Binary Copy] Build path: ${buildPath}`);
+      console.log(`[Python Binary Copy] Resources path: ${resourcesPath}`);
+
+      if (fs.existsSync(binarySrc)) {
+        fs.copyFileSync(binarySrc, binaryDest);
+        console.log(`✅ [Python Binary Copy] Successfully copied ${binaryName} to resources`);
+
+        // Verify the copy
+        if (fs.existsSync(binaryDest)) {
+          const stats = fs.statSync(binaryDest);
+          console.log(`✅ [Python Binary Copy] Verified: ${binaryName} (${stats.size} bytes)`);
+        } else {
+          console.error(`❌ [Python Binary Copy] ERROR: Copy verification failed for ${binaryName}`);
+        }
+      } else {
+        console.error(`❌ [Python Binary Copy] ERROR: Source binary not found at ${binarySrc}`);
+        throw new Error(`Python server binary not found at ${binarySrc}. Did the Python build step complete successfully?`);
+      }
     },
   },
   makers: [
