@@ -132,8 +132,14 @@ const config: ForgeConfig = {
       setupIcon: 'assets/icon.ico',
       // Note: iconUrl should point to a publicly accessible URL for auto-updates
       // For now, leaving it undefined. Add when hosting releases on GitHub.
+      // Skip MSI creation (reduces installer complexity and Windows security issues)
+      noMsi: true,
+      // Reduce Windows Application Control issues by skipping desktop shortcuts
+      // Users can still pin to taskbar manually or create shortcuts
+      loadingGif: undefined,
     }),
-    new MakerZIP({}, ['darwin']),
+    // Portable ZIP for both platforms (Windows: alternative to problematic Squirrel installer)
+    new MakerZIP({}, ['darwin', 'win32']),
     new MakerDMG({
       format: 'ULFO',
       icon: 'assets/icon.icns',
