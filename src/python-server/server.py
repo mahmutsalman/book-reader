@@ -54,6 +54,39 @@ try:
     import numpy as np
     OCR_AVAILABLE = True
     OCR_IMPORT_ERROR = None
+
+    def _configure_tesseract_cmd():
+        """
+        Ensure pytesseract can find the `tesseract` executable.
+
+        In packaged Electron apps on macOS, PATH can be minimal, so `tesseract`
+        may not be discoverable via `shutil.which()`. We probe common install
+        locations and set `pytesseract.pytesseract.tesseract_cmd` when found.
+        """
+        try:
+            env_cmd = os.environ.get("TESSERACT_CMD")
+            if env_cmd and os.path.exists(env_cmd):
+                pytesseract.pytesseract.tesseract_cmd = env_cmd
+                return
+
+            which_cmd = shutil.which("tesseract")
+            if which_cmd:
+                pytesseract.pytesseract.tesseract_cmd = which_cmd
+                return
+
+            candidates = [
+                "/opt/homebrew/bin/tesseract",  # Apple Silicon Homebrew
+                "/usr/local/bin/tesseract",     # Intel Homebrew
+            ]
+            for candidate in candidates:
+                if os.path.exists(candidate):
+                    pytesseract.pytesseract.tesseract_cmd = candidate
+                    return
+        except Exception:
+            # Best-effort; if this fails, pytesseract will raise a clear error later.
+            return
+
+    _configure_tesseract_cmd()
 except Exception as e:
     OCR_AVAILABLE = False
     pytesseract = None
@@ -451,8 +484,32 @@ TESSERACT_LANGS = {
 
 def check_tesseract_installed() -> tuple[bool, Optional[str]]:
     """Check if Tesseract OCR is installed and return its path."""
+    # Prefer pytesseract configured command if set (important in packaged apps with minimal PATH).
+    if OCR_AVAILABLE and pytesseract is not None:
+        try:
+            configured_cmd = getattr(getattr(pytesseract, "pytesseract", None), "tesseract_cmd", None)
+            if configured_cmd and os.path.exists(configured_cmd):
+                return True, configured_cmd
+        except Exception:
+            pass
+
+        # Best-effort: (re)configure from common locations if available.
+        try:
+            if "_configure_tesseract_cmd" in globals():
+                globals()["_configure_tesseract_cmd"]()
+                configured_cmd = getattr(getattr(pytesseract, "pytesseract", None), "tesseract_cmd", None)
+                if configured_cmd and os.path.exists(configured_cmd):
+                    return True, configured_cmd
+        except Exception:
+            pass
+
     tesseract_path = shutil.which("tesseract")
     if tesseract_path:
+        if OCR_AVAILABLE and pytesseract is not None:
+            try:
+                pytesseract.pytesseract.tesseract_cmd = tesseract_path
+            except Exception:
+                pass
         return True, tesseract_path
     # Check common installation paths
     common_paths = [
@@ -463,6 +520,11 @@ def check_tesseract_installed() -> tuple[bool, Optional[str]]:
     ]
     for path in common_paths:
         if os.path.exists(path):
+            if OCR_AVAILABLE and pytesseract is not None:
+                try:
+                    pytesseract.pytesseract.tesseract_cmd = path
+                except Exception:
+                    pass
             return True, path
     return False, None
 
@@ -1614,13 +1676,29 @@ async def extract_manga_text(request: MangaOCRRequest):
     Returns:
         MangaOCRResponse with OCRTextRegion array containing text and bounding boxes
     """
-    requested_engine = (request.ocr_engine or "tesseract").lower()
+    requested_engine = (request.ocr_engine or "paddleocr").lower()
     engine_used = requested_engine
     fallback_reason = None
 
     # Only import PaddleOCR if it's potentially needed for this request.
     if requested_engine != "tesseract" or not OCR_AVAILABLE:
         ensure_paddleocr_imported()
+
+    # If the client explicitly requested tesseract, verify the binary is reachable.
+    # In packaged apps PATH can be minimal; if tesseract isn't found but PaddleOCR is available,
+    # automatically fall back to PaddleOCR to keep the feature working.
+    if requested_engine == "tesseract":
+        tesseract_installed, _tess_path = check_tesseract_installed()
+        if not tesseract_installed:
+            ensure_paddleocr_imported()
+            if PADDLEOCR_AVAILABLE:
+                engine_used = "paddleocr"
+                fallback_reason = "tesseract not found; using paddleocr"
+            else:
+                return MangaOCRResponse(
+                    success=False,
+                    error="OCR not available. tesseract is not installed or it's not in your PATH.",
+                )
 
     if requested_engine in ("hybrid", "trocr", "easyocr"):
         if PADDLEOCR_AVAILABLE:
@@ -1643,10 +1721,20 @@ async def extract_manga_text(request: MangaOCRRequest):
 
     if engine_used == "paddleocr" and not PADDLEOCR_AVAILABLE:
         if OCR_AVAILABLE:
-            engine_used = "tesseract"
-            fallback_reason = "PaddleOCR not available; using tesseract"
+            tesseract_installed, _tess_path = check_tesseract_installed()
+            if tesseract_installed:
+                engine_used = "tesseract"
+                fallback_reason = "PaddleOCR not available; using tesseract"
+            else:
+                return MangaOCRResponse(
+                    success=False,
+                    error="OCR not available. PaddleOCR import failed and tesseract is not installed or not in PATH.",
+                )
         else:
-            return MangaOCRResponse(success=False, error="OCR not available. PaddleOCR not installed and pytesseract unavailable.")
+            return MangaOCRResponse(
+                success=False,
+                error="OCR not available. PaddleOCR not installed and pytesseract unavailable.",
+            )
 
     if engine_used == "tesseract" and not OCR_AVAILABLE:
         if PADDLEOCR_AVAILABLE:
@@ -1654,6 +1742,19 @@ async def extract_manga_text(request: MangaOCRRequest):
             fallback_reason = "Tesseract not available; using paddleocr"
         else:
             return MangaOCRResponse(success=False, error="OCR not available. pytesseract is not installed.")
+
+    if engine_used == "tesseract":
+        tesseract_installed, _tess_path = check_tesseract_installed()
+        if not tesseract_installed:
+            ensure_paddleocr_imported()
+            if PADDLEOCR_AVAILABLE:
+                engine_used = "paddleocr"
+                fallback_reason = "tesseract not found; using paddleocr"
+            else:
+                return MangaOCRResponse(
+                    success=False,
+                    error="OCR not available. tesseract is not installed or it's not in your PATH.",
+                )
 
     image_path = request.image_path
 
@@ -1683,6 +1784,9 @@ async def extract_manga_text(request: MangaOCRRequest):
                     log_debug_info("[PaddleOCR] Full-page OCR exception (falling back)", {"error": str(e)})
                     if not OCR_AVAILABLE:
                         raise
+                    tesseract_installed, _tess_path = check_tesseract_installed()
+                    if not tesseract_installed:
+                        raise Exception(f"PaddleOCR failed and tesseract is not installed: {str(e)}")
                     engine_used = "tesseract"
                     fallback_reason = f"PaddleOCR failed: {str(e)}; using tesseract"
 
@@ -1790,13 +1894,22 @@ async def extract_manga_text_region(request: MangaOCRRegionRequest):
     """
     Extract text from a specific region of a manga/comic page image.
     """
-    requested_engine = (request.ocr_engine or "tesseract").lower()
+    requested_engine = (request.ocr_engine or "paddleocr").lower()
     engine_used = requested_engine
     fallback_reason = None
 
     # Only import PaddleOCR if it's potentially needed for this request.
     if requested_engine != "tesseract" or not OCR_AVAILABLE:
         ensure_paddleocr_imported()
+
+    # If the client explicitly requested tesseract, verify the binary is reachable.
+    if requested_engine == "tesseract":
+        tesseract_installed, _tess_path = check_tesseract_installed()
+        if not tesseract_installed:
+            ensure_paddleocr_imported()
+            if PADDLEOCR_AVAILABLE:
+                engine_used = "paddleocr"
+                fallback_reason = "tesseract not found; using paddleocr"
 
     if requested_engine in ("hybrid", "trocr", "easyocr"):
         if PADDLEOCR_AVAILABLE:
@@ -1819,10 +1932,20 @@ async def extract_manga_text_region(request: MangaOCRRegionRequest):
 
     if engine_used == "paddleocr" and not PADDLEOCR_AVAILABLE:
         if OCR_AVAILABLE:
-            engine_used = "tesseract"
-            fallback_reason = "PaddleOCR not available; using tesseract"
+            tesseract_installed, _tess_path = check_tesseract_installed()
+            if tesseract_installed:
+                engine_used = "tesseract"
+                fallback_reason = "PaddleOCR not available; using tesseract"
+            else:
+                return MangaOCRResponse(
+                    success=False,
+                    error="OCR not available. PaddleOCR import failed and tesseract is not installed or not in PATH.",
+                )
         else:
-            return MangaOCRResponse(success=False, error="OCR not available. PaddleOCR not installed and pytesseract unavailable.")
+            return MangaOCRResponse(
+                success=False,
+                error="OCR not available. PaddleOCR not installed and pytesseract unavailable.",
+            )
 
     if engine_used == "tesseract" and not OCR_AVAILABLE:
         if PADDLEOCR_AVAILABLE:
@@ -1830,6 +1953,19 @@ async def extract_manga_text_region(request: MangaOCRRegionRequest):
             fallback_reason = "Tesseract not available; using paddleocr"
         else:
             return MangaOCRResponse(success=False, error="OCR not available. pytesseract is not installed.")
+
+    if engine_used == "tesseract":
+        tesseract_installed, _tess_path = check_tesseract_installed()
+        if not tesseract_installed:
+            ensure_paddleocr_imported()
+            if PADDLEOCR_AVAILABLE:
+                engine_used = "paddleocr"
+                fallback_reason = "tesseract not found; using paddleocr"
+            else:
+                return MangaOCRResponse(
+                    success=False,
+                    error="OCR not available. tesseract is not installed or it's not in your PATH.",
+                )
 
     image_path = request.image_path
 
@@ -1896,6 +2032,9 @@ async def extract_manga_text_region(request: MangaOCRRegionRequest):
                     log_debug_info("[PaddleOCR] Region OCR exception (falling back)", {"error": str(e)})
                     if not OCR_AVAILABLE:
                         raise
+                    tesseract_installed, _tess_path = check_tesseract_installed()
+                    if not tesseract_installed:
+                        raise Exception(f"PaddleOCR failed and tesseract is not installed: {str(e)}")
                     engine_used = "tesseract"
                     fallback_reason = f"PaddleOCR failed: {str(e)}; using tesseract"
 
