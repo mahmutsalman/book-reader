@@ -60,8 +60,90 @@ jobs:
           call build.bat
         shell: cmd
 
+      - name: Verify Python server binary (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          echo "=== Verifying Python server binary ==="
+          BINARY_PATH="src/python-server/dist/pronunciation-server"
+          if [ -f "$BINARY_PATH" ]; then
+            echo "✅ Binary found at $BINARY_PATH"
+            ls -lh "$BINARY_PATH"
+            file "$BINARY_PATH"
+          else
+            echo "❌ ERROR: Binary not found at $BINARY_PATH"
+            echo "Build output:"
+            ls -la src/python-server/dist/ || echo "dist/ directory does not exist"
+            exit 1
+          fi
+        shell: bash
+
+      - name: Verify Python server binary (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          echo "=== Verifying Python server binary ==="
+          set BINARY_PATH=src\python-server\dist\pronunciation-server.exe
+          if exist "%BINARY_PATH%" (
+            echo ✅ Binary found at %BINARY_PATH%
+            dir "%BINARY_PATH%"
+          ) else (
+            echo ❌ ERROR: Binary not found at %BINARY_PATH%
+            echo Build output:
+            if exist "src\python-server\dist\" (
+              dir src\python-server\dist\
+            ) else (
+              echo dist\ directory does not exist
+            )
+            exit /b 1
+          )
+        shell: cmd
+
       - name: Build Electron app
         run: npm run make
+
+      - name: Verify binary in packaged app (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          echo "=== Verifying binary in packaged app ==="
+          # Find the app bundle
+          APP_PATH=$(find out -name "*.app" -type d | head -n 1)
+          if [ -z "$APP_PATH" ]; then
+            echo "⚠️  Warning: Could not find .app bundle to verify"
+            exit 0
+          fi
+          echo "Found app at: $APP_PATH"
+          RESOURCES_PATH="$APP_PATH/Contents/Resources"
+          BINARY_PATH="$RESOURCES_PATH/pronunciation-server"
+          if [ -f "$BINARY_PATH" ]; then
+            echo "✅ Binary successfully packaged at $BINARY_PATH"
+            ls -lh "$BINARY_PATH"
+          else
+            echo "❌ ERROR: Binary NOT found in packaged app at $BINARY_PATH"
+            echo "Resources directory contents:"
+            ls -la "$RESOURCES_PATH" || echo "Resources directory not found"
+            exit 1
+          fi
+        shell: bash
+
+      - name: Verify binary in packaged app (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          echo "=== Verifying binary in packaged app ==="
+          set RESOURCES_PATH=out\BookReader-win32-x64\resources
+          set BINARY_PATH=%RESOURCES_PATH%\pronunciation-server.exe
+          if exist "%BINARY_PATH%" (
+            echo ✅ Binary successfully packaged at %BINARY_PATH%
+            dir "%BINARY_PATH%"
+          ) else (
+            echo ❌ ERROR: Binary NOT found in packaged app at %BINARY_PATH%
+            echo Resources directory contents:
+            if exist "%RESOURCES_PATH%" (
+              dir "%RESOURCES_PATH%"
+            ) else (
+              echo Resources directory not found
+            )
+            exit /b 1
+          )
+        shell: cmd
 
       - name: List build outputs (macOS)
         if: runner.os == 'macOS'
