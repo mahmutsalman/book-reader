@@ -14,8 +14,7 @@ Output:
 import sys
 import glob
 from pathlib import Path
-from PyInstaller.utils.hooks import collect_dynamic_libs
-from PyInstaller.utils.hooks import collect_data_files
+from PyInstaller.utils.hooks import collect_dynamic_libs, collect_data_files, collect_all
 import site
 
 # Auto-detect espeak-ng-data path (cross-platform)
@@ -132,15 +131,21 @@ def find_openssl_binaries():
 
 openssl_binaries = find_openssl_binaries()
 
-# Paddle (paddlepaddle) ships a set of shared libraries in `paddle/libs` that are
-# loaded dynamically at runtime. PyInstaller may miss these unless explicitly collected.
+# Paddle (paddlepaddle) ships libraries in `paddle/libs` that are loaded dynamically.
+# Use collect_all() to get EVERYTHING: binaries, data files, submodules
+# This fixes "name 'libpaddle' is not defined" errors in frozen builds
+print("[Paddle] Collecting all paddle files (binaries, data, submodules)...")
 try:
-    paddle_dynamic_libs = collect_dynamic_libs('paddle')
-    if paddle_dynamic_libs:
-        print(f"✓ Collected Paddle dynamic libs: {len(paddle_dynamic_libs)} files")
+    paddle_all = collect_all('paddle')
+    paddle_datas = paddle_all[0] if paddle_all else []
+    paddle_binaries = paddle_all[1] if paddle_all else []
+    paddle_hiddenimports = paddle_all[2] if paddle_all else []
+    print(f"✓ Collected Paddle: {len(paddle_datas)} data files, {len(paddle_binaries)} binaries, {len(paddle_hiddenimports)} hidden imports")
 except Exception as e:
-    print(f"WARNING: Failed to collect Paddle dynamic libs: {e}")
-    paddle_dynamic_libs = []
+    print(f"WARNING: Failed to collect Paddle files: {e}")
+    paddle_datas = []
+    paddle_binaries = []
+    paddle_hiddenimports = []
 
 # IMPORTANT: Voice models are NOT bundled in the executable
 # They will be downloaded on-demand by the user through the app UI
@@ -152,9 +157,9 @@ model_data_files = []  # Empty - no models bundled
 a = Analysis(
     ['server.py'],
     pathex=[],
-    binaries=paddle_dynamic_libs + openssl_binaries,
-    datas=model_data_files + paddlex_data_files + ([(espeak_data_path, 'piper/espeak-ng-data')] if espeak_data_path else []),
-    hiddenimports=[
+    binaries=paddle_binaries + openssl_binaries,
+    datas=model_data_files + paddlex_data_files + paddle_datas + ([(espeak_data_path, 'piper/espeak-ng-data')] if espeak_data_path else []),
+    hiddenimports=paddle_hiddenimports + [
         # FastAPI and dependencies
         'fastapi',
         'uvicorn',
