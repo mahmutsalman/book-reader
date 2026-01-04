@@ -105,6 +105,7 @@ const config: ForgeConfig = {
 
       console.log(`[Python Binary Copy] Resources path: ${resourcesPath}`);
       console.log(`[Python Binary Copy] Destination path: ${binaryDest}`);
+      console.log(`[Python Binary Copy] Resources path exists: ${fs.existsSync(resourcesPath)}`);
 
       try {
         fs.copyFileSync(binarySrc, binaryDest);

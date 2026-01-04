@@ -113,6 +113,10 @@ exit /b 0
 echo.
 echo Building standalone executable with PyInstaller...
 
+REM Set UTF-8 encoding to prevent charmap codec errors
+set PYTHONIOENCODING=utf-8
+chcp 65001 >nul 2>&1
+
 REM Clean previous build
 echo [PyInstaller] Cleaning previous build artifacts...
 if exist build rmdir /s /q build
