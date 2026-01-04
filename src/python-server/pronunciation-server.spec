@@ -34,6 +34,35 @@ def find_espeak_data():
 
 espeak_data_path = find_espeak_data()
 
+# Auto-detect PaddleX data files
+def find_paddlex_data():
+    """Find PaddleX .version file and other data files."""
+    paddlex_data = []
+
+    # Try to find paddlex in venv
+    # Windows path
+    windows_paths = glob.glob('venv/Lib/python*/site-packages/paddlex')
+    # Unix/macOS path
+    unix_paths = glob.glob('venv/lib/python*/site-packages/paddlex')
+
+    paddlex_paths = windows_paths + unix_paths
+
+    if paddlex_paths:
+        paddlex_dir = Path(paddlex_paths[0])
+        # Include .version file
+        version_file = paddlex_dir / '.version'
+        if version_file.exists():
+            paddlex_data.append((str(version_file), 'paddlex'))
+            print(f"✓ Found PaddleX .version file: {version_file}")
+        else:
+            print(f"WARNING: PaddleX .version file not found at {version_file}")
+    else:
+        print("WARNING: PaddleX not found in venv. OCR may not work!")
+
+    return paddlex_data
+
+paddlex_data_files = find_paddlex_data()
+
 # IMPORTANT: Voice models are NOT bundled in the executable
 # They will be downloaded on-demand by the user through the app UI
 # This significantly reduces the bundle size (~180MB saved)
@@ -45,7 +74,7 @@ a = Analysis(
     ['server.py'],
     pathex=[],
     binaries=[],
-    datas=model_data_files + ([(espeak_data_path, 'piper/espeak-ng-data')] if espeak_data_path else []),
+    datas=model_data_files + paddlex_data_files + ([(espeak_data_path, 'piper/espeak-ng-data')] if espeak_data_path else []),
     hiddenimports=[
         # FastAPI and dependencies
         'fastapi',
