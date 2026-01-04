@@ -51,7 +51,16 @@ jobs:
         run: |
           cd src/python-server
           chmod +x build.sh
-          ./build.sh
+          echo "=== Starting Python server build ==="
+          ./build.sh || {
+            echo "❌ Build script failed with exit code $?"
+            echo "=== Checking what was created ==="
+            ls -la dist/ 2>/dev/null || echo "dist/ directory does not exist"
+            exit 1
+          }
+          echo "=== Build script completed successfully ==="
+          echo "=== Checking dist directory ==="
+          ls -la dist/
 
       - name: Build Python server (Windows)
         if: runner.os == 'Windows'
