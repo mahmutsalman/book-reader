@@ -22,7 +22,10 @@ from pathlib import Path
 # Environment defaults
 # These must be set before importing heavy OCR/ML libraries (Paddle/PaddleX/OpenCV),
 # otherwise they may perform slow network checks or spawn excessive native threads.
-if not os.environ.get("DISABLE_MODEL_SOURCE_CHECK"):
+#
+# Note: Some OCR libs read these env vars at import-time. For reliability we force
+# a safe default unless the user already set a truthy value.
+if os.environ.get("DISABLE_MODEL_SOURCE_CHECK", "").strip().lower() not in ("1", "true", "yes"):
     os.environ["DISABLE_MODEL_SOURCE_CHECK"] = "True"
 if not os.environ.get("OMP_NUM_THREADS"):
     os.environ["OMP_NUM_THREADS"] = "1"
@@ -40,15 +43,23 @@ if not os.environ.get("MKL_NUM_THREADS"):
 #
 # This "belt and suspenders" approach is necessary because Windows DLL loading
 # is complex and different methods work in different scenarios.
+#
+# Important: `os.add_dll_directory()` returns a handle that MUST be kept alive for
+# the directory to remain active. If we don't keep a reference, CPython will close
+# it immediately and Paddle will fail to load its dependent DLLs later.
+_dll_directory_handles = []
 if sys.platform == 'win32' and hasattr(sys, '_MEIPASS'):
     # Running as frozen executable (PyInstaller)
     base_path = Path(sys._MEIPASS)
     paddle_libs_path = base_path / 'paddle' / 'libs'
+    paddle_base_path = base_path / 'paddle' / 'base'
 
     # Strategy 1 & 2: Add to PATH (works for all Python versions and loading scenarios)
     paths_to_add = []
     if paddle_libs_path.exists():
         paths_to_add.append(str(paddle_libs_path))
+    if paddle_base_path.exists():
+        paths_to_add.append(str(paddle_base_path))
     paths_to_add.append(str(base_path))  # Add base temp directory too
 
     if paths_to_add:
@@ -58,10 +69,13 @@ if sys.platform == 'win32' and hasattr(sys, '_MEIPASS'):
         print(f"[Paddle] Added to PATH: {', '.join(paths_to_add)}")
 
     # Strategy 3: Use add_dll_directory() on Python 3.8+ (additional layer)
-    if paddle_libs_path.exists() and hasattr(os, 'add_dll_directory'):
+    if hasattr(os, 'add_dll_directory'):
         try:
-            os.add_dll_directory(str(paddle_libs_path))
-            os.add_dll_directory(str(base_path))
+            if paddle_libs_path.exists():
+                _dll_directory_handles.append(os.add_dll_directory(str(paddle_libs_path)))
+            if paddle_base_path.exists():
+                _dll_directory_handles.append(os.add_dll_directory(str(paddle_base_path)))
+            _dll_directory_handles.append(os.add_dll_directory(str(base_path)))
             print(f"[Paddle] Added DLL directories via add_dll_directory()")
         except Exception as e:
             print(f"[Paddle] Warning: add_dll_directory failed: {e}")
