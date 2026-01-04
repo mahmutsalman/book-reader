@@ -77,10 +77,27 @@ exit /b 0
 echo.
 echo Installing dependencies...
 
+echo [Dependencies] Installing from requirements.txt...
 pip install -r requirements.txt
-pip install pyinstaller
+if %errorlevel% neq 0 (
+    echo ❌ ERROR: Failed to install dependencies from requirements.txt
+    exit /b 1
+)
 
-echo Dependencies installed.
+echo [Dependencies] Installing PyInstaller...
+pip install pyinstaller
+if %errorlevel% neq 0 (
+    echo ❌ ERROR: Failed to install PyInstaller
+    exit /b 1
+)
+
+echo [Dependencies] Verifying critical packages...
+python -c "import paddleocr; print('✓ paddleocr')" || echo ⚠ paddleocr not found
+python -c "import Polygon; print('✓ Polygon3')" || echo ⚠ Polygon3 not found
+python -c "import lanms; print('✓ lanms-neo')" || echo ⚠ lanms-neo not found
+python -c "import piper; print('✓ piper-tts')" || echo ⚠ piper-tts not found
+
+echo Dependencies installed successfully.
 exit /b 0
 
 :build_binary
@@ -88,19 +105,34 @@ echo.
 echo Building standalone executable with PyInstaller...
 
 REM Clean previous build
+echo [PyInstaller] Cleaning previous build artifacts...
 if exist build rmdir /s /q build
 if exist dist rmdir /s /q dist
 
 REM Run PyInstaller
-pyinstaller pronunciation-server.spec --clean
+echo [PyInstaller] Running PyInstaller with spec file...
+pyinstaller pronunciation-server.spec --clean --log-level INFO
+if %errorlevel% neq 0 (
+    echo ❌ ERROR: PyInstaller build failed with exit code %errorlevel%
+    echo Check the output above for specific errors
+    exit /b 1
+)
 
 REM Check output
+echo [PyInstaller] Verifying build output...
 if exist "dist\pronunciation-server.exe" (
     echo.
-    echo Build successful!
+    echo ✅ Build successful!
     echo Executable: dist\pronunciation-server.exe
+    dir "dist\pronunciation-server.exe"
 ) else (
-    echo Error: Build failed. Executable not found.
+    echo ❌ ERROR: Build completed but executable not found at dist\pronunciation-server.exe
+    echo [PyInstaller] Checking dist directory...
+    if exist "dist" (
+        dir /s dist
+    ) else (
+        echo dist\ directory was not created
+    )
     exit /b 1
 )
 exit /b 0

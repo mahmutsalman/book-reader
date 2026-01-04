@@ -160,9 +160,12 @@ a = Analysis(
         'scipy',
         'scipy.special',
         'scipy.ndimage',
-        'Polygon',
-        'lanms',
+        'Polygon',  # Legacy name (kept for compatibility)
+        'Polygon3',  # Modern package name
+        'lanms',  # Legacy name (kept for compatibility)
+        'lanms.adaptor',  # lanms-neo submodule
         'imgaug',
+        'imgaug.augmenters',
         # gruut for IPA
         'gruut',
         'gruut.lang',
