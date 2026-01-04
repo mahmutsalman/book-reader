@@ -135,30 +135,37 @@ class PythonManager {
         stdio: ['ignore', 'pipe', 'pipe'],
       });
     } else {
-      // Production: Run bundled PyInstaller binary
-      const binaryPath = this.getBinaryPath();
-      console.log(`[PythonManager] Production mode - using bundled binary`);
-      console.log(`[PythonManager] Binary path: ${binaryPath}`);
+      // Production: Use embedded Python with launcher script
+      const launcherPath = this.getLauncherPath();
+      console.log(`[PythonManager] Production mode - using embedded Python launcher`);
+      console.log(`[PythonManager] Launcher: ${launcherPath}`);
       console.log(`[PythonManager] Resources path: ${process.resourcesPath}`);
 
-      // Check if binary exists
-      if (!fs.existsSync(binaryPath)) {
-        const error = `Server binary not found at: ${binaryPath}\n` +
-          `This usually means the binary was not included in the app build.\n` +
-          `Expected location: ${process.resourcesPath}/pronunciation-server.exe`;
+      // Check if launcher exists
+      if (!fs.existsSync(launcherPath)) {
+        const error = `Launcher not found: ${launcherPath}`;
         console.error(`[PythonManager] ${error}`);
         this.lastStartupError = error;
         throw new Error(error);
       }
 
-      console.log(`[PythonManager] Binary exists: ${fs.existsSync(binaryPath)}`);
-      console.log(`[PythonManager] Binary size: ${fs.statSync(binaryPath).size} bytes`);
+      const env = this.getEmbeddedPythonEnv();
 
-      this.process = spawn(binaryPath, [], {
-        cwd: path.dirname(binaryPath),
-        env: { ...process.env, PORT: String(this.port), PYTHONUNBUFFERED: '1' },
-        stdio: ['ignore', 'pipe', 'pipe'],
-      });
+      if (process.platform === 'win32') {
+        // Windows: Execute .bat launcher
+        this.process = spawn('cmd.exe', ['/c', launcherPath], {
+          cwd: path.dirname(launcherPath),
+          env,
+          stdio: ['ignore', 'pipe', 'pipe'],
+        });
+      } else {
+        // macOS/Linux: Execute .sh launcher
+        this.process = spawn('/bin/bash', [launcherPath], {
+          cwd: path.dirname(launcherPath),
+          env,
+          stdio: ['ignore', 'pipe', 'pipe'],
+        });
+      }
     }
 
     // Handle process output
@@ -428,14 +435,45 @@ class PythonManager {
   }
 
   /**
-   * Get the path to the bundled binary (production only).
-   * extraResource places the binary at the root of resourcesPath.
+   * Get launcher script path (production only).
    */
-  private getBinaryPath(): string {
-    const binaryName = process.platform === 'win32'
-      ? 'pronunciation-server.exe'
-      : 'pronunciation-server';
-    return path.join(process.resourcesPath, binaryName);
+  private getLauncherPath(): string {
+    const name = process.platform === 'win32'
+      ? 'launch-server.bat'
+      : 'launch-server.sh';
+    return path.join(process.resourcesPath, name);
+  }
+
+  /**
+   * Get embedded Python environment variables (production only).
+   */
+  private getEmbeddedPythonEnv(): NodeJS.ProcessEnv {
+    const env = { ...process.env };
+    const runtimeDir = path.join(process.resourcesPath, 'python-runtime');
+
+    if (process.platform === 'win32') {
+      // Windows: embeddable package
+      env.PYTHONHOME = runtimeDir;
+      env.PATH = `${runtimeDir};${runtimeDir}\\Scripts;${env.PATH}`;
+    } else {
+      // macOS and Linux: python-build-standalone (consistent structure)
+      env.PYTHONHOME = runtimeDir;
+      env.PATH = `${runtimeDir}/bin:${env.PATH}`;
+
+      // Linux-specific library path
+      if (process.platform === 'linux') {
+        env.LD_LIBRARY_PATH = `${runtimeDir}/lib:${env.LD_LIBRARY_PATH || ''}`;
+      }
+    }
+
+    // Add user OCR packages directory
+    const userOcrDir = path.join(app.getPath('userData'), 'ocr-packages');
+    env.PYTHONPATH = `${userOcrDir}${path.delimiter}${env.PYTHONPATH || ''}`;
+
+    env.PORT = String(this.port);
+    env.PYTHONUNBUFFERED = '1';
+
+    return env;
   }
 
   /**

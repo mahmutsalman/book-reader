@@ -4,6 +4,7 @@ import type { AppSettings } from '../../shared/types';
 import type { IPALanguageInfo, VoiceModelInfo } from '../../shared/types/pronunciation.types';
 import { useReaderTheme } from '../hooks/useReaderTheme';
 import { addAlpha, getContrastColor } from '../utils/colorUtils';
+import { OCRSettings } from '../components/Settings/OCRSettings';
 
 type ThemeOption = AppSettings['theme'];
 
@@ -1388,6 +1389,13 @@ const SettingsPage: React.FC = () => {
               <div className="mt-3 text-xs" style={{ color: theme.textSecondary }}>
                 💡 Tip: Without voice models, pronunciation features will show placeholders. Download models to enable offline text-to-speech.
               </div>
+            </div>
+          )}
+
+          {/* OCR Engine Management */}
+          {pythonStatus?.ready && (
+            <div className="mt-6 pt-4 border-t" style={{ borderTopColor: theme.border }}>
+              <OCRSettings />
             </div>
           )}
 

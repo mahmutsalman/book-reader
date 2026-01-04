@@ -1,159 +1,177 @@
 @echo off
-REM Build script for BookReader Pronunciation Server (Windows)
+REM
+REM Build script for BookReader Pronunciation Server - Embedded Python Distribution (Windows)
 REM
 REM This script:
-REM 1. Creates/updates a virtual environment
-REM 2. Installs dependencies
-REM 3. Runs PyInstaller to create standalone executable
+REM 1. Downloads and configures embedded Python for Windows
+REM 2. Installs CORE dependencies only (TTS, IPA, PDF - NO OCR)
+REM 3. Creates launcher script for production deployment
+REM
+REM OCR engines (PaddleOCR, EasyOCR) are installed on-demand by users via Settings UI
 REM
 REM Usage:
-REM   build.bat           - Full build (venv + dependencies + PyInstaller)
-REM   build.bat --dev     - Dev setup only (venv + dependencies, no PyInstaller)
-REM   build.bat --binary  - PyInstaller only (assumes venv exists)
+REM   build.bat           Full build for production
+REM   build.bat --dev     Development setup (creates venv for local testing)
+REM
 
 setlocal enabledelayedexpansion
 
 set SCRIPT_DIR=%~dp0
 cd /d "%SCRIPT_DIR%"
 
+set RUNTIME_DIR=%SCRIPT_DIR%python-runtime
+set PYTHON_VERSION=3.11.9
 set VENV_DIR=venv
-set PYTHON_MIN_VERSION=3.9
 
-echo ===================================
-echo BookReader Pronunciation Server Build
-echo ===================================
+echo ==============================================
+echo BookReader Embedded Python Build (Windows)
+echo ==============================================
 
-REM Check Python
-where python >nul 2>&1
-if %errorlevel% neq 0 (
-    echo Error: Python not found. Please install Python %PYTHON_MIN_VERSION% or higher.
-    exit /b 1
-)
+REM Development mode: Create venv for local testing
+if "%1"=="--dev" (
+    echo Development mode: Creating venv...
 
-for /f "tokens=*" %%i in ('python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"') do set PYTHON_VERSION=%%i
-echo Found Python %PYTHON_VERSION%
-
-REM Parse arguments
-if "%1"=="--dev" goto :setup_dev
-if "%1"=="--binary" goto :build_binary_only
-goto :full_build
-
-:setup_dev
-call :setup_venv
-call :install_deps
-echo.
-echo Development setup complete. Run 'venv\Scripts\activate' to activate.
-goto :done
-
-:build_binary_only
-call %VENV_DIR%\Scripts\activate
-call :build_binary
-goto :done
-
-:full_build
-call :setup_venv
-call :install_deps
-call :build_binary
-goto :done
-
-:setup_venv
-echo.
-echo Setting up virtual environment...
-
-if not exist "%VENV_DIR%" (
-    echo Creating virtual environment...
-    python -m venv %VENV_DIR%
-) else (
-    echo Virtual environment already exists.
-)
-
-call %VENV_DIR%\Scripts\activate
-
-REM Upgrade pip, wheel, and setuptools FIRST
-echo [Setup] Upgrading pip, wheel, and setuptools...
-python -m pip install --upgrade pip wheel setuptools
-if %errorlevel% neq 0 (
-    echo [ERROR] Failed to upgrade pip/wheel/setuptools
-    exit /b 1
-)
-exit /b 0
-
-:install_deps
-echo.
-echo Installing dependencies...
-
-echo [Dependencies] Installing from requirements.txt...
-pip install -r requirements.txt
-if %errorlevel% neq 0 (
-    echo [ERROR] Failed to install dependencies from requirements.txt
-    exit /b 1
-)
-
-echo [Dependencies] Installing PyInstaller...
-pip install pyinstaller
-if %errorlevel% neq 0 (
-    echo [ERROR] Failed to install PyInstaller
-    exit /b 1
-)
-
-echo [Dependencies] Verifying critical packages (using correct import names)...
-python -c "import paddleocr; print('[OK] paddleocr')" 2>nul || echo [WARNING] paddleocr not found
-python -c "import paddle; print('[OK] paddle (paddlepaddle)')" 2>nul || echo [WARNING] paddle not found
-python -c "import Polygon; print('[OK] Polygon (from Polygon3 package)')" 2>nul || echo [WARNING] Polygon not found
-python -c "import lanms; print('[OK] lanms (from lanms-neo package)')" 2>nul || echo [WARNING] lanms not found
-python -c "import piper; print('[OK] piper-tts')" 2>nul || echo [WARNING] piper-tts not found
-python -c "import cv2; print('[OK] opencv (cv2)')" 2>nul || echo [WARNING] opencv not found
-python -c "import skimage; print('[OK] scikit-image')" 2>nul || echo [WARNING] scikit-image not found
-
-echo [Dependencies] Checking PaddleX runtime data (paddlex/.version)...
-python -c "import importlib.util; from pathlib import Path; s=importlib.util.find_spec('paddlex'); p=Path(next(iter(s.submodule_search_locations))) if s and s.submodule_search_locations else None; vf=(p/'.version') if p else None; print(f\"[INFO] paddlex package dir: {p}\"); print(f\"[INFO] paddlex .version: {vf} exists={vf.exists() if vf else False}\")" 2>nul || echo [WARNING] Could not locate paddlex/.version (OCR may fail in frozen builds)
-
-echo [Dependencies] Installation completed.
-echo [INFO] NOTE: Package names != Import names (e.g., Polygon3 pkg imports as 'Polygon')
-exit /b 0
-
-:build_binary
-echo.
-echo Building standalone executable with PyInstaller...
-
-REM Set UTF-8 encoding to prevent charmap codec errors
-set PYTHONIOENCODING=utf-8
-chcp 65001 >nul 2>&1
-
-REM Clean previous build
-echo [PyInstaller] Cleaning previous build artifacts...
-if exist build rmdir /s /q build
-if exist dist rmdir /s /q dist
-
-REM Run PyInstaller
-echo [PyInstaller] Running PyInstaller with spec file...
-pyinstaller pronunciation-server.spec --clean --log-level INFO
-if %errorlevel% neq 0 (
-    echo [ERROR] PyInstaller build failed with exit code %errorlevel%
-    echo Check the output above for specific errors
-    exit /b 1
-)
-
-REM Check output
-echo [PyInstaller] Verifying build output...
-if exist "dist\pronunciation-server.exe" (
-    echo.
-    echo [SUCCESS] Build successful!
-    echo Executable: dist\pronunciation-server.exe
-    dir "dist\pronunciation-server.exe"
-) else (
-    echo [ERROR] Build completed but executable not found at dist\pronunciation-server.exe
-    echo [PyInstaller] Checking dist directory...
-    if exist "dist" (
-        dir /s dist
+    where python >nul 2>nul
+    if !ERRORLEVEL! EQU 0 (
+        set PYTHON_CMD=python
     ) else (
-        echo dist\ directory was not created
+        echo Error: Python not found. Please install Python 3.9 or higher.
+        exit /b 1
     )
+
+    !PYTHON_CMD! --version
+
+    if not exist "%VENV_DIR%" (
+        echo Creating virtual environment...
+        !PYTHON_CMD! -m venv "%VENV_DIR%"
+    )
+
+    call "%VENV_DIR%\Scripts\activate.bat"
+
+    echo Installing dependencies...
+    python -m pip install --upgrade pip wheel setuptools
+    python -m pip install -r requirements.txt
+
+    echo.
+    echo [OK] Development environment ready!
+    echo To activate: %VENV_DIR%\Scripts\activate.bat
+    echo To run server: python server.py
+    exit /b 0
+)
+
+REM Production mode: Setup embedded Python
+echo Production mode: Setting up embedded Python...
+echo Platform: Windows
+echo Architecture: x64
+
+echo.
+echo Creating runtime directory...
+if not exist "%RUNTIME_DIR%" mkdir "%RUNTIME_DIR%"
+
+REM Download Python embeddable package
+echo.
+echo Downloading Python %PYTHON_VERSION% embeddable package...
+set EMBED_URL=https://www.python.org/ftp/python/%PYTHON_VERSION%/python-%PYTHON_VERSION%-embed-amd64.zip
+
+if not exist "python-embed.zip" (
+    powershell -Command "Invoke-WebRequest -Uri '%EMBED_URL%' -OutFile 'python-embed.zip'"
+    if !ERRORLEVEL! NEQ 0 (
+        echo Error: Failed to download Python embeddable package
+        exit /b 1
+    )
+)
+
+echo Extracting Python...
+powershell -Command "Expand-Archive -Path 'python-embed.zip' -DestinationPath '%RUNTIME_DIR%' -Force"
+if exist "python-embed.zip" del "python-embed.zip"
+
+echo [OK] Python extracted to: %RUNTIME_DIR%
+
+REM Configure python311._pth to enable site-packages
+echo.
+echo Configuring Python paths...
+(
+echo python311.zip
+echo .
+echo site-packages
+echo.
+echo import site
+) > "%RUNTIME_DIR%\python311._pth"
+
+echo [OK] Python path configuration created
+
+REM Install pip
+echo.
+echo Installing pip...
+if not exist "get-pip.py" (
+    powershell -Command "Invoke-WebRequest -Uri 'https://bootstrap.pypa.io/get-pip.py' -OutFile 'get-pip.py'"
+)
+
+"%RUNTIME_DIR%\python.exe" get-pip.py
+if !ERRORLEVEL! NEQ 0 (
+    echo Error: Failed to install pip
     exit /b 1
 )
-exit /b 0
 
-:done
+if exist "get-pip.py" del "get-pip.py"
+echo [OK] pip installed
+
+REM Install core dependencies
 echo.
-echo Done!
+echo Installing core dependencies...
+
+echo Installing web server...
+"%RUNTIME_DIR%\python.exe" -m pip install fastapi>=0.104.0 uvicorn>=0.24.0 pydantic>=2.0.0
+if !ERRORLEVEL! NEQ 0 (
+    echo Error: Failed to install web server dependencies
+    exit /b 1
+)
+
+echo Installing TTS and IPA...
+"%RUNTIME_DIR%\python.exe" -m pip install piper-tts>=1.2.0 gruut>=2.3.0
+if !ERRORLEVEL! NEQ 0 (
+    echo Error: Failed to install TTS dependencies
+    exit /b 1
+)
+
+echo Installing PDF processing...
+"%RUNTIME_DIR%\python.exe" -m pip install PyMuPDF>=1.23.0 pytesseract>=0.3.10 Pillow>=10.0.0 scipy>=1.10.0
+if !ERRORLEVEL! NEQ 0 (
+    echo Error: Failed to install PDF processing dependencies
+    exit /b 1
+)
+
+echo.
+echo [OK] Core dependencies installed (OCR excluded - install via Settings UI)
+
+REM Create launcher script
+echo.
+echo Creating launcher script...
+
+(
+echo @echo off
+echo REM Launcher for BookReader Python Server
+echo set PYTHONHOME=%%~dp0python-runtime
+echo set PYTHONPATH=%%APPDATA%%\BookReader\ocr-packages;%%PYTHONPATH%%
+echo set PATH=%%PYTHONHOME%%;%%PYTHONHOME%%\Scripts;%%PATH%%
+echo "%%PYTHONHOME%%\python.exe" "%%~dp0server.py" %%*
+) > "%SCRIPT_DIR%launch-server.bat"
+
+echo [OK] Launcher script created: launch-server.bat
+
+echo.
+echo ==============================================
+echo [OK] Embedded Python build complete!
+echo ==============================================
+echo.
+echo Runtime location: %RUNTIME_DIR%
+echo Launcher script: launch-server.bat
+echo.
+echo To test locally: launch-server.bat
+echo To package with Electron: npm run make:win
+echo.
+echo Note: OCR engines (PaddleOCR, EasyOCR) are NOT bundled.
+echo Users can install them via Settings UI (~800MB download).
+echo.
+
 endlocal

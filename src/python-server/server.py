@@ -32,68 +32,16 @@ if not os.environ.get("OMP_NUM_THREADS"):
 if not os.environ.get("MKL_NUM_THREADS"):
     os.environ["MKL_NUM_THREADS"] = "1"
 
-# Windows DLL search path fix for PaddlePaddle in frozen builds (PyInstaller)
-# Fixes: "Can not import paddle core while this file exists: libpaddle.pyd"
-# See: https://github.com/PaddlePaddle/PaddleOCR/discussions/14757
-#
-# CRITICAL: We use MULTIPLE DLL loading strategies simultaneously:
-# 1. Add paddle/libs to PATH (broadest compatibility)
-# 2. Add base temp directory to PATH (ensures all paddle DLLs are findable)
-# 3. Use os.add_dll_directory() on Python 3.8+ (additional safety)
-#
-# This "belt and suspenders" approach is necessary because Windows DLL loading
-# is complex and different methods work in different scenarios.
-#
-# Important: `os.add_dll_directory()` returns a handle that MUST be kept alive for
-# the directory to remain active. If we don't keep a reference, CPython will close
-# it immediately and Paddle will fail to load its dependent DLLs later.
-_dll_directory_handles = []
-if sys.platform == 'win32' and hasattr(sys, '_MEIPASS'):
-    # Running as frozen executable (PyInstaller)
-    base_path = Path(sys._MEIPASS)
-    paddle_libs_path = base_path / 'paddle' / 'libs'
-    paddle_base_path = base_path / 'paddle' / 'base'
-
-    # Strategy 1 & 2: Add to PATH (works for all Python versions and loading scenarios)
-    paths_to_add = []
-    if paddle_libs_path.exists():
-        paths_to_add.append(str(paddle_libs_path))
-    if paddle_base_path.exists():
-        paths_to_add.append(str(paddle_base_path))
-    paths_to_add.append(str(base_path))  # Add base temp directory too
-
-    if paths_to_add:
-        current_path = os.environ.get('PATH', '')
-        new_path = os.pathsep.join(paths_to_add + [current_path])
-        os.environ['PATH'] = new_path
-        print(f"[Paddle] Added to PATH: {', '.join(paths_to_add)}")
-
-    # Strategy 3: Use add_dll_directory() on Python 3.8+ (additional layer)
-    if hasattr(os, 'add_dll_directory'):
-        try:
-            if paddle_libs_path.exists():
-                _dll_directory_handles.append(os.add_dll_directory(str(paddle_libs_path)))
-            if paddle_base_path.exists():
-                _dll_directory_handles.append(os.add_dll_directory(str(paddle_base_path)))
-            _dll_directory_handles.append(os.add_dll_directory(str(base_path)))
-            print(f"[Paddle] Added DLL directories via add_dll_directory()")
-        except Exception as e:
-            print(f"[Paddle] Warning: add_dll_directory failed: {e}")
-
-    # Diagnostic: Check what's in paddle/libs
-    if paddle_libs_path.exists():
-        dll_files = list(paddle_libs_path.glob('*.dll'))
-        print(f"[Paddle] Found {len(dll_files)} DLL files in paddle/libs")
-        if len(dll_files) == 0:
-            print(f"[Paddle] WARNING: No DLL files found in {paddle_libs_path}!")
-    else:
-        print(f"[Paddle] WARNING: paddle/libs directory not found at {paddle_libs_path}")
+# Note: PyInstaller DLL workarounds removed - OCR packages now installed via Settings UI
+# to user's app data directory, eliminating need for sys._MEIPASS path manipulation
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from datetime import datetime
+from typing import Dict, List, Optional
+import subprocess
 
 from generators.tts import generate_audio, MODELS_DIR, VOICE_MODELS
 from generators.ipa import generate_ipa
@@ -199,6 +147,33 @@ def ensure_paddleocr_imported():
 
 # Shutdown flag for graceful termination
 shutdown_flag = False
+
+# OCR installation state tracking
+_installing_ocr: Dict[str, bool] = {}
+_install_progress: Dict[str, int] = {}
+
+def get_ocr_packages_dir() -> Path:
+    """Get user's OCR packages directory (cross-platform)."""
+    if sys.platform == 'win32':
+        base = Path(os.environ.get('APPDATA', Path.home() / 'AppData' / 'Roaming'))
+    elif sys.platform == 'darwin':
+        base = Path.home() / 'Library' / 'Application Support'
+    else:
+        base = Path.home() / '.local' / 'share'
+
+    ocr_dir = base / 'BookReader' / 'ocr-packages'
+    ocr_dir.mkdir(parents=True, exist_ok=True)
+    return ocr_dir
+
+def is_ocr_installed(engine: str) -> bool:
+    """Check if OCR engine is installed."""
+    try:
+        if engine == 'paddleocr':
+            import paddleocr
+            return True
+        return False
+    except ImportError:
+        return False
 
 # PaddleOCR instances (initialized lazily on first use, per language)
 paddle_ocr_instances = {}
@@ -2220,6 +2195,113 @@ async def extract_manga_text_region(request: MangaOCRRegionRequest):
             success=False,
             error=f"OCR region extraction failed: {str(e)}"
         )
+
+# ============================================================================
+# OCR Engine Management API (On-Demand Installation)
+# ============================================================================
+
+class OCREngineInfo(BaseModel):
+    engine: str
+    installed: bool
+    size_mb: int
+    languages: List[str]
+    description: str
+
+class InstallOCRRequest(BaseModel):
+    engine: str
+
+class InstallOCRResponse(BaseModel):
+    success: bool
+    message: str
+    progress: Optional[int] = None
+
+@app.get("/api/ocr/engines")
+async def get_ocr_engines():
+    """List available OCR engines and installation status."""
+    engines = [
+        OCREngineInfo(
+            engine="paddleocr",
+            installed=is_ocr_installed("paddleocr"),
+            size_mb=800,
+            languages=["en", "ja", "zh", "ko"],
+            description="PaddleOCR - Fast neural OCR (recommended)"
+        ),
+    ]
+    return {"success": True, "engines": engines}
+
+@app.post("/api/ocr/install")
+async def install_ocr(request: InstallOCRRequest, background_tasks: BackgroundTasks):
+    """Install OCR engine to user data directory."""
+    engine = request.engine.lower()
+
+    if is_ocr_installed(engine):
+        return InstallOCRResponse(
+            success=True,
+            message=f"{engine} already installed",
+            progress=100
+        )
+
+    if _installing_ocr.get(engine):
+        return InstallOCRResponse(
+            success=False,
+            message="Installation in progress"
+        )
+
+    _installing_ocr[engine] = True
+    background_tasks.add_task(install_ocr_sync, engine)
+
+    return InstallOCRResponse(
+        success=True,
+        message=f"Installing {engine}...",
+        progress=0
+    )
+
+def install_ocr_sync(engine: str):
+    """Background OCR installation."""
+    try:
+        ocr_dir = get_ocr_packages_dir()
+        _install_progress[engine] = 10
+
+        packages = [
+            'paddleocr>=2.7.0',
+            'paddlepaddle>=2.5.0',
+            'Polygon3>=3.0.9',
+            'lanms-neo>=1.0.2',
+            'pyclipper>=1.3.0',
+            'imgaug>=0.4.0',
+            'lmdb>=1.4.1',
+            'scikit-image>=0.20.0'
+        ]
+
+        for i, pkg in enumerate(packages):
+            _install_progress[engine] = 20 + (60 * i // len(packages))
+
+            result = subprocess.run(
+                [sys.executable, "-m", "pip", "install", pkg, f"--target={ocr_dir}"],
+                capture_output=True,
+                text=True,
+                timeout=600
+            )
+
+            if result.returncode != 0:
+                raise Exception(f"Failed to install {pkg}: {result.stderr}")
+
+        _install_progress[engine] = 100
+        print(f"[OCR] Successfully installed {engine}")
+    except Exception as e:
+        print(f"[OCR] Installation failed: {e}")
+        _install_progress[engine] = -1
+    finally:
+        _installing_ocr[engine] = False
+
+@app.get("/api/ocr/install/progress/{engine}")
+async def get_install_progress(engine: str):
+    """Poll installation progress."""
+    return {
+        "engine": engine,
+        "installing": _installing_ocr.get(engine, False),
+        "progress": _install_progress.get(engine, 0)
+    }
 
 # Main entry point
 if __name__ == "__main__":

@@ -116,3 +116,9 @@ src/python-server/models/
 test_*.wav
 test_*.py
 *.wav
+
+# Python server build artifacts
+src/python-server/python-runtime/
+src/python-server/launch-server.sh
+src/python-server/launch-server.bat
+src/python-server/=*

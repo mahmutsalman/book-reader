@@ -1,16 +1,17 @@
 #!/bin/bash
 #
-# Build script for BookReader Pronunciation Server (macOS/Linux)
+# Build script for BookReader Pronunciation Server - Embedded Python Distribution
 #
 # This script:
-# 1. Creates/updates a virtual environment
-# 2. Installs dependencies
-# 3. Runs PyInstaller to create standalone executable
+# 1. Downloads and configures embedded Python for the target platform
+# 2. Installs CORE dependencies only (TTS, IPA, PDF - NO OCR)
+# 3. Creates launcher script for production deployment
+#
+# OCR engines (PaddleOCR, EasyOCR) are installed on-demand by users via Settings UI
 #
 # Usage:
-#   ./build.sh           # Full build (venv + dependencies + PyInstaller)
-#   ./build.sh --dev     # Dev setup only (venv + dependencies, no PyInstaller)
-#   ./build.sh --binary  # PyInstaller only (assumes venv exists)
+#   ./build.sh           # Full build for production
+#   ./build.sh --dev     # Development setup (creates venv for local testing)
 #
 
 set -e
@@ -18,233 +19,219 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+RUNTIME_DIR="$SCRIPT_DIR/python-runtime"
+PYTHON_VERSION="3.11.9"
 VENV_DIR="venv"
-PYTHON_MIN_VERSION="3.9"
 
-echo "==================================="
-echo "BookReader Pronunciation Server Build"
-echo "==================================="
+echo "=============================================="
+echo "BookReader Embedded Python Build"
+echo "=============================================="
 
-# Check Python version
-check_python() {
+# Development mode: Create venv for local testing
+if [ "$1" == "--dev" ]; then
+    echo "Development mode: Creating venv..."
+
     if command -v python3 &> /dev/null; then
         PYTHON_CMD="python3"
     elif command -v python &> /dev/null; then
         PYTHON_CMD="python"
     else
-        echo "Error: Python not found. Please install Python $PYTHON_MIN_VERSION or higher."
+        echo "Error: Python not found. Please install Python 3.9 or higher."
         exit 1
     fi
 
-    PYTHON_VERSION=$($PYTHON_CMD -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
-    echo "Found Python $PYTHON_VERSION at $($PYTHON_CMD -c 'import sys; print(sys.executable)')"
-}
-
-# Check for Tesseract OCR system dependency
-check_tesseract() {
-    echo ""
-    echo "Checking Tesseract OCR..."
-
-    if command -v tesseract &> /dev/null; then
-        TESS_VERSION=$(tesseract --version 2>&1 | head -n 1)
-        echo "✅ Found: $TESS_VERSION"
-    else
-        echo "❌ Tesseract OCR not found!"
-        echo ""
-        echo "Manga/Comic OCR requires Tesseract OCR to be installed."
-        echo ""
-        echo "Installation instructions:"
-        echo "  macOS:   brew install tesseract"
-        echo "  Ubuntu:  sudo apt-get install tesseract-ocr"
-        echo "  Windows: Download from https://github.com/UB-Mannheim/tesseract/wiki"
-        echo ""
-        echo "After installation, restart the terminal and run this script again."
-        echo ""
-
-        # Ask if they want to continue without Tesseract
-        if [ -z "$CI" ] && [ -z "$GITHUB_ACTIONS" ]; then
-            echo "Continue without Tesseract? (OCR features will not work) [y/N]"
-            read -r response
-            if [[ ! "$response" =~ ^[Yy]$ ]]; then
-                echo "Exiting. Please install Tesseract OCR and try again."
-                exit 1
-            fi
-        else
-            echo "⚠️  Continuing without Tesseract (CI mode)"
-        fi
-    fi
-}
-
-# Create virtual environment
-setup_venv() {
-    echo ""
-    echo "Setting up virtual environment..."
+    echo "Using: $($PYTHON_CMD --version)"
 
     if [ ! -d "$VENV_DIR" ]; then
         echo "Creating virtual environment..."
         $PYTHON_CMD -m venv "$VENV_DIR"
-    else
-        echo "Virtual environment already exists."
     fi
 
-    # Activate venv
     source "$VENV_DIR/bin/activate"
 
-    # If pip is broken, recreate the venv
-    if ! python -m pip --version >/dev/null 2>&1; then
-        echo "Pip is not working in the virtual environment; recreating..."
-        if type deactivate >/dev/null 2>&1; then
-            deactivate
-        fi
-        rm -rf "$VENV_DIR"
-        $PYTHON_CMD -m venv "$VENV_DIR"
-        source "$VENV_DIR/bin/activate"
-    fi
-
-    # Upgrade pip
-    python -m ensurepip --upgrade >/dev/null 2>&1 || true
-    python -m pip install --upgrade pip wheel setuptools
-}
-
-# Install dependencies
-install_deps() {
-    echo ""
     echo "Installing dependencies..."
-
-    # Install production dependencies
+    pip install --upgrade pip wheel setuptools
     pip install -r requirements.txt
 
-    # Install PyInstaller for building
-    pip install pyinstaller
-
     echo ""
-    echo "Checking PaddleX runtime data (paddlex/.version)..."
-    python - <<'PY' || echo "WARNING: Could not locate paddlex/.version (OCR may fail in frozen builds)"
-import importlib.util
-from pathlib import Path
+    echo "✅ Development environment ready!"
+    echo "To activate: source venv/bin/activate"
+    echo "To run server: python server.py"
+    exit 0
+fi
 
-spec = importlib.util.find_spec("paddlex")
-pkg_dir = Path(next(iter(spec.submodule_search_locations))) if spec and spec.submodule_search_locations else None
-version_file = (pkg_dir / ".version") if pkg_dir else None
+# Production mode: Setup embedded Python
+echo "Production mode: Setting up embedded Python..."
+echo "Platform: $(uname)"
+echo "Architecture: $(uname -m)"
 
-print(f"[INFO] paddlex package dir: {pkg_dir}")
-print(f"[INFO] paddlex .version: {version_file} exists={version_file.exists() if version_file else False}")
-PY
+# Platform detection and Python download
+setup_embedded_python() {
+    mkdir -p "$RUNTIME_DIR"
 
-    echo "Dependencies installed."
-}
+    # Determine architecture
+    ARCH=$(uname -m)
 
-# Check and optionally download voice models
-check_models() {
-    echo ""
-    echo "Checking voice models..."
-
-    # Check if models directory exists and contains .onnx files
-    if [ ! -d "models" ] || [ -z "$(ls -A models/*.onnx 2>/dev/null)" ]; then
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        # macOS: Use python-build-standalone (relocatable, no hardcoded paths)
         echo ""
-        echo "⚠️  Voice models not found!"
-        echo "   Pronunciation feature requires voice models (~180MB total)"
-        echo "   Models: English (US), German, Russian"
-        echo ""
+        echo "Downloading standalone Python for macOS ($ARCH)..."
 
-        # In CI environment, skip interactive prompt and download automatically
-        if [ -n "$CI" ] || [ -n "$GITHUB_ACTIONS" ]; then
-            echo "CI environment detected - downloading models automatically..."
-            python download_models.py
-
-            if [ $? -eq 0 ]; then
-                echo "✅ Voice models downloaded successfully!"
-            else
-                echo "⚠️  Failed to download models in CI. Continuing without models."
-                echo "   App will work but pronunciation feature may be limited."
-            fi
+        # Map macOS architecture names
+        if [ "$ARCH" == "arm64" ]; then
+            ARCH_NAME="aarch64"
+        elif [ "$ARCH" == "x86_64" ]; then
+            ARCH_NAME="x86_64"
         else
-            # Interactive mode - ask user
-            echo "Would you like to download them now? [Y/n]"
-            read -r response
-
-            if [[ ! "$response" =~ ^[Nn]$ ]]; then
-                echo ""
-                echo "Downloading voice models from HuggingFace..."
-                python download_models.py
-
-                if [ $? -eq 0 ]; then
-                    echo "✅ Voice models downloaded successfully!"
-                else
-                    echo "❌ Failed to download models. You can try again later with:"
-                    echo "   cd src/python-server && python download_models.py"
-                fi
-            else
-                echo ""
-                echo "⏭️  Skipping model download."
-                echo "   To download later, run:"
-                echo "   cd src/python-server && python download_models.py"
-            fi
+            echo "Error: Unsupported macOS architecture: $ARCH"
+            exit 1
         fi
+
+        STANDALONE_URL="https://github.com/indygreg/python-build-standalone/releases/download/20240107/cpython-3.11.7+20240107-${ARCH_NAME}-apple-darwin-install_only.tar.gz"
+
+        if [ ! -f "python.tar.gz" ]; then
+            curl -L "$STANDALONE_URL" -o python.tar.gz
+        fi
+
+        echo "Extracting Python..."
+        tar -xzf python.tar.gz -C "$RUNTIME_DIR" --strip-components=1
+        rm python.tar.gz
+
+        PYTHON_EXE="$RUNTIME_DIR/bin/python3"
+        echo "✅ Python extracted to: $RUNTIME_DIR"
+
     else
-        model_count=$(ls -1 models/*.onnx 2>/dev/null | wc -l | tr -d ' ')
-        echo "✅ Found $model_count voice model(s)"
-    fi
-}
-
-# Build with PyInstaller
-build_binary() {
-    echo ""
-    echo "Building standalone executable with PyInstaller..."
-
-    # Clean previous build
-    rm -rf build dist
-
-    # Keep PyInstaller cache/config inside the project directory.
-    # This makes builds more reproducible and avoids writing to user-level cache paths
-    # (e.g. ~/Library/Application Support/pyinstaller), which may be blocked in sandboxed environments.
-    export PYINSTALLER_CONFIG_DIR="$SCRIPT_DIR/.pyinstaller"
-    mkdir -p "$PYINSTALLER_CONFIG_DIR"
-
-    # Run PyInstaller
-    pyinstaller pronunciation-server.spec --clean
-
-    # Check output
-    if [ -f "dist/pronunciation-server" ]; then
+        # Linux: Use python-build-standalone
         echo ""
-        echo "Build successful!"
-        echo "Executable: dist/pronunciation-server"
+        echo "Downloading standalone Python for Linux ($ARCH)..."
 
-        # Show file size
-        SIZE=$(du -h dist/pronunciation-server | cut -f1)
-        echo "Size: $SIZE"
-    else
-        echo "Error: Build failed. Executable not found."
+        # Map architecture names
+        if [ "$ARCH" == "x86_64" ]; then
+            ARCH_NAME="x86_64"
+        elif [ "$ARCH" == "aarch64" ]; then
+            ARCH_NAME="aarch64"
+        else
+            echo "Warning: Unsupported architecture $ARCH, trying x86_64..."
+            ARCH_NAME="x86_64"
+        fi
+
+        STANDALONE_URL="https://github.com/indygreg/python-build-standalone/releases/download/20240107/cpython-3.11.7+20240107-${ARCH_NAME}-unknown-linux-gnu-install_only.tar.gz"
+
+        if [ ! -f "python.tar.gz" ]; then
+            curl -L "$STANDALONE_URL" -o python.tar.gz
+        fi
+
+        echo "Extracting Python..."
+        tar -xzf python.tar.gz -C "$RUNTIME_DIR" --strip-components=1
+        rm python.tar.gz
+
+        PYTHON_EXE="$RUNTIME_DIR/bin/python3"
+        echo "✅ Python extracted to: $RUNTIME_DIR"
+    fi
+
+    # Verify Python works
+    if [ ! -f "$PYTHON_EXE" ]; then
+        echo "Error: Python executable not found at $PYTHON_EXE"
         exit 1
     fi
+
+    echo "Verifying Python: $("$PYTHON_EXE" --version)"
 }
 
-# Main
-check_python
-check_tesseract
+# Install CORE dependencies only (NO OCR)
+install_core_dependencies() {
+    echo ""
+    echo "Installing core dependencies..."
 
-case "${1:-}" in
-    --dev)
-        setup_venv
-        install_deps
-        check_models
-        echo ""
-        echo "✅ Development setup complete!"
-        echo "   Python packages installed (including scipy for OCR)"
-        echo "   Run 'source venv/bin/activate' to activate."
-        ;;
-    --binary)
-        source "$VENV_DIR/bin/activate"
-        check_models
-        build_binary
-        ;;
-    *)
-        setup_venv
-        install_deps
-        check_models
-        build_binary
-        ;;
-esac
+    # Ensure pip is available
+    "$PYTHON_EXE" -m ensurepip --default-pip 2>/dev/null || true
+    "$PYTHON_EXE" -m pip install --upgrade pip wheel setuptools
+
+    echo "Installing web server..."
+    "$PYTHON_EXE" -m pip install \
+        fastapi>=0.104.0 \
+        uvicorn>=0.24.0 \
+        pydantic>=2.0.0
+
+    echo "Installing TTS and IPA..."
+    "$PYTHON_EXE" -m pip install \
+        piper-tts>=1.2.0 \
+        gruut>=2.3.0
+
+    echo "Installing PDF processing..."
+    "$PYTHON_EXE" -m pip install \
+        PyMuPDF>=1.23.0 \
+        pytesseract>=0.3.10 \
+        Pillow>=10.0.0 \
+        scipy>=1.10.0
+
+    echo ""
+    echo "✅ Core dependencies installed (OCR excluded - install via Settings UI)"
+}
+
+# Create launcher script
+create_launcher() {
+    echo ""
+    echo "Creating launcher script..."
+
+    cat > "$SCRIPT_DIR/launch-server.sh" << 'LAUNCHER_EOF'
+#!/bin/bash
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Python runtime paths (consistent across macOS and Linux)
+PYTHON_HOME="$SCRIPT_DIR/python-runtime"
+PYTHON_EXE="$PYTHON_HOME/bin/python3"
+
+# Set Python environment
+export PYTHONHOME="$PYTHON_HOME"
+export PATH="$PYTHON_HOME/bin:$PATH"
+
+# Linux-specific library path
+if [[ "$OSTYPE" != "darwin"* ]]; then
+    export LD_LIBRARY_PATH="$PYTHON_HOME/lib:${LD_LIBRARY_PATH:-}"
+fi
+
+# Add user's OCR packages to PYTHONPATH
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    USER_DATA="$HOME/Library/Application Support/BookReader"
+else
+    USER_DATA="$HOME/.local/share/BookReader"
+fi
+
+export PYTHONPATH="$USER_DATA/ocr-packages:${PYTHONPATH:-}"
+
+# Launch server
+exec "$PYTHON_EXE" "$SCRIPT_DIR/server.py" "$@"
+LAUNCHER_EOF
+
+    chmod +x "$SCRIPT_DIR/launch-server.sh"
+    echo "✅ Launcher script created: launch-server.sh"
+}
+
+# Execute build
+echo ""
+echo "Step 1/3: Setting up embedded Python runtime..."
+setup_embedded_python
 
 echo ""
-echo "Done!"
+echo "Step 2/3: Installing core dependencies..."
+install_core_dependencies
+
+echo ""
+echo "Step 3/3: Creating launcher script..."
+create_launcher
+
+echo ""
+echo "=============================================="
+echo "✅ Embedded Python build complete!"
+echo "=============================================="
+echo ""
+echo "Runtime location: $RUNTIME_DIR"
+echo "Launcher script: launch-server.sh"
+echo ""
+echo "To test locally: ./launch-server.sh"
+echo "To package with Electron: npm run make"
+echo ""
+echo "Note: OCR engines (PaddleOCR, EasyOCR) are NOT bundled."
+echo "Users can install them via Settings UI (~800MB download)."
+echo ""

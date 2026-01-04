@@ -8,77 +8,25 @@ from typing import Optional
 from pathlib import Path
 import sys
 
-# Set espeak data path BEFORE importing piper
-# Handles both development (venv) and production (PyInstaller bundle)
-try:
-    # Check if running in PyInstaller bundle
-    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
-        # Production: PyInstaller bundle
-        base_path = Path(sys._MEIPASS)
-        espeak_path = base_path / "piper" / "espeak-ng-data"
-
-        if espeak_path.exists():
-            os.environ['ESPEAK_DATA_PATH'] = str(espeak_path)
-            print(f"[TTS] Production - ESPEAK_DATA_PATH: {espeak_path}")
-        else:
-            print(f"[TTS] ERROR: espeak-ng-data not found in bundle: {espeak_path}")
-    else:
-        # Development: Use venv
-        import site
-        site_packages = site.getsitepackages()
-
-        espeak_found = False
-        for sp in site_packages:
-            espeak_path = Path(sp) / "piper" / "espeak-ng-data"
-            if espeak_path.exists():
-                os.environ['ESPEAK_DATA_PATH'] = str(espeak_path)
-                print(f"[TTS] Development - ESPEAK_DATA_PATH: {espeak_path}")
-                espeak_found = True
-                break
-
-        if not espeak_found:
-            print(f"[TTS] ERROR: espeak-ng-data not found in site-packages")
-
-except Exception as e:
-    print(f"[TTS] ERROR setting ESPEAK_DATA_PATH: {e}")
-    import traceback
-    traceback.print_exc()
-
-# Now import piper after setting environment variable
+# Import Piper TTS
 from piper import PiperVoice
 
-# Model directory - Use user's app data directory for cross-platform compatibility
-# This allows models to be downloaded on-demand after installation
+# Get TTS models directory in user data (cross-platform)
 def get_models_directory() -> Path:
-    """Get platform-specific models directory in user's app data."""
+    """Get TTS models directory in user data."""
     if sys.platform == 'win32':
-        # Windows: %APPDATA%/BookReader/models
-        base_dir = Path(os.environ.get('APPDATA', Path.home() / 'AppData' / 'Roaming'))
+        base = Path(os.environ.get('APPDATA', Path.home() / 'AppData' / 'Roaming'))
     elif sys.platform == 'darwin':
-        # macOS: ~/Library/Application Support/BookReader/models
-        base_dir = Path.home() / 'Library' / 'Application Support'
+        base = Path.home() / 'Library' / 'Application Support'
     else:
-        # Linux: ~/.local/share/BookReader/models
-        base_dir = Path.home() / '.local' / 'share'
+        base = Path.home() / '.local' / 'share'
 
-    models_dir = base_dir / 'BookReader' / 'models'
+    models_dir = base / 'BookReader' / 'models'
     models_dir.mkdir(parents=True, exist_ok=True)
     return models_dir
 
-# Development override: Use local models directory if it exists
-if not getattr(sys, 'frozen', False):
-    # Development mode - check for local models first
-    dev_models = Path(__file__).parent.parent / "models"
-    if dev_models.exists() and any(dev_models.glob('*.onnx')):
-        MODELS_DIR = dev_models
-        print(f"[TTS] Using development models directory: {MODELS_DIR}")
-    else:
-        MODELS_DIR = get_models_directory()
-        print(f"[TTS] Using app data models directory: {MODELS_DIR}")
-else:
-    # Production mode - always use app data directory
-    MODELS_DIR = get_models_directory()
-    print(f"[TTS] Using app data models directory: {MODELS_DIR}")
+MODELS_DIR = get_models_directory()
+print(f"[TTS] Models directory: {MODELS_DIR}")
 
 # Voice model mapping
 VOICE_MODELS = {

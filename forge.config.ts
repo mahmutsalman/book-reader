@@ -33,12 +33,19 @@ const config: ForgeConfig = {
       unpack: '{**/node_modules/better-sqlite3/**,**/node_modules/bindings/**,**/node_modules/file-uri-to-path/**}',
     },
     icon: 'assets/icon',
-    // Include bundled Python server binary in resources
+    // Include embedded Python runtime and server files
     extraResource: [
-      // macOS/Linux binary
-      ...(process.platform !== 'win32' ? ['src/python-server/dist/pronunciation-server'] : []),
-      // Windows binary
-      ...(process.platform === 'win32' ? ['src/python-server/dist/pronunciation-server.exe'] : []),
+      // Bundle entire Python runtime directory
+      'src/python-server/python-runtime',
+
+      // Bundle server source files
+      'src/python-server/server.py',
+      'src/python-server/generators',
+
+      // Bundle platform-specific launcher
+      process.platform === 'win32'
+        ? 'src/python-server/launch-server.bat'
+        : 'src/python-server/launch-server.sh'
     ].filter(Boolean),
   },
   rebuildConfig: {
@@ -61,67 +68,9 @@ const config: ForgeConfig = {
         }
       }
 
-      // CRITICAL: Copy Python server binary to resources directory
-      // This ensures the binary is included even if extraResource fails
-      console.log('[Python Binary Copy] Starting binary copy process...');
-      console.log(`[Python Binary Copy] Platform: ${process.platform}`);
-      console.log(`[Python Binary Copy] Build path: ${buildPath}`);
-
-      const binaryName = process.platform === 'win32'
-        ? 'pronunciation-server.exe'
-        : 'pronunciation-server';
-      const binarySrc = path.resolve(__dirname, 'src', 'python-server', 'dist', binaryName);
-
-      console.log(`[Python Binary Copy] Binary name: ${binaryName}`);
-      console.log(`[Python Binary Copy] Source path: ${binarySrc}`);
-      console.log(`[Python Binary Copy] Source exists: ${fs.existsSync(binarySrc)}`);
-
-      // Check if source binary exists
-      if (!fs.existsSync(binarySrc)) {
-        console.error(`[ERROR] [Python Binary Copy] Source binary not found at ${binarySrc}`);
-        console.error(`[Python Binary Copy] This usually means the Python build step failed.`);
-        console.error(`[Python Binary Copy] Skipping binary copy to avoid breaking the build.`);
-        console.error(`[Python Binary Copy] WARNING: The packaged app will NOT have the Python server!`);
-        return; // Don't throw - let the verification step catch this
-      }
-
-      // Calculate destination path
-      // buildPath structure varies by platform:
-      // macOS: .../Smart Book.app/Contents/Resources/app
-      // Windows: .../BookReader-win32-x64/resources/app
-
-      let resourcesPath: string;
-      if (process.platform === 'darwin') {
-        // macOS: buildPath = .../Smart Book.app/Contents/Resources/app
-        // We want: .../Smart Book.app/Contents/Resources/
-        resourcesPath = path.dirname(buildPath);
-      } else {
-        // Windows/Linux: buildPath = .../resources/app
-        // We want: .../resources/
-        resourcesPath = path.dirname(buildPath);
-      }
-
-      const binaryDest = path.join(resourcesPath, binaryName);
-
-      console.log(`[Python Binary Copy] Resources path: ${resourcesPath}`);
-      console.log(`[Python Binary Copy] Destination path: ${binaryDest}`);
-      console.log(`[Python Binary Copy] Resources path exists: ${fs.existsSync(resourcesPath)}`);
-
-      try {
-        fs.copyFileSync(binarySrc, binaryDest);
-        console.log(`[SUCCESS] [Python Binary Copy] Successfully copied ${binaryName}`);
-
-        // Verify the copy
-        if (fs.existsSync(binaryDest)) {
-          const stats = fs.statSync(binaryDest);
-          console.log(`[SUCCESS] [Python Binary Copy] Verified: ${binaryName} (${stats.size} bytes)`);
-        } else {
-          console.error(`[ERROR] [Python Binary Copy] Copy verification failed - file not found at destination`);
-        }
-      } catch (error) {
-        console.error(`[ERROR] [Python Binary Copy] Failed to copy binary:`, error);
-        console.error(`[Python Binary Copy] WARNING: The packaged app will NOT have the Python server!`);
-      }
+      // Note: Python runtime and launcher are copied via extraResource
+      // They will be available in the final packaged app, but not during this hook
+      console.log('[Python Server] Python runtime will be bundled via extraResource');
     },
   },
   makers: [
