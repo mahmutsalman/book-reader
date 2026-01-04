@@ -15,19 +15,21 @@ import sys
 import glob
 from pathlib import Path
 from PyInstaller.utils.hooks import collect_dynamic_libs
+from PyInstaller.utils.hooks import collect_data_files
+import site
 
 # Auto-detect espeak-ng-data path (cross-platform)
 def find_espeak_data():
-    """Find espeak-ng-data in venv, handling both Windows and Unix paths."""
-    # Try Windows path first (venv/Lib with capital L)
-    windows_paths = glob.glob('venv/Lib/python*/site-packages/piper/espeak-ng-data')
-    if windows_paths:
-        return windows_paths[0]
+    """Find espeak-ng-data in the current Python environment (cross-platform)."""
+    try:
+        site_packages = [Path(p) for p in site.getsitepackages()]
+    except Exception:
+        site_packages = []
 
-    # Try Unix/macOS path (venv/lib lowercase)
-    unix_paths = glob.glob('venv/lib/python*/site-packages/piper/espeak-ng-data')
-    if unix_paths:
-        return unix_paths[0]
+    for sp_dir in site_packages:
+        candidate = sp_dir / "piper" / "espeak-ng-data"
+        if candidate.exists():
+            return str(candidate)
 
     # Fallback: print warning and return None
     print("WARNING: espeak-ng-data not found in venv. Piper TTS may not work!")
@@ -37,30 +39,64 @@ espeak_data_path = find_espeak_data()
 
 # Auto-detect PaddleX data files
 def find_paddlex_data():
-    """Find PaddleX .version file and other data files."""
-    paddlex_data = []
+    """
+    Collect PaddleX runtime data files.
 
-    # Try to find paddlex in venv
-    # Windows path
-    windows_paths = glob.glob('venv/Lib/python*/site-packages/paddlex')
-    # Unix/macOS path
-    unix_paths = glob.glob('venv/lib/python*/site-packages/paddlex')
+    PaddleX expects a `.version` file at runtime under `paddlex/.version`.
+    PyInstaller will not reliably include dotfiles unless explicitly collected.
+    """
+    datas = []
 
-    paddlex_paths = windows_paths + unix_paths
+    # Prefer PyInstaller's helper (robust across venv layouts, including Windows' venv/Lib/site-packages).
+    try:
+        datas = collect_data_files("paddlex")
+        print(f"✓ Collected PaddleX data files: {len(datas)} entries")
+    except Exception as e:
+        print(f"WARNING: Failed to collect PaddleX data files: {e}")
+        datas = []
 
-    if paddlex_paths:
-        paddlex_dir = Path(paddlex_paths[0])
-        # Include .version file
-        version_file = paddlex_dir / '.version'
-        if version_file.exists():
-            paddlex_data.append((str(version_file), 'paddlex'))
-            print(f"✓ Found PaddleX .version file: {version_file}")
-        else:
-            print(f"WARNING: PaddleX .version file not found at {version_file}")
-    else:
-        print("WARNING: PaddleX not found in venv. OCR may not work!")
+    # Ensure `.version` is included even if collect_data_files misses dotfiles in some environments.
+    try:
+        has_version = any(Path(src).name == ".version" and str(dest).replace("\\", "/").rstrip("/") == "paddlex" for src, dest in datas)
+    except Exception:
+        has_version = False
 
-    return paddlex_data
+    if has_version:
+        return datas
+
+    # Fallback: locate paddlex/.version directly from site-packages.
+    try:
+        site_packages = [Path(p) for p in site.getsitepackages()]
+    except Exception:
+        site_packages = []
+
+    paddlex_dir = None
+    version_file = None
+    for sp_dir in site_packages:
+        candidate_dir = sp_dir / "paddlex"
+        candidate_version = candidate_dir / ".version"
+        if candidate_version.exists():
+            paddlex_dir = candidate_dir
+            version_file = candidate_version
+            break
+
+    if version_file is not None:
+        datas.append((str(version_file), "paddlex"))
+        print(f"✓ Added PaddleX .version file explicitly: {version_file}")
+        return datas
+
+    # If the package exists but `.version` is missing, fail loudly to avoid shipping a broken OCR feature.
+    for sp_dir in site_packages:
+        candidate_dir = sp_dir / "paddlex"
+        if candidate_dir.exists():
+            paddlex_dir = candidate_dir
+            break
+
+    if paddlex_dir is not None:
+        raise FileNotFoundError(f"PaddleX package found but missing required data file: {paddlex_dir / '.version'}")
+
+    print("WARNING: PaddleX not found in site-packages. OCR may not work!")
+    return datas
 
 paddlex_data_files = find_paddlex_data()
 

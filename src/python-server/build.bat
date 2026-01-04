@@ -105,6 +105,9 @@ python -c "import piper; print('[OK] piper-tts')" 2>nul || echo [WARNING] piper-
 python -c "import cv2; print('[OK] opencv (cv2)')" 2>nul || echo [WARNING] opencv not found
 python -c "import skimage; print('[OK] scikit-image')" 2>nul || echo [WARNING] scikit-image not found
 
+echo [Dependencies] Checking PaddleX runtime data (paddlex/.version)...
+python -c "import importlib.util; from pathlib import Path; s=importlib.util.find_spec('paddlex'); p=Path(next(iter(s.submodule_search_locations))) if s and s.submodule_search_locations else None; vf=(p/'.version') if p else None; print(f\"[INFO] paddlex package dir: {p}\"); print(f\"[INFO] paddlex .version: {vf} exists={vf.exists() if vf else False}\")" 2>nul || echo [WARNING] Could not locate paddlex/.version (OCR may fail in frozen builds)
+
 echo [Dependencies] Installation completed.
 echo [INFO] NOTE: Package names != Import names (e.g., Polygon3 pkg imports as 'Polygon')
 exit /b 0

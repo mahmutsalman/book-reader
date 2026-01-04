@@ -117,6 +117,20 @@ install_deps() {
     # Install PyInstaller for building
     pip install pyinstaller
 
+    echo ""
+    echo "Checking PaddleX runtime data (paddlex/.version)..."
+    python - <<'PY' || echo "WARNING: Could not locate paddlex/.version (OCR may fail in frozen builds)"
+import importlib.util
+from pathlib import Path
+
+spec = importlib.util.find_spec("paddlex")
+pkg_dir = Path(next(iter(spec.submodule_search_locations))) if spec and spec.submodule_search_locations else None
+version_file = (pkg_dir / ".version") if pkg_dir else None
+
+print(f"[INFO] paddlex package dir: {pkg_dir}")
+print(f"[INFO] paddlex .version: {version_file} exists={version_file.exists() if version_file else False}")
+PY
+
     echo "Dependencies installed."
 }
 
