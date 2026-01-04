@@ -1728,7 +1728,7 @@ async def extract_manga_text(request: MangaOCRRequest):
             else:
                 return MangaOCRResponse(
                     success=False,
-                    error="OCR not available. PaddleOCR import failed and tesseract is not installed or not in PATH.",
+                    error=f"OCR not available. PaddleOCR import failed: {PADDLEOCR_IMPORT_ERROR}. Tesseract is not installed or not in PATH.",
                 )
         else:
             return MangaOCRResponse(
@@ -1939,7 +1939,7 @@ async def extract_manga_text_region(request: MangaOCRRegionRequest):
             else:
                 return MangaOCRResponse(
                     success=False,
-                    error="OCR not available. PaddleOCR import failed and tesseract is not installed or not in PATH.",
+                    error=f"OCR not available. PaddleOCR import failed: {PADDLEOCR_IMPORT_ERROR}. Tesseract is not installed or not in PATH.",
                 )
         else:
             return MangaOCRResponse(
