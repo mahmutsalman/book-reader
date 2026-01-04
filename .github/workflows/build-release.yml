@@ -120,7 +120,7 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           echo "=== Full output directory structure ==="
-          find out -type f -o -type d | head -n 50
+          find out -type f -o -type d | head -n 50 || true
         shell: bash
 
       - name: Verify binary in packaged app (macOS)
@@ -128,7 +128,7 @@ jobs:
         run: |
           echo "=== Verifying binary in packaged app ==="
           # Find the app bundle
-          APP_PATH=$(find out -name "*.app" -type d | head -n 1)
+          APP_PATH=$(find out -name "*.app" -type d | head -n 1 || true)
           if [ -z "$APP_PATH" ]; then
             echo "⚠️  Warning: Could not find .app bundle to verify"
             exit 0
