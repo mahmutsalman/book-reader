@@ -23,6 +23,7 @@ class PythonManager {
   private healthCheckInterval: NodeJS.Timeout | null = null;
   private startupPromise: Promise<void> | null = null;
   private isRestarting = false;
+  private lastStartupError: string | null = null;
 
   /**
    * Get the base URL of the Python server.
@@ -68,6 +69,9 @@ class PythonManager {
           // Start health checks
           this.startHealthChecks();
 
+          // Clear any previous errors on successful start
+          this.lastStartupError = null;
+
           console.log('[PythonManager] Server started successfully');
           return;
         } catch (error) {
@@ -86,7 +90,9 @@ class PythonManager {
 
       throw lastError ?? new Error('Failed to start server');
     } catch (error) {
-      console.error('[PythonManager] Failed to start server:', error);
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.error('[PythonManager] Failed to start server:', errorMsg);
+      this.lastStartupError = errorMsg;
       this.startupPromise = null;
       throw error;
     }
@@ -95,6 +101,7 @@ class PythonManager {
   private spawnServerProcess(): void {
     // Check if we're in development or production
     const isDev = !app.isPackaged;
+    const fs = require('fs');
 
     if (isDev) {
       // Development: Use venv Python to run the script
@@ -106,6 +113,22 @@ class PythonManager {
       console.log(`[PythonManager] Python: ${pythonPath}`);
       console.log(`[PythonManager] Script: ${scriptPath}`);
 
+      // Check if Python executable exists
+      if (!fs.existsSync(pythonPath)) {
+        const error = `Python executable not found at: ${pythonPath}`;
+        console.error(`[PythonManager] ${error}`);
+        this.lastStartupError = error;
+        throw new Error(error);
+      }
+
+      // Check if script exists
+      if (!fs.existsSync(scriptPath)) {
+        const error = `Server script not found at: ${scriptPath}`;
+        console.error(`[PythonManager] ${error}`);
+        this.lastStartupError = error;
+        throw new Error(error);
+      }
+
       this.process = spawn(pythonPath, [scriptPath], {
         cwd: serverDir,
         env: { ...process.env, PORT: String(this.port), PYTHONUNBUFFERED: '1' },
@@ -115,7 +138,21 @@ class PythonManager {
       // Production: Run bundled PyInstaller binary
       const binaryPath = this.getBinaryPath();
       console.log(`[PythonManager] Production mode - using bundled binary`);
-      console.log(`[PythonManager] Binary: ${binaryPath}`);
+      console.log(`[PythonManager] Binary path: ${binaryPath}`);
+      console.log(`[PythonManager] Resources path: ${process.resourcesPath}`);
+
+      // Check if binary exists
+      if (!fs.existsSync(binaryPath)) {
+        const error = `Server binary not found at: ${binaryPath}\n` +
+          `This usually means the binary was not included in the app build.\n` +
+          `Expected location: ${process.resourcesPath}/pronunciation-server.exe`;
+        console.error(`[PythonManager] ${error}`);
+        this.lastStartupError = error;
+        throw new Error(error);
+      }
+
+      console.log(`[PythonManager] Binary exists: ${fs.existsSync(binaryPath)}`);
+      console.log(`[PythonManager] Binary size: ${fs.statSync(binaryPath).size} bytes`);
 
       this.process = spawn(binaryPath, [], {
         cwd: path.dirname(binaryPath),
@@ -136,12 +173,17 @@ class PythonManager {
     });
 
     this.process.on('error', (err) => {
-      console.error('[PythonManager] Process error:', err);
+      const errorMsg = `Process spawn error: ${err.message}`;
+      console.error('[PythonManager]', errorMsg);
+      this.lastStartupError = errorMsg;
       this.isReady = false;
     });
 
     this.process.on('exit', (code) => {
       console.log(`[PythonManager] Process exited with code ${code}`);
+      if (code !== 0 && code !== null) {
+        this.lastStartupError = `Process exited with non-zero code: ${code}`;
+      }
       this.isReady = false;
       this.process = null;
     });
@@ -292,6 +334,7 @@ class PythonManager {
       ready: this.isReady,
       port: this.port,
       url: this.baseUrl,
+      error: this.lastStartupError || undefined,
     };
   }
 

@@ -1148,7 +1148,24 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
       setHoveredRegion(null);
     } catch (error) {
       console.error('[MangaImageView] In-reading OCR failed:', error);
-      alert('Failed to process OCR for the selected region.');
+
+      // Check if this is a Python server not ready error
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes('Python server not ready')) {
+        alert(
+          'OCR Server Not Ready\n\n' +
+          'The OCR processing server is not running or failed to start.\n\n' +
+          'To fix this:\n' +
+          '1. Open Settings (⚙️)\n' +
+          '2. Scroll to "Pronunciation Server" section\n' +
+          '3. Click "🔄 Restart Server"\n' +
+          '4. Wait for green "Ready" status\n' +
+          '5. Try OCR again\n\n' +
+          'If the issue persists, check that the app installation includes the OCR server binary.'
+        );
+      } else {
+        alert('Failed to process OCR for the selected region.');
+      }
     } finally {
       setIsOcrProcessing(false);
     }
