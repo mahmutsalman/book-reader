@@ -14,6 +14,7 @@ Output:
 import sys
 import glob
 from pathlib import Path
+from PyInstaller.utils.hooks import collect_dynamic_libs
 
 # Auto-detect espeak-ng-data path (cross-platform)
 def find_espeak_data():
@@ -63,6 +64,48 @@ def find_paddlex_data():
 
 paddlex_data_files = find_paddlex_data()
 
+def find_openssl_binaries():
+    """
+    Ensure the frozen app bundles a compatible OpenSSL for Python's `ssl` module.
+
+    OpenCV wheels often bundle their own `libssl`/`libcrypto` which can conflict with
+    Python's `_ssl` extension at runtime, causing `import ssl` to fail.
+
+    We prefer the OpenSSL installation that Homebrew Python is linked against.
+    """
+    if sys.platform != "darwin":
+        return []
+
+    py_ver_dir = f"python{sys.version_info.major}.{sys.version_info.minor}"
+
+    prefixes = [
+        "/opt/homebrew/opt/openssl@3",  # Apple Silicon Homebrew
+        "/usr/local/opt/openssl@3",     # Intel Homebrew
+    ]
+
+    for prefix in prefixes:
+        libssl = Path(prefix) / "lib" / "libssl.3.dylib"
+        libcrypto = Path(prefix) / "lib" / "libcrypto.3.dylib"
+        if libssl.exists() and libcrypto.exists():
+            print(f"✓ Using OpenSSL from: {prefix}")
+            # Place next to the embedded Python runtime so `_ssl` can resolve them via @rpath.
+            return [(str(libssl), py_ver_dir), (str(libcrypto), py_ver_dir)]
+
+    print("WARNING: OpenSSL@3 not found in Homebrew prefixes; `import ssl` may fail in the frozen build.")
+    return []
+
+openssl_binaries = find_openssl_binaries()
+
+# Paddle (paddlepaddle) ships a set of shared libraries in `paddle/libs` that are
+# loaded dynamically at runtime. PyInstaller may miss these unless explicitly collected.
+try:
+    paddle_dynamic_libs = collect_dynamic_libs('paddle')
+    if paddle_dynamic_libs:
+        print(f"✓ Collected Paddle dynamic libs: {len(paddle_dynamic_libs)} files")
+except Exception as e:
+    print(f"WARNING: Failed to collect Paddle dynamic libs: {e}")
+    paddle_dynamic_libs = []
+
 # IMPORTANT: Voice models are NOT bundled in the executable
 # They will be downloaded on-demand by the user through the app UI
 # This significantly reduces the bundle size (~180MB saved)
@@ -73,7 +116,7 @@ model_data_files = []  # Empty - no models bundled
 a = Analysis(
     ['server.py'],
     pathex=[],
-    binaries=[],
+    binaries=paddle_dynamic_libs + openssl_binaries,
     datas=model_data_files + paddlex_data_files + ([(espeak_data_path, 'piper/espeak-ng-data')] if espeak_data_path else []),
     hiddenimports=[
         # FastAPI and dependencies
@@ -142,13 +185,43 @@ a = Analysis(
         'tkinter',
         'matplotlib',
         # numpy is required by piper-tts for ONNX operations - DO NOT EXCLUDE
-        'pandas',
-        'scipy',
-        'PIL',
-        'cv2',
     ],
     noarchive=False,
 )
+
+# OpenCV wheels can ship their own OpenSSL (`cv2/.dylibs/libssl*.dylib` and `libcrypto*.dylib`)
+# and PyInstaller may create top-level `libssl.3.dylib`/`libcrypto.3.dylib` symlinks pointing to them.
+# This can break `import ssl` (Python's `_ssl` extension expects the OpenSSL it was built against).
+if sys.platform == "darwin":
+    py_ver_dir = f"python{sys.version_info.major}.{sys.version_info.minor}"
+    blocked_dests = {
+        "cv2/.dylibs/libssl.3.dylib",
+        "cv2/.dylibs/libcrypto.3.dylib",
+    }
+
+    filtered = []
+    removed = []
+    for dest, src, typecode in list(a.binaries):
+        src_str = str(src)
+        if dest in blocked_dests:
+            removed.append((dest, src_str))
+            continue
+        # Remove any top-level OpenSSL symlinks so we can recreate them to point at the Python OpenSSL.
+        if typecode == "SYMLINK" and dest in ("libssl.3.dylib", "libcrypto.3.dylib"):
+            removed.append((dest, src_str))
+            continue
+        filtered.append((dest, src, typecode))
+
+    if removed:
+        print("✓ Removed OpenCV-provided OpenSSL from bundle (avoid ssl symbol conflicts)")
+        for dest, src_str in removed:
+            print(f"  - {dest} <= {src_str}")
+
+    # Re-add stable top-level symlinks for OpenSSL to the Python runtime directory.
+    filtered.append(("libssl.3.dylib", f"{py_ver_dir}/libssl.3.dylib", "SYMLINK"))
+    filtered.append(("libcrypto.3.dylib", f"{py_ver_dir}/libcrypto.3.dylib", "SYMLINK"))
+
+    a.binaries = filtered
 
 # Create single-file executable
 pyz = PYZ(a.pure)

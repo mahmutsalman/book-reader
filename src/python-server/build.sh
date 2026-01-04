@@ -181,6 +181,12 @@ build_binary() {
     # Clean previous build
     rm -rf build dist
 
+    # Keep PyInstaller cache/config inside the project directory.
+    # This makes builds more reproducible and avoids writing to user-level cache paths
+    # (e.g. ~/Library/Application Support/pyinstaller), which may be blocked in sandboxed environments.
+    export PYINSTALLER_CONFIG_DIR="$SCRIPT_DIR/.pyinstaller"
+    mkdir -p "$PYINSTALLER_CONFIG_DIR"
+
     # Run PyInstaller
     pyinstaller pronunciation-server.spec --clean
 

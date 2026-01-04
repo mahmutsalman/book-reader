@@ -19,6 +19,16 @@ from contextlib import asynccontextmanager
 from typing import Optional, List, Dict
 from pathlib import Path
 
+# Environment defaults
+# These must be set before importing heavy OCR/ML libraries (Paddle/PaddleX/OpenCV),
+# otherwise they may perform slow network checks or spawn excessive native threads.
+if not os.environ.get("DISABLE_MODEL_SOURCE_CHECK"):
+    os.environ["DISABLE_MODEL_SOURCE_CHECK"] = "True"
+if not os.environ.get("OMP_NUM_THREADS"):
+    os.environ["OMP_NUM_THREADS"] = "1"
+if not os.environ.get("MKL_NUM_THREADS"):
+    os.environ["MKL_NUM_THREADS"] = "1"
+
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -43,7 +53,8 @@ try:
     from PIL import Image, ImageEnhance, ImageFilter, ImageOps
     import numpy as np
     OCR_AVAILABLE = True
-except ImportError:
+    OCR_IMPORT_ERROR = None
+except Exception as e:
     OCR_AVAILABLE = False
     pytesseract = None
     Image = None
@@ -51,24 +62,47 @@ except ImportError:
     ImageFilter = None
     ImageOps = None
     np = None
+    OCR_IMPORT_ERROR = f"{type(e).__name__}: {e}"
+    print(f"[OCR] pytesseract/PIL import failed: {OCR_IMPORT_ERROR}", file=sys.stderr)
 
 # PaddleOCR support (optional, installed by default)
-# Using lazy initialization to avoid blocking server startup with model downloads
-try:
-    from paddleocr import PaddleOCR
-    PADDLEOCR_AVAILABLE = True
-    PaddleOCR_class = PaddleOCR  # Store the class for lazy initialization
-except ImportError:
-    PADDLEOCR_AVAILABLE = False
-    PaddleOCR_class = None
+# NOTE: PaddleOCR import is intentionally deferred to first use.
+# Importing PaddleOCR (and its PaddleX dependencies) can be very slow in frozen apps
+# and may perform connectivity checks; deferring keeps the server startup fast.
+PADDLEOCR_AVAILABLE = False
+PADDLEOCR_IMPORT_ERROR = None
+PaddleOCR_class = None  # Set on successful import
+_paddleocr_import_attempted = False
+_paddleocr_import_lock = None
 
-# PaddleOCR/PaddleX may try to check remote model hosters even when local models are cached.
-# BookReader runs locally and may not have network access, so disable by default.
-os.environ.setdefault("DISABLE_MODEL_SOURCE_CHECK", "True")
 
-# Limit native thread fan-out to reduce RAM spikes on some systems.
-os.environ.setdefault("OMP_NUM_THREADS", "1")
-os.environ.setdefault("MKL_NUM_THREADS", "1")
+def ensure_paddleocr_imported():
+    global PADDLEOCR_AVAILABLE, PADDLEOCR_IMPORT_ERROR, PaddleOCR_class
+    global _paddleocr_import_attempted, _paddleocr_import_lock
+
+    if _paddleocr_import_attempted:
+        return
+
+    if _paddleocr_import_lock is None:
+        import threading
+        _paddleocr_import_lock = threading.Lock()
+
+    with _paddleocr_import_lock:
+        if _paddleocr_import_attempted:
+            return
+
+        try:
+            from paddleocr import PaddleOCR
+            PADDLEOCR_AVAILABLE = True
+            PaddleOCR_class = PaddleOCR  # Store the class for lazy initialization
+            PADDLEOCR_IMPORT_ERROR = None
+        except Exception as e:
+            PADDLEOCR_AVAILABLE = False
+            PaddleOCR_class = None
+            PADDLEOCR_IMPORT_ERROR = f"{type(e).__name__}: {e}"
+            print(f"[PaddleOCR] import failed: {PADDLEOCR_IMPORT_ERROR}", file=sys.stderr)
+        finally:
+            _paddleocr_import_attempted = True
 
 # Shutdown flag for graceful termination
 shutdown_flag = False
@@ -96,6 +130,8 @@ def get_paddle_ocr(language: str = "en"):
     Models are downloaded on first use instead.
     """
     global paddle_ocr_instances, paddle_ocr_lock
+
+    ensure_paddleocr_imported()
 
     if not PADDLEOCR_AVAILABLE:
         raise Exception("PaddleOCR not available. Install with: pip install paddleocr paddlepaddle")
@@ -1582,6 +1618,10 @@ async def extract_manga_text(request: MangaOCRRequest):
     engine_used = requested_engine
     fallback_reason = None
 
+    # Only import PaddleOCR if it's potentially needed for this request.
+    if requested_engine != "tesseract" or not OCR_AVAILABLE:
+        ensure_paddleocr_imported()
+
     if requested_engine in ("hybrid", "trocr", "easyocr"):
         if PADDLEOCR_AVAILABLE:
             engine_used = "paddleocr"
@@ -1753,6 +1793,10 @@ async def extract_manga_text_region(request: MangaOCRRegionRequest):
     requested_engine = (request.ocr_engine or "tesseract").lower()
     engine_used = requested_engine
     fallback_reason = None
+
+    # Only import PaddleOCR if it's potentially needed for this request.
+    if requested_engine != "tesseract" or not OCR_AVAILABLE:
+        ensure_paddleocr_imported()
 
     if requested_engine in ("hybrid", "trocr", "easyocr"):
         if PADDLEOCR_AVAILABLE:
@@ -1985,6 +2029,10 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", DEFAULT_PORT))
     print(f"[Server] Starting BookReader Pronunciation Server on port {port}...")
     print(f"[Server] Press Ctrl+C to stop gracefully")
+    print(f"[OCR] pytesseract available: {OCR_AVAILABLE}")
+    if not OCR_AVAILABLE and OCR_IMPORT_ERROR:
+        print(f"[OCR] pytesseract/PIL error: {OCR_IMPORT_ERROR}")
+    print("[OCR] PaddleOCR: lazy import (loads on first OCR request)")
 
     uvicorn.run(
         app,

@@ -7,4 +7,5 @@ test_audio.mp3
 # PyInstaller build artifacts
 build/
 dist/
+.pyinstaller/
 *.spec.bak
