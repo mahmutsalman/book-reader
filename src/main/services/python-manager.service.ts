@@ -152,8 +152,9 @@ class PythonManager {
       const env = this.getEmbeddedPythonEnv();
 
       if (process.platform === 'win32') {
-        // Windows: Execute .bat launcher
-        this.process = spawn('cmd.exe', ['/c', launcherPath], {
+        // Windows: Execute .bat launcher using ComSpec (full path to cmd.exe)
+        const cmdPath = process.env.ComSpec || 'C:\\Windows\\System32\\cmd.exe';
+        this.process = spawn(cmdPath, ['/c', launcherPath], {
           cwd: path.dirname(launcherPath),
           env,
           stdio: ['ignore', 'pipe', 'pipe'],
