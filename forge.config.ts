@@ -78,7 +78,7 @@ const config: ForgeConfig = {
 
       // Check if source binary exists
       if (!fs.existsSync(binarySrc)) {
-        console.error(`❌ [Python Binary Copy] ERROR: Source binary not found at ${binarySrc}`);
+        console.error(`[ERROR] [Python Binary Copy] Source binary not found at ${binarySrc}`);
         console.error(`[Python Binary Copy] This usually means the Python build step failed.`);
         console.error(`[Python Binary Copy] Skipping binary copy to avoid breaking the build.`);
         console.error(`[Python Binary Copy] WARNING: The packaged app will NOT have the Python server!`);
@@ -108,17 +108,17 @@ const config: ForgeConfig = {
 
       try {
         fs.copyFileSync(binarySrc, binaryDest);
-        console.log(`✅ [Python Binary Copy] Successfully copied ${binaryName}`);
+        console.log(`[SUCCESS] [Python Binary Copy] Successfully copied ${binaryName}`);
 
         // Verify the copy
         if (fs.existsSync(binaryDest)) {
           const stats = fs.statSync(binaryDest);
-          console.log(`✅ [Python Binary Copy] Verified: ${binaryName} (${stats.size} bytes)`);
+          console.log(`[SUCCESS] [Python Binary Copy] Verified: ${binaryName} (${stats.size} bytes)`);
         } else {
-          console.error(`❌ [Python Binary Copy] ERROR: Copy verification failed - file not found at destination`);
+          console.error(`[ERROR] [Python Binary Copy] Copy verification failed - file not found at destination`);
         }
       } catch (error) {
-        console.error(`❌ [Python Binary Copy] ERROR: Failed to copy binary:`, error);
+        console.error(`[ERROR] [Python Binary Copy] Failed to copy binary:`, error);
         console.error(`[Python Binary Copy] WARNING: The packaged app will NOT have the Python server!`);
       }
     },

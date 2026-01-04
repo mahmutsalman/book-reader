@@ -66,13 +66,13 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           cd src/python-server
-          echo "=== Starting Windows Python server build ==="
+          echo === Starting Windows Python server build ===
           call build.bat
           if %errorlevel% neq 0 (
-            echo "❌ Build script failed with exit code %errorlevel%"
+            echo [ERROR] Build script failed with exit code %errorlevel%
             exit /b 1
           )
-          echo "=== Build script completed successfully ==="
+          echo === Build script completed successfully ===
         shell: cmd
 
       - name: Verify Python server binary (macOS)
@@ -95,16 +95,16 @@ jobs:
       - name: Verify Python server binary (Windows)
         if: runner.os == 'Windows'
         run: |
-          echo "=== Verifying Python server binary ==="
+          echo === Verifying Python server binary ===
           set BINARY_PATH=src\python-server\dist\pronunciation-server.exe
           if exist "%BINARY_PATH%" (
-            echo ✅ Binary found at %BINARY_PATH%
+            echo [SUCCESS] Binary found at %BINARY_PATH%
             dir "%BINARY_PATH%"
-            echo "Binary size and timestamp:"
+            echo Binary size and timestamp:
             for %%A in ("%BINARY_PATH%") do echo Size: %%~zA bytes, Modified: %%~tA
           ) else (
-            echo ❌ ERROR: Binary not found at %BINARY_PATH%
-            echo "Checking src\python-server directory structure:"
+            echo [ERROR] Binary not found at %BINARY_PATH%
+            echo Checking src\python-server directory structure:
             dir /s src\python-server
             exit /b 1
           )

@@ -69,8 +69,13 @@ if not exist "%VENV_DIR%" (
 
 call %VENV_DIR%\Scripts\activate
 
-REM Upgrade pip
-pip install --upgrade pip wheel setuptools
+REM Upgrade pip, wheel, and setuptools FIRST
+echo [Setup] Upgrading pip, wheel, and setuptools...
+python -m pip install --upgrade pip wheel setuptools
+if %errorlevel% neq 0 (
+    echo [ERROR] Failed to upgrade pip/wheel/setuptools
+    exit /b 1
+)
 exit /b 0
 
 :install_deps
@@ -80,24 +85,24 @@ echo Installing dependencies...
 echo [Dependencies] Installing from requirements.txt...
 pip install -r requirements.txt
 if %errorlevel% neq 0 (
-    echo ❌ ERROR: Failed to install dependencies from requirements.txt
+    echo [ERROR] Failed to install dependencies from requirements.txt
     exit /b 1
 )
 
 echo [Dependencies] Installing PyInstaller...
 pip install pyinstaller
 if %errorlevel% neq 0 (
-    echo ❌ ERROR: Failed to install PyInstaller
+    echo [ERROR] Failed to install PyInstaller
     exit /b 1
 )
 
 echo [Dependencies] Verifying critical packages...
-python -c "import paddleocr; print('✓ paddleocr')" || echo ⚠ paddleocr not found
-python -c "import Polygon; print('✓ Polygon3')" || echo ⚠ Polygon3 not found
-python -c "import lanms; print('✓ lanms-neo')" || echo ⚠ lanms-neo not found
-python -c "import piper; print('✓ piper-tts')" || echo ⚠ piper-tts not found
+python -c "import paddleocr; print('[OK] paddleocr installed')" 2>nul || echo [WARNING] paddleocr not found
+python -c "import Polygon; print('[OK] Polygon3 installed')" 2>nul || echo [WARNING] Polygon3 not found
+python -c "import lanms; print('[OK] lanms-neo installed')" 2>nul || echo [WARNING] lanms-neo not found
+python -c "import piper; print('[OK] piper-tts installed')" 2>nul || echo [WARNING] piper-tts not found
 
-echo Dependencies installed successfully.
+echo [Dependencies] Installation completed.
 exit /b 0
 
 :build_binary
@@ -113,7 +118,7 @@ REM Run PyInstaller
 echo [PyInstaller] Running PyInstaller with spec file...
 pyinstaller pronunciation-server.spec --clean --log-level INFO
 if %errorlevel% neq 0 (
-    echo ❌ ERROR: PyInstaller build failed with exit code %errorlevel%
+    echo [ERROR] PyInstaller build failed with exit code %errorlevel%
     echo Check the output above for specific errors
     exit /b 1
 )
@@ -122,11 +127,11 @@ REM Check output
 echo [PyInstaller] Verifying build output...
 if exist "dist\pronunciation-server.exe" (
     echo.
-    echo ✅ Build successful!
+    echo [SUCCESS] Build successful!
     echo Executable: dist\pronunciation-server.exe
     dir "dist\pronunciation-server.exe"
 ) else (
-    echo ❌ ERROR: Build completed but executable not found at dist\pronunciation-server.exe
+    echo [ERROR] Build completed but executable not found at dist\pronunciation-server.exe
     echo [PyInstaller] Checking dist directory...
     if exist "dist" (
         dir /s dist
