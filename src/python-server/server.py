@@ -29,6 +29,24 @@ if not os.environ.get("OMP_NUM_THREADS"):
 if not os.environ.get("MKL_NUM_THREADS"):
     os.environ["MKL_NUM_THREADS"] = "1"
 
+# Windows DLL search path fix for PaddlePaddle in frozen builds (PyInstaller)
+# Fixes: "Can not import paddle core while this file exists: libpaddle.pyd"
+# See: https://github.com/PaddlePaddle/PaddleOCR/discussions/14757
+if sys.platform == 'win32' and hasattr(sys, '_MEIPASS'):
+    # Running as frozen executable (PyInstaller)
+    paddle_libs_path = Path(sys._MEIPASS) / 'paddle' / 'libs'
+    if paddle_libs_path.exists():
+        # Python 3.8+ requires os.add_dll_directory() to load DLLs from non-system paths
+        if hasattr(os, 'add_dll_directory'):
+            os.add_dll_directory(str(paddle_libs_path))
+            print(f"[Paddle] Added DLL directory: {paddle_libs_path}")
+        else:
+            # Python <3.8 fallback: modify PATH
+            os.environ['PATH'] = str(paddle_libs_path) + os.pathsep + os.environ.get('PATH', '')
+            print(f"[Paddle] Added to PATH: {paddle_libs_path}")
+    else:
+        print(f"[Paddle] WARNING: paddle/libs not found at {paddle_libs_path}")
+
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
