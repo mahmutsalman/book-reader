@@ -23,6 +23,7 @@ import { ThemeContextMenu } from './ThemeContextMenu';
 import { ClearSelectionsMenu } from './ClearSelectionsMenu';
 import { RemoveWordMenu } from './RemoveWordMenu';
 import { OCREngineSelector } from '../OCREngineSelector';
+import { OCRInstallPrompt } from './OCRInstallPrompt';
 import InlineEditablePageNumber from './InlineEditablePageNumber';
 import { MangaImageView } from './MangaImageView';
 import { readerThemes } from '../../config/readerThemes';
@@ -84,6 +85,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
 
   const [zoom, setZoom] = useState(initialProgress?.zoom_level || ZOOM_LEVELS.DEFAULT);
   const [ocrSelectionMode, setOcrSelectionMode] = useState(false);
+  const [showOcrInstallPrompt, setShowOcrInstallPrompt] = useState(false);
   const [selectedWord, setSelectedWord] = useState<SelectedWord | null>(null);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [showChapterMenu, setShowChapterMenu] = useState(false);
@@ -1852,7 +1854,26 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
 
           {bookData.type === 'manga' && (
             <button
-              onClick={() => setOcrSelectionMode(prev => !prev)}
+              onClick={async () => {
+                // Check if OCR is installed before activating selection mode
+                try {
+                  const res = await fetch('http://127.0.0.1:8766/api/ocr/engines');
+                  const data = await res.json();
+                  const paddleOcr = data.engines?.find((e: { engine: string; installed: boolean }) => e.engine === 'paddleocr');
+
+                  if (paddleOcr?.installed) {
+                    // OCR is installed, toggle selection mode
+                    setOcrSelectionMode(prev => !prev);
+                  } else {
+                    // OCR not installed, show installation prompt
+                    setShowOcrInstallPrompt(true);
+                  }
+                } catch (err) {
+                  console.error('Failed to check OCR installation status:', err);
+                  // Fallback: show installation prompt
+                  setShowOcrInstallPrompt(true);
+                }
+              }}
               onContextMenu={(e) => {
                 e.preventDefault();
                 setOCREngineMenuPosition({ x: e.clientX, y: e.clientY });
@@ -2287,6 +2308,18 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
           onClose={() => {
             setShowRemoveWordMenu(false);
             setSelectedWordIndex(null);
+          }}
+        />
+      )}
+
+      {/* OCR Installation Prompt */}
+      {showOcrInstallPrompt && (
+        <OCRInstallPrompt
+          onClose={() => setShowOcrInstallPrompt(false)}
+          onInstallComplete={() => {
+            // After successful installation, close prompt and activate OCR mode
+            setShowOcrInstallPrompt(false);
+            setOcrSelectionMode(true);
           }}
         />
       )}

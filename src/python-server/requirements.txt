@@ -9,20 +9,12 @@ piper-tts>=1.2.0
 # IPA Transcription
 gruut>=2.3.0
 
-# PDF Processing & OCR
+# PDF Processing
 PyMuPDF>=1.23.0
 pytesseract>=0.3.10
 Pillow>=10.0.0
 scipy>=1.10.0
 
-# OCR Engines (default installation)
-paddleocr>=2.7.0
-paddlepaddle>=2.5.0
-
-# PaddleOCR Optional Dependencies (required for full functionality)
-Polygon3>=3.0.9  # Shape manipulation (imports as 'Polygon' not 'Polygon3')
-lanms-neo>=1.0.2  # NMS for text detection (imports as 'lanms' not 'lanms-neo')
-pyclipper>=1.3.0  # Clipping operations
-imgaug>=0.4.0  # Image augmentation
-lmdb>=1.4.1  # Database for data loading
-scikit-image>=0.20.0  # Image processing (required by PaddleOCR)
+# Note: OCR engines (PaddleOCR, EasyOCR) are NOT included in core dependencies.
+# Users install them on-demand via Settings UI to reduce initial download size.
+# OCR packages install to user data directory: ~/Library/Application Support/BookReader/ocr-packages
