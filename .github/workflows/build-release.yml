@@ -56,12 +56,14 @@ jobs:
           ./build.sh || {
             echo "❌ Build script failed with exit code $?"
             echo "=== Checking what was created ==="
-            ls -la dist/ 2>/dev/null || echo "dist/ directory does not exist"
+            ls -la python-runtime/ 2>/dev/null || echo "python-runtime/ directory does not exist"
             exit 1
           }
           echo "=== Build script completed successfully ==="
-          echo "=== Checking dist directory ==="
-          ls -la dist/
+          echo "=== Checking python-runtime directory ==="
+          ls -la python-runtime/
+          echo "=== Checking launcher script ==="
+          ls -la launch-server.sh
 
       - name: Build Python server (Windows)
         if: runner.os == 'Windows'
@@ -74,39 +76,56 @@ jobs:
             exit /b 1
           )
           echo === Build script completed successfully ===
+          echo === Checking python-runtime directory ===
+          dir python-runtime
+          echo === Checking launcher script ===
+          dir launch-server.bat
         shell: cmd
 
-      - name: Verify Python server binary (macOS)
+      - name: Verify Python server runtime (macOS)
         if: runner.os == 'macOS'
         run: |
-          echo "=== Verifying Python server binary ==="
-          BINARY_PATH="src/python-server/dist/pronunciation-server"
-          if [ -f "$BINARY_PATH" ]; then
-            echo "✅ Binary found at $BINARY_PATH"
-            ls -lh "$BINARY_PATH"
-            file "$BINARY_PATH"
+          echo "=== Verifying embedded Python runtime ==="
+          RUNTIME_DIR="src/python-server/python-runtime"
+          LAUNCHER_SCRIPT="src/python-server/launch-server.sh"
+
+          if [ -d "$RUNTIME_DIR" ]; then
+            echo "✅ Python runtime directory found at $RUNTIME_DIR"
+            ls -lh "$RUNTIME_DIR" | head -20
           else
-            echo "❌ ERROR: Binary not found at $BINARY_PATH"
-            echo "Build output:"
-            ls -la src/python-server/dist/ || echo "dist/ directory does not exist"
+            echo "❌ ERROR: Python runtime directory not found at $RUNTIME_DIR"
+            exit 1
+          fi
+
+          if [ -f "$LAUNCHER_SCRIPT" ]; then
+            echo "✅ Launcher script found at $LAUNCHER_SCRIPT"
+            ls -lh "$LAUNCHER_SCRIPT"
+          else
+            echo "❌ ERROR: Launcher script not found at $LAUNCHER_SCRIPT"
             exit 1
           fi
         shell: bash
 
-      - name: Verify Python server binary (Windows)
+      - name: Verify Python server runtime (Windows)
         if: runner.os == 'Windows'
         run: |
-          echo === Verifying Python server binary ===
-          set BINARY_PATH=src\python-server\dist\pronunciation-server.exe
-          if exist "%BINARY_PATH%" (
-            echo [SUCCESS] Binary found at %BINARY_PATH%
-            dir "%BINARY_PATH%"
-            echo Binary size and timestamp:
-            for %%A in ("%BINARY_PATH%") do echo Size: %%~zA bytes, Modified: %%~tA
+          echo === Verifying embedded Python runtime ===
+          set RUNTIME_DIR=src\python-server\python-runtime
+          set LAUNCHER_SCRIPT=src\python-server\launch-server.bat
+
+          if exist "%RUNTIME_DIR%" (
+            echo [SUCCESS] Python runtime directory found at %RUNTIME_DIR%
+            dir "%RUNTIME_DIR%"
           ) else (
-            echo [ERROR] Binary not found at %BINARY_PATH%
-            echo Checking src\python-server directory structure:
-            dir /s src\python-server
+            echo [ERROR] Python runtime directory not found at %RUNTIME_DIR%
+            exit /b 1
+          )
+
+          if exist "%LAUNCHER_SCRIPT%" (
+            echo [SUCCESS] Launcher script found at %LAUNCHER_SCRIPT%
+            dir "%LAUNCHER_SCRIPT%"
+          ) else (
+            echo [ERROR] Launcher script not found at %LAUNCHER_SCRIPT%
             exit /b 1
           )
         shell: cmd
@@ -130,10 +149,10 @@ jobs:
           find out -type f -o -type d | head -n 50 || true
         shell: bash
 
-      - name: Verify binary in packaged app (macOS)
+      - name: Verify Python runtime in packaged app (macOS)
         if: runner.os == 'macOS'
         run: |
-          echo "=== Verifying binary in packaged app ==="
+          echo "=== Verifying Python runtime in packaged app ==="
           # Find the app bundle
           APP_PATH=$(find out -name "*.app" -type d | head -n 1 || true)
           if [ -z "$APP_PATH" ]; then
@@ -142,37 +161,55 @@ jobs:
           fi
           echo "Found app at: $APP_PATH"
           RESOURCES_PATH="$APP_PATH/Contents/Resources"
-          BINARY_PATH="$RESOURCES_PATH/pronunciation-server"
-          if [ -f "$BINARY_PATH" ]; then
-            echo "✅ Binary successfully packaged at $BINARY_PATH"
-            ls -lh "$BINARY_PATH"
+          RUNTIME_PATH="$RESOURCES_PATH/python-runtime"
+          LAUNCHER_PATH="$RESOURCES_PATH/launch-server.sh"
+
+          if [ -d "$RUNTIME_PATH" ]; then
+            echo "✅ Python runtime successfully packaged at $RUNTIME_PATH"
+            ls -lh "$RUNTIME_PATH" | head -10
           else
-            echo "❌ ERROR: Binary NOT found in packaged app at $BINARY_PATH"
+            echo "❌ ERROR: Python runtime NOT found in packaged app at $RUNTIME_PATH"
             echo "Resources directory contents:"
             ls -la "$RESOURCES_PATH" || echo "Resources directory not found"
             exit 1
           fi
+
+          if [ -f "$LAUNCHER_PATH" ]; then
+            echo "✅ Launcher script successfully packaged at $LAUNCHER_PATH"
+            ls -lh "$LAUNCHER_PATH"
+          else
+            echo "❌ ERROR: Launcher script NOT found at $LAUNCHER_PATH"
+            exit 1
+          fi
         shell: bash
 
-      - name: Verify binary in packaged app (Windows)
+      - name: Verify Python runtime in packaged app (Windows)
         if: runner.os == 'Windows'
         run: |
-          echo === Verifying binary in packaged app ===
+          echo === Verifying Python runtime in packaged app ===
           set RESOURCES_PATH=out\Smart Book-win32-x64\resources
-          set BINARY_PATH=%RESOURCES_PATH%\pronunciation-server.exe
-          if exist "%BINARY_PATH%" (
-            echo [SUCCESS] Binary successfully packaged at %BINARY_PATH%
-            dir "%BINARY_PATH%"
+          set RUNTIME_PATH=%RESOURCES_PATH%\python-runtime
+          set LAUNCHER_PATH=%RESOURCES_PATH%\launch-server.bat
+
+          if exist "%RUNTIME_PATH%" (
+            echo [SUCCESS] Python runtime successfully packaged at %RUNTIME_PATH%
+            dir "%RUNTIME_PATH%"
           ) else (
-            echo [ERROR] Binary NOT found at %BINARY_PATH%
-            echo Searching for pronunciation-server.exe...
-            dir /s /b out\pronunciation-server.exe 2>nul
+            echo [ERROR] Python runtime NOT found at %RUNTIME_PATH%
             if exist "%RESOURCES_PATH%" (
               echo Resources directory contents:
               dir "%RESOURCES_PATH%"
             ) else (
               echo Resources directory not found
             )
+            exit /b 1
+          )
+
+          if exist "%LAUNCHER_PATH%" (
+            echo [SUCCESS] Launcher script successfully packaged at %LAUNCHER_PATH%
+            dir "%LAUNCHER_PATH%"
+          ) else (
+            echo [ERROR] Launcher script NOT found at %LAUNCHER_PATH%
             exit /b 1
           )
         shell: cmd
