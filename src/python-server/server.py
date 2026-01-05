@@ -2262,29 +2262,39 @@ def install_ocr_sync(engine: str):
         ocr_dir = get_ocr_packages_dir()
         _install_progress[engine] = 10
 
+        # Install main packages and let pip handle dependencies
+        # Use --prefer-binary to avoid building from source (requires MSVC on Windows)
         packages = [
             'paddleocr>=2.7.0',
-            'paddlepaddle>=2.5.0',
-            'Polygon3>=3.0.9',
-            'lanms-neo>=1.0.2',
-            'pyclipper>=1.3.0',
-            'imgaug>=0.4.0',
-            'lmdb>=1.4.1',
-            'scikit-image>=0.20.0'
+            'paddlepaddle>=2.5.0'
         ]
 
         for i, pkg in enumerate(packages):
-            _install_progress[engine] = 20 + (60 * i // len(packages))
+            _install_progress[engine] = 20 + (70 * i // len(packages))
 
             result = subprocess.run(
-                [sys.executable, "-m", "pip", "install", pkg, f"--target={ocr_dir}"],
+                [
+                    sys.executable, "-m", "pip", "install",
+                    pkg,
+                    f"--target={ocr_dir}",
+                    "--prefer-binary",  # Prefer pre-built wheels over source
+                    "--only-binary", ":all:"  # Only use wheels, don't build from source
+                ],
                 capture_output=True,
                 text=True,
                 timeout=600
             )
 
             if result.returncode != 0:
-                raise Exception(f"Failed to install {pkg}: {result.stderr}")
+                error_msg = result.stderr
+                # Check for common Windows build errors
+                if "Microsoft Visual C++" in error_msg or "error: Microsoft" in error_msg:
+                    raise Exception(
+                        "Installation requires Microsoft C++ Build Tools. "
+                        "This is a Windows limitation. "
+                        "Alternative: Use EasyOCR instead (no build tools required)."
+                    )
+                raise Exception(f"Failed to install {pkg}: {error_msg}")
 
         _install_progress[engine] = 100
         print(f"[OCR] Successfully installed {engine}")
