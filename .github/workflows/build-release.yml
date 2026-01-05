@@ -190,6 +190,8 @@ jobs:
           set RESOURCES_PATH=out\Smart Book-win32-x64\resources
           set RUNTIME_PATH=%RESOURCES_PATH%\python-runtime
           set LAUNCHER_PATH=%RESOURCES_PATH%\launch-server.bat
+          set SERVER_PATH=%RESOURCES_PATH%\server.py
+          set GENERATORS_PATH=%RESOURCES_PATH%\generators
 
           if exist "%RUNTIME_PATH%" (
             echo [SUCCESS] Python runtime successfully packaged at %RUNTIME_PATH%
@@ -210,6 +212,36 @@ jobs:
             dir "%LAUNCHER_PATH%"
           ) else (
             echo [ERROR] Launcher script NOT found at %LAUNCHER_PATH%
+            exit /b 1
+          )
+
+          if exist "%SERVER_PATH%" (
+            echo [SUCCESS] Server script successfully packaged at %SERVER_PATH%
+          ) else (
+            echo [ERROR] Server script NOT found at %SERVER_PATH%
+            exit /b 1
+          )
+
+          if exist "%GENERATORS_PATH%" (
+            echo [SUCCESS] Generators directory successfully packaged at %GENERATORS_PATH%
+            dir "%GENERATORS_PATH%"
+          ) else (
+            echo [ERROR] Generators directory NOT found at %GENERATORS_PATH%
+            echo This will cause ModuleNotFoundError: No module named 'generators'
+            exit /b 1
+          )
+
+          if exist "%GENERATORS_PATH%\__init__.py" (
+            echo [SUCCESS] generators/__init__.py found
+          ) else (
+            echo [ERROR] generators/__init__.py NOT found - package may not be importable
+            exit /b 1
+          )
+
+          if exist "%GENERATORS_PATH%\tts.py" (
+            echo [SUCCESS] generators/tts.py found
+          ) else (
+            echo [ERROR] generators/tts.py NOT found
             exit /b 1
           )
         shell: cmd

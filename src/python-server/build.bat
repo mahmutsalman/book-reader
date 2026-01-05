@@ -176,22 +176,29 @@ if !ERRORLEVEL! NEQ 0 (
 echo.
 echo [OK] Core dependencies installed (OCR excluded - install via Settings UI)
 
-REM Create launcher script
+REM Verify launcher script exists (maintained separately in source control)
 echo.
-echo Creating launcher script...
+echo Verifying launcher script...
 
-(
-echo @echo off
-echo REM Launcher for BookReader Python Server
-echo set SCRIPT_DIR=%%~dp0
-echo set PYTHONHOME=%%SCRIPT_DIR%%python-runtime
-echo set PYTHONPATH=%%SCRIPT_DIR%%;%%APPDATA%%\BookReader\ocr-packages;%%PYTHONPATH%%
-echo set PATH=%%PYTHONHOME%%;%%PYTHONHOME%%\Scripts;%%PATH%%
-echo cd /d "%%SCRIPT_DIR%%"
-echo "%%PYTHONHOME%%\python.exe" "%%SCRIPT_DIR%%server.py" %%*
-) > "%SCRIPT_DIR%launch-server.bat"
-
-echo [OK] Launcher script created: launch-server.bat
+if exist "%SCRIPT_DIR%launch-server.bat" (
+    echo [OK] Launcher script found: launch-server.bat
+) else (
+    echo [WARNING] Launcher script not found - this may indicate a missing file
+    echo Creating a basic launcher script for testing...
+    (
+    echo @echo off
+    echo REM Launcher for BookReader Python Server ^(auto-generated^)
+    echo set SCRIPT_DIR=%%~dp0
+    echo if "%%SCRIPT_DIR:~-1%%"=="\" set SCRIPT_DIR=%%SCRIPT_DIR:~0,-1%%
+    echo set PYTHONHOME=%%SCRIPT_DIR%%\python-runtime
+    echo set PYTHONPATH=%%SCRIPT_DIR%%
+    echo if defined APPDATA set PYTHONPATH=%%PYTHONPATH%%;%%APPDATA%%\BookReader\ocr-packages
+    echo set PATH=%%PYTHONHOME%%;%%PYTHONHOME%%\Scripts;%%PATH%%
+    echo cd /d "%%SCRIPT_DIR%%"
+    echo "%%PYTHONHOME%%\python.exe" "%%SCRIPT_DIR%%\server.py" %%*
+    ) > "%SCRIPT_DIR%launch-server.bat"
+    echo [OK] Basic launcher script created: launch-server.bat
+)
 
 echo.
 echo ==============================================

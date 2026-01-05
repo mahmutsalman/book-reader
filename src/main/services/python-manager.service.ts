@@ -451,6 +451,7 @@ class PythonManager {
   private getEmbeddedPythonEnv(): NodeJS.ProcessEnv {
     const env = { ...process.env };
     const runtimeDir = path.join(process.resourcesPath, 'python-runtime');
+    const resourcesDir = process.resourcesPath;
 
     if (process.platform === 'win32') {
       // Windows: embeddable package
@@ -467,9 +468,15 @@ class PythonManager {
       }
     }
 
+    // Build PYTHONPATH with resources directory FIRST (where server.py and generators/ are located)
+    // This is critical for the import statement: from generators.tts import ...
+    const pythonPathParts: string[] = [resourcesDir];
+
     // Add user OCR packages directory
     const userOcrDir = path.join(app.getPath('userData'), 'ocr-packages');
-    env.PYTHONPATH = `${userOcrDir}${path.delimiter}${env.PYTHONPATH || ''}`;
+    pythonPathParts.push(userOcrDir);
+
+    env.PYTHONPATH = pythonPathParts.join(path.delimiter);
 
     env.PORT = String(this.port);
     env.PYTHONUNBUFFERED = '1';
