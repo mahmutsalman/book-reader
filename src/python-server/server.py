@@ -140,6 +140,24 @@ def ensure_paddleocr_imported():
                 sys.path.insert(0, ocr_dir_str)
                 print(f"[PaddleOCR] Added to sys.path: {ocr_dir_str}", file=sys.stderr)
 
+            # Windows: Add OCR directory to DLL search path for native dependencies
+            if sys.platform == 'win32':
+                # Add main OCR directory
+                if hasattr(os, 'add_dll_directory'):
+                    os.add_dll_directory(ocr_dir_str)
+                    print(f"[PaddleOCR] Added DLL directory: {ocr_dir_str}", file=sys.stderr)
+
+                # Add paddle subdirectories that might contain DLLs
+                paddle_dirs = [
+                    ocr_dir / 'paddle' / 'base',
+                    ocr_dir / 'paddle' / 'libs',
+                    ocr_dir / 'paddle',
+                ]
+                for dll_dir in paddle_dirs:
+                    if dll_dir.exists() and hasattr(os, 'add_dll_directory'):
+                        os.add_dll_directory(str(dll_dir))
+                        print(f"[PaddleOCR] Added DLL directory: {dll_dir}", file=sys.stderr)
+
             from paddleocr import PaddleOCR
             PADDLEOCR_AVAILABLE = True
             PaddleOCR_class = PaddleOCR  # Store the class for lazy initialization
