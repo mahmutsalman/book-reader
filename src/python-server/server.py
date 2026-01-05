@@ -2257,13 +2257,24 @@ async def install_ocr(request: InstallOCRRequest, background_tasks: BackgroundTa
     )
 
 def install_ocr_sync(engine: str):
-    """Background OCR installation."""
+    """Background OCR installation from pre-bundled wheels."""
     try:
         ocr_dir = get_ocr_packages_dir()
         _install_progress[engine] = 10
 
+        # Find bundled OCR wheels directory
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        wheels_dir = os.path.join(script_dir, 'ocr-wheels')
+
+        # Check if bundled wheels exist
+        has_bundled_wheels = os.path.exists(wheels_dir) and os.path.isdir(wheels_dir)
+
+        if has_bundled_wheels:
+            print(f"[OCR] Installing from bundled wheels: {wheels_dir}")
+        else:
+            print(f"[OCR] Bundled wheels not found, will download from PyPI")
+
         # Install main packages and let pip handle dependencies
-        # Use --prefer-binary to avoid building from source (requires MSVC on Windows)
         packages = [
             'paddleocr>=2.7.0',
             'paddlepaddle>=2.5.0'
@@ -2272,14 +2283,28 @@ def install_ocr_sync(engine: str):
         for i, pkg in enumerate(packages):
             _install_progress[engine] = 20 + (70 * i // len(packages))
 
+            # Build pip install command
+            pip_cmd = [
+                sys.executable, "-m", "pip", "install",
+                pkg,
+                f"--target={ocr_dir}"
+            ]
+
+            if has_bundled_wheels:
+                # Install from bundled wheels (offline, no compilation)
+                pip_cmd.extend([
+                    "--find-links", wheels_dir,  # Look in bundled wheels first
+                    "--no-index",                # Don't use PyPI (offline mode)
+                ])
+            else:
+                # Fallback: Download from PyPI (online mode)
+                pip_cmd.extend([
+                    "--prefer-binary",           # Prefer pre-built wheels
+                    "--only-binary", ":all:"     # Don't build from source
+                ])
+
             result = subprocess.run(
-                [
-                    sys.executable, "-m", "pip", "install",
-                    pkg,
-                    f"--target={ocr_dir}",
-                    "--prefer-binary",  # Prefer pre-built wheels over source
-                    "--only-binary", ":all:"  # Only use wheels, don't build from source
-                ],
+                pip_cmd,
                 capture_output=True,
                 text=True,
                 timeout=600

@@ -41,6 +41,9 @@ const config: ForgeConfig = {
       'src/python-server/server.py',
       'src/python-server/generators',
 
+      // Bundle pre-downloaded OCR wheels for offline installation
+      'src/python-server/ocr-wheels',
+
       // Bundle platform-specific launcher
       process.platform === 'win32'
         ? 'src/python-server/launch-server.bat'

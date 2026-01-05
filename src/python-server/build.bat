@@ -201,6 +201,29 @@ if exist "%SCRIPT_DIR%launch-server.bat" (
     echo [OK] Basic launcher script created: launch-server.bat
 )
 
+REM Download OCR wheels for offline installation
+echo.
+echo Downloading OCR wheels for bundling...
+set OCR_WHEELS_DIR=%SCRIPT_DIR%ocr-wheels
+if not exist "%OCR_WHEELS_DIR%" mkdir "%OCR_WHEELS_DIR%"
+
+echo Downloading PaddleOCR wheels...
+"%RUNTIME_DIR%\python.exe" -m pip download ^
+    paddleocr>=2.7.0 ^
+    paddlepaddle>=2.5.0 ^
+    --dest "%OCR_WHEELS_DIR%" ^
+    --only-binary :all: ^
+    --platform win_amd64 ^
+    --python-version 311 ^
+    --no-deps
+
+if !ERRORLEVEL! NEQ 0 (
+    echo [WARNING] Failed to download some OCR wheels
+    echo OCR installation may require internet connection
+) else (
+    echo [OK] OCR wheels downloaded to: ocr-wheels\
+)
+
 echo.
 echo ==============================================
 echo [OK] Embedded Python build complete!
@@ -208,12 +231,13 @@ echo ==============================================
 echo.
 echo Runtime location: %RUNTIME_DIR%
 echo Launcher script: launch-server.bat
+echo OCR wheels: ocr-wheels\ (for offline installation)
 echo.
 echo To test locally: launch-server.bat
 echo To package with Electron: npm run make:win
 echo.
-echo Note: OCR engines (PaddleOCR, EasyOCR) are NOT bundled.
-echo Users can install them via Settings UI (~800MB download).
+echo Note: OCR wheels are pre-bundled for offline installation.
+echo Users can install OCR engines via Settings UI (no internet required).
 echo.
 
 endlocal

@@ -119,4 +119,5 @@ test_*.py
 
 # Python server build artifacts
 src/python-server/python-runtime/
+src/python-server/ocr-wheels/
 src/python-server/=*
