@@ -133,6 +133,13 @@ def ensure_paddleocr_imported():
             return
 
         try:
+            # Add OCR packages directory to sys.path before importing
+            ocr_dir = get_ocr_packages_dir()
+            ocr_dir_str = str(ocr_dir)
+            if ocr_dir_str not in sys.path:
+                sys.path.insert(0, ocr_dir_str)
+                print(f"[PaddleOCR] Added to sys.path: {ocr_dir_str}", file=sys.stderr)
+
             from paddleocr import PaddleOCR
             PADDLEOCR_AVAILABLE = True
             PaddleOCR_class = PaddleOCR  # Store the class for lazy initialization
@@ -169,6 +176,12 @@ def is_ocr_installed(engine: str) -> bool:
     """Check if OCR engine is installed."""
     try:
         if engine == 'paddleocr':
+            # Add OCR packages directory to sys.path before checking
+            ocr_dir = get_ocr_packages_dir()
+            ocr_dir_str = str(ocr_dir)
+            if ocr_dir_str not in sys.path:
+                sys.path.insert(0, ocr_dir_str)
+
             import paddleocr
             return True
         return False
