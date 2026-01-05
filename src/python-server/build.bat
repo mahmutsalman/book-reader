@@ -115,6 +115,7 @@ echo Configuring Python paths...
 (
 echo python311.zip
 echo .
+echo ..
 echo site-packages
 echo.
 echo import site
