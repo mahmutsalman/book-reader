@@ -133,35 +133,13 @@ def ensure_paddleocr_imported():
             return
 
         try:
-            # Add OCR packages directory to sys.path before importing
-            ocr_dir = get_ocr_packages_dir()
-            ocr_dir_str = str(ocr_dir)
-            if ocr_dir_str not in sys.path:
-                sys.path.insert(0, ocr_dir_str)
-                print(f"[PaddleOCR] Added to sys.path: {ocr_dir_str}", file=sys.stderr)
-
-            # Windows: Add OCR directory to DLL search path for native dependencies
-            if sys.platform == 'win32':
-                # Add main OCR directory
-                if hasattr(os, 'add_dll_directory'):
-                    os.add_dll_directory(ocr_dir_str)
-                    print(f"[PaddleOCR] Added DLL directory: {ocr_dir_str}", file=sys.stderr)
-
-                # Add paddle subdirectories that might contain DLLs
-                paddle_dirs = [
-                    ocr_dir / 'paddle' / 'base',
-                    ocr_dir / 'paddle' / 'libs',
-                    ocr_dir / 'paddle',
-                ]
-                for dll_dir in paddle_dirs:
-                    if dll_dir.exists() and hasattr(os, 'add_dll_directory'):
-                        os.add_dll_directory(str(dll_dir))
-                        print(f"[PaddleOCR] Added DLL directory: {dll_dir}", file=sys.stderr)
-
+            # Import PaddleOCR from standard site-packages location
+            # (No custom sys.path manipulation needed - installed normally)
             from paddleocr import PaddleOCR
             PADDLEOCR_AVAILABLE = True
             PaddleOCR_class = PaddleOCR  # Store the class for lazy initialization
             PADDLEOCR_IMPORT_ERROR = None
+            print(f"[PaddleOCR] Import successful", file=sys.stderr)
         except Exception as e:
             PADDLEOCR_AVAILABLE = False
             PaddleOCR_class = None
@@ -191,15 +169,9 @@ def get_ocr_packages_dir() -> Path:
     return ocr_dir
 
 def is_ocr_installed(engine: str) -> bool:
-    """Check if OCR engine is installed."""
+    """Check if OCR engine is installed in standard site-packages."""
     try:
         if engine == 'paddleocr':
-            # Add OCR packages directory to sys.path before checking
-            ocr_dir = get_ocr_packages_dir()
-            ocr_dir_str = str(ocr_dir)
-            if ocr_dir_str not in sys.path:
-                sys.path.insert(0, ocr_dir_str)
-
             import paddleocr
             return True
         return False
@@ -2315,10 +2287,11 @@ def install_ocr_sync(engine: str):
             _install_progress[engine] = 20 + (70 * i // len(packages))
 
             # Build pip install command
+            # Note: Install directly to Python's site-packages (no --target)
+            # PaddlePaddle has complex native dependencies that require standard installation
             pip_cmd = [
                 sys.executable, "-m", "pip", "install",
-                pkg,
-                f"--target={ocr_dir}"
+                pkg
             ]
 
             if has_bundled_wheels:
