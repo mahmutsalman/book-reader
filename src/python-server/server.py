@@ -2291,10 +2291,11 @@ def install_ocr_sync(engine: str):
             ]
 
             if has_bundled_wheels:
-                # Install from bundled wheels (offline, no compilation)
+                # Install from bundled wheels (prefer offline, allow online fallback)
                 pip_cmd.extend([
                     "--find-links", wheels_dir,  # Look in bundled wheels first
-                    "--no-index",                # Don't use PyPI (offline mode)
+                    # Don't use --no-index, allow PyPI fallback for missing dependencies
+                    "--prefer-binary",           # Prefer wheels over source
                 ])
             else:
                 # Fallback: Download from PyPI (online mode)

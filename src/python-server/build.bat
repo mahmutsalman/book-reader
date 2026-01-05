@@ -207,15 +207,14 @@ echo Downloading OCR wheels for bundling...
 set OCR_WHEELS_DIR=%SCRIPT_DIR%ocr-wheels
 if not exist "%OCR_WHEELS_DIR%" mkdir "%OCR_WHEELS_DIR%"
 
-echo Downloading PaddleOCR wheels...
+echo Downloading PaddleOCR wheels with all dependencies...
 "%RUNTIME_DIR%\python.exe" -m pip download ^
     paddleocr>=2.7.0 ^
     paddlepaddle>=2.5.0 ^
     --dest "%OCR_WHEELS_DIR%" ^
     --only-binary :all: ^
     --platform win_amd64 ^
-    --python-version 311 ^
-    --no-deps
+    --python-version 311
 
 if !ERRORLEVEL! NEQ 0 (
     echo [WARNING] Failed to download some OCR wheels
