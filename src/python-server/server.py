@@ -117,6 +117,50 @@ _paddleocr_import_attempted = False
 _paddleocr_import_lock = None
 
 
+def configure_windows_dll_paths():
+    """
+    Configure Windows DLL search paths for PaddlePaddle native libraries.
+
+    PaddlePaddle includes native C++ extensions (.pyd files) that depend on additional DLLs.
+    On Windows, these DLLs are bundled in site-packages/paddle/libs/ or similar subdirectories.
+    Python 3.8+ requires explicit os.add_dll_directory() calls for security reasons.
+
+    This function must be called BEFORE importing paddleocr to ensure Windows can find
+    all required DLLs (MSVCP140.dll, VCRUNTIME140.dll, and paddle's own DLLs).
+    """
+    if sys.platform != 'win32':
+        return
+
+    import os
+
+    # Required for Python 3.8+ on Windows
+    # PaddlePaddle bundles DLLs in site-packages/paddle/libs/
+    try:
+        import paddle
+        paddle_dir = Path(paddle.__file__).parent
+
+        # Common DLL locations in PaddlePaddle installations
+        dll_dirs = [
+            paddle_dir / 'libs',           # Main DLL directory (common location)
+            paddle_dir / 'fluid',          # Legacy location (older versions)
+            paddle_dir / 'base',           # Base library DLLs (newer versions)
+        ]
+
+        for dll_dir in dll_dirs:
+            if dll_dir.exists() and dll_dir.is_dir():
+                try:
+                    os.add_dll_directory(str(dll_dir))
+                    print(f"[PaddleOCR] Added DLL directory: {dll_dir}", file=sys.stderr)
+                except Exception as e:
+                    print(f"[PaddleOCR] Warning: Could not add DLL directory {dll_dir}: {e}", file=sys.stderr)
+
+    except ImportError:
+        # Paddle not installed yet - will be configured after installation
+        pass
+    except Exception as e:
+        print(f"[PaddleOCR] Warning: DLL path configuration failed: {e}", file=sys.stderr)
+
+
 def ensure_paddleocr_imported():
     global PADDLEOCR_AVAILABLE, PADDLEOCR_IMPORT_ERROR, PaddleOCR_class
     global _paddleocr_import_attempted, _paddleocr_import_lock
@@ -133,6 +177,10 @@ def ensure_paddleocr_imported():
             return
 
         try:
+            # Configure Windows DLL paths BEFORE import
+            # This is critical for Windows to find PaddlePaddle's native DLLs
+            configure_windows_dll_paths()
+
             # Import PaddleOCR from standard site-packages location
             # (No custom sys.path manipulation needed - installed normally)
             from paddleocr import PaddleOCR
@@ -143,7 +191,16 @@ def ensure_paddleocr_imported():
         except Exception as e:
             PADDLEOCR_AVAILABLE = False
             PaddleOCR_class = None
-            PADDLEOCR_IMPORT_ERROR = f"{type(e).__name__}: {e}"
+            error_msg = f"{type(e).__name__}: {e}"
+
+            # Windows-specific guidance for DLL loading issues
+            if sys.platform == 'win32' and 'libpaddle' in str(e).lower():
+                error_msg += "\n\nWindows DLL loading issue detected. Possible solutions:\n"
+                error_msg += "1. Ensure Visual C++ Redistributables are installed\n"
+                error_msg += "2. Try reinstalling PaddleOCR from Settings\n"
+                error_msg += "3. Check if antivirus is blocking DLL loading"
+
+            PADDLEOCR_IMPORT_ERROR = error_msg
             print(f"[PaddleOCR] import failed: {PADDLEOCR_IMPORT_ERROR}", file=sys.stderr)
         finally:
             _paddleocr_import_attempted = True
@@ -2328,6 +2385,14 @@ def install_ocr_sync(engine: str):
 
         _install_progress[engine] = 100
         print(f"[OCR] Successfully installed {engine}")
+
+        # Configure Windows DLL paths for newly installed packages
+        if sys.platform == 'win32' and engine == 'paddleocr':
+            try:
+                configure_windows_dll_paths()
+                print(f"[OCR] Windows DLL paths configured for PaddlePaddle")
+            except Exception as dll_error:
+                print(f"[OCR] Warning: DLL path configuration failed: {dll_error}")
     except Exception as e:
         print(f"[OCR] Installation failed: {e}")
         _install_progress[engine] = -1

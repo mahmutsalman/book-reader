@@ -46,6 +46,9 @@ if defined APPDATA (
     set PYTHONPATH=%PYTHONPATH%;%APPDATA%\BookReader\ocr-packages
 )
 
+REM Disable CUDA for CPU-only PaddlePaddle builds
+set PADDLE_NO_CUDA=1
+
 REM Change to script directory before running (helps with relative imports)
 cd /d "%SCRIPT_DIR%"
 

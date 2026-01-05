@@ -480,6 +480,8 @@ class PythonManager {
 
     env.PORT = String(this.port);
     env.PYTHONUNBUFFERED = '1';
+    // Disable CUDA for CPU-only PaddlePaddle builds
+    env.PADDLE_NO_CUDA = '1';
 
     return env;
   }
