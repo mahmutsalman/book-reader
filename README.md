@@ -57,23 +57,29 @@ A smart book reader application with dynamic text wrapping, AI-powered word look
 
 ### AI-Powered Word Lookup
 
-<div style="display: flex; gap: 10px; justify-content: center;">
-  <img src=".github/media/screenshots/app-reading-view-ex1.png" alt="Reading View with Word Lookup" width="400"/>
-  <img src=".github/media/screenshots/app-reading-view-ex2.png" alt="Reading View Alternative" width="400"/>
-</div>
+<img src=".github/media/screenshots/app-reading-view-ex1.png" alt="Reading View with Word Lookup" width="800"/>
 
-*Instant word definitions and context analysis*
+*Instant word definitions and context analysis - Light theme*
+
+---
+
+<img src=".github/media/screenshots/app-reading-view-ex2.png" alt="Reading View Alternative" width="800"/>
+
+*Dark theme variant with word lookup panel*
 
 ---
 
 ### Smart Side Panel Features
 
-<div style="display: flex; gap: 10px; justify-content: center;">
-  <img src=".github/media/screenshots/side-panel-opened1.png" alt="Side Panel with Features" width="400"/>
-  <img src=".github/media/screenshots/only-sidepanel-opened-grammer-toggle.png" alt="Grammar Toggle Panel" width="400"/>
-</div>
+<img src=".github/media/screenshots/side-panel-opened1.png" alt="Side Panel with Features" width="800"/>
 
 *Pronunciation, IPA transcription, and grammar insights*
+
+---
+
+<img src=".github/media/screenshots/only-sidepanel-opened-grammer-toggle.png" alt="Grammar Toggle Panel" width="800"/>
+
+*Grammar analysis panel with detailed linguistic breakdown*
 
 ---
 
