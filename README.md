@@ -31,9 +31,9 @@ Track your vocabulary, hear accurate pronunciations in multiple languages, and u
 - **Vocabulary Tracking**: Track learned words and build your vocabulary.
 - **Multi-Format Support**: EPUB, PDF, and text files.
 - **Adaptive Themes**: Multiple reading themes with automatic adjustment.
-- **Manga OCR (In-Reader)**: Draw a rectangle to OCR only the selected area for better precision.
+- **Comic Book & Manga OCR**: Built-in PaddleOCR for reading comics and manga. Extract text from images and look up words instantly with AI-powered definitions.
 
-> Current limitation: OCR regions are typically returned as **lines/phrases**, not individual words (word-level segmentation is not implemented yet).
+> Powered by [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) - an open-source OCR toolkit for accurate text detection in comics, manga, and image-based content.
 
 ## 🎬 See It in Action
 
@@ -118,6 +118,19 @@ Track your vocabulary, hear accurate pronunciations in multiple languages, and u
 <img src=".github/media/screenshots/vocabulary.png" alt="Vocabulary Management" width="800"/>
 
 *Build and track your vocabulary over time*
+
+---
+
+### Comic Book OCR with PaddleOCR
+<img src=".github/media/screenshots/comic-book-ocr-example.png" alt="Comic Book OCR Example" width="800"/>
+
+*Read manga and comics with built-in OCR powered by PaddleOCR*
+
+---
+
+<img src=".github/media/screenshots/comic-book-word-lookup.png" alt="Comic Book Word Lookup" width="800"/>
+
+*Extract text from comics and look up words instantly with AI-powered definitions*
 
 </div>
 
