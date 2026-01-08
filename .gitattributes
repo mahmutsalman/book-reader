@@ -1,0 +1,10 @@
+# Git LFS tracking for large binary files
+*.gif binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.icns binary
+
+# Treat GIF files as binary to prevent corruption
+*.gif -diff

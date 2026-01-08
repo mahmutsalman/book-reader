@@ -17,12 +17,36 @@ A smart book reader application with dynamic text wrapping, AI-powered word look
 
 > Current limitation: OCR regions are typically returned as **lines/phrases**, not individual words (word-level segmentation is not implemented yet).
 
+## 🎬 See It in Action
+
+<div align="center">
+
+### 📝 Word Selection & Multi-Word Lookup
+
+<div style="display: flex; gap: 10px; justify-content: center;">
+  <img src=".github/media/demos/word-selection-with-multiple-words-included-1.gif" alt="Word Selection Demo - Light Theme" width="400"/>
+  <img src=".github/media/demos/word-selection-with-multiple-words-included-2.gif" alt="Word Selection Demo - Dark Theme" width="400"/>
+</div>
+
+*Select multiple words for comprehensive context analysis - shown in different reading themes*
+
+---
+
+### 🎯 Focus Mode with Grammar Analysis
+![Focus Mode Demo](.github/media/demos/focus-mode-grammar-mode-on.gif)
+
+*Immersive focus mode with grammar insights for deeper language learning*
+
+</div>
+
+---
+
 ## Screenshots
 
 <div align="center">
 
 ### Reading Experience
-<img src="screenshots/app-reading-full-screen1.png" alt="Full Screen Reading View" width="800"/>
+<img src=".github/media/screenshots/app-reading-full-screen1.png" alt="Full Screen Reading View" width="800"/>
 
 *Immersive full-screen reading mode with clean typography*
 
@@ -31,8 +55,8 @@ A smart book reader application with dynamic text wrapping, AI-powered word look
 ### AI-Powered Word Lookup
 
 <div style="display: flex; gap: 10px; justify-content: center;">
-  <img src="screenshots/app-reading-view-ex1.png" alt="Reading View with Word Lookup" width="400"/>
-  <img src="screenshots/app-reading-view-ex2.png" alt="Reading View Alternative" width="400"/>
+  <img src=".github/media/screenshots/app-reading-view-ex1.png" alt="Reading View with Word Lookup" width="400"/>
+  <img src=".github/media/screenshots/app-reading-view-ex2.png" alt="Reading View Alternative" width="400"/>
 </div>
 
 *Instant word definitions and context analysis*
@@ -42,8 +66,8 @@ A smart book reader application with dynamic text wrapping, AI-powered word look
 ### Smart Side Panel Features
 
 <div style="display: flex; gap: 10px; justify-content: center;">
-  <img src="screenshots/side-panel-opened1.png" alt="Side Panel with Features" width="400"/>
-  <img src="screenshots/only-sidepanel-opened-grammer-toggle.png" alt="Grammar Toggle Panel" width="400"/>
+  <img src=".github/media/screenshots/side-panel-opened1.png" alt="Side Panel with Features" width="400"/>
+  <img src=".github/media/screenshots/only-sidepanel-opened-grammer-toggle.png" alt="Grammar Toggle Panel" width="400"/>
 </div>
 
 *Pronunciation, IPA transcription, and grammar insights*
@@ -51,7 +75,7 @@ A smart book reader application with dynamic text wrapping, AI-powered word look
 ---
 
 ### Vocabulary Tracking
-<img src="screenshots/vocabulary.png" alt="Vocabulary Management" width="800"/>
+<img src=".github/media/screenshots/vocabulary.png" alt="Vocabulary Management" width="800"/>
 
 *Build and track your vocabulary over time*
 
