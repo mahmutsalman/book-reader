@@ -3,7 +3,25 @@
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Code Signing](https://img.shields.io/badge/code%20signing-pending-yellow)
 
-A smart book reader application with dynamic text wrapping, AI-powered word lookup, offline pronunciation audio, and vocabulary tracking.
+## About
+
+Smart Book Reader revolutionizes the reading experience with **lightning-fast, context-aware word lookup**. Unlike traditional dictionaries that overwhelm you with dozens of irrelevant meanings, our AI analyzes the surrounding text to deliver **exactly the meaning you need** — instantly.
+
+### Why Smart Book Reader?
+
+**📚 Context-Aware Definitions**
+Traditional dictionaries list 10+ meanings for simple words, leaving you confused about which one fits your context. Smart Book Reader uses AI to understand the sentence you're reading and provides **only the relevant definition** — no more guessing, no more confusion.
+
+**⚡ Instant Multi-Word Lookup**
+Select single words or **entire phrases** to get comprehensive context analysis. Perfect for idioms, technical terms, or complex expressions that don't make sense word-by-word.
+
+**🎯 Smart & Fast**
+Click any word and get instant AI-powered definitions, translations, pronunciation, and grammar insights — all without leaving your reading flow.
+
+**🌍 Built for Language Learners**
+Track your vocabulary, hear accurate pronunciations in multiple languages, and understand grammar patterns — all while enjoying your favorite books.
+
+---
 
 ## Features
 
