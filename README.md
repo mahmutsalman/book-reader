@@ -23,12 +23,15 @@ A smart book reader application with dynamic text wrapping, AI-powered word look
 
 ### 📝 Word Selection & Multi-Word Lookup
 
-<div style="display: flex; gap: 10px; justify-content: center;">
-  <img src=".github/media/demos/word-selection-with-multiple-words-included-1.gif" alt="Word Selection Demo - Light Theme" width="400"/>
-  <img src=".github/media/demos/word-selection-with-multiple-words-included-2.gif" alt="Word Selection Demo - Dark Theme" width="400"/>
-</div>
+![Word Selection Demo - Light Theme](.github/media/demos/word-selection-with-multiple-words-included-1.gif)
 
-*Select multiple words for comprehensive context analysis - shown in different reading themes*
+*Select multiple words for comprehensive context analysis - Light theme*
+
+---
+
+![Word Selection Demo - Dark Theme](.github/media/demos/word-selection-with-multiple-words-included-2.gif)
+
+*Dark theme variant with enhanced readability*
 
 ---
 
