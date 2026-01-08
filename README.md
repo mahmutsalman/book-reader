@@ -73,6 +73,13 @@ Track your vocabulary, hear accurate pronunciations in multiple languages, and u
 
 ---
 
+### Adaptive Themes
+<img src=".github/media/screenshots/app-reading-purple-theme.png" alt="Purple Theme Reading View" width="800"/>
+
+*Multiple reading themes including purple theme for comfortable reading*
+
+---
+
 ### AI-Powered Word Lookup
 
 <img src=".github/media/screenshots/app-reading-view-ex1.png" alt="Reading View with Word Lookup" width="800"/>
