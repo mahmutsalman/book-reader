@@ -21,6 +21,13 @@ Click any word and get instant AI-powered definitions, translations, pronunciati
 **🌍 Built for Language Learners**
 Track your vocabulary, hear accurate pronunciations in multiple languages, and understand grammar patterns — all while enjoying your favorite books.
 
+**🔧 Advanced Technical Stack**
+- **Neural Text-to-Speech**: Offline pronunciation using [Piper TTS](https://github.com/rhasspy/piper) with Microsoft-quality neural voices (English, German, Russian) — no internet required
+- **IPA Phonetic Transcription**: Accurate pronunciation guides generated with [gruut](https://github.com/rhasspy/gruut) linguistic toolkit
+- **Multiple AI Sources**: Flexible AI backend supporting cloud (Groq API) and local LLM models for definitions and context analysis
+- **PaddleOCR Integration**: Open-source OCR for manga and comics with high accuracy text detection
+- **Offline-First Architecture**: All core features work without internet connectivity
+
 ---
 
 ## Features
