@@ -439,24 +439,26 @@ jobs:
             mkdir -p ${VPS_PATH}/windows ${VPS_PATH}/macos ${VPS_PATH}/release-notes
           "
 
-          # Find and upload Windows artifacts
-          WINDOWS_ZIPS=$(find ./artifacts/windows -name "*.zip" -type f 2>/dev/null)
-          if [ -n "$WINDOWS_ZIPS" ]; then
-            echo "Found Windows artifacts: $WINDOWS_ZIPS"
-            rsync -avz --progress -e "ssh -i ~/.ssh/vps_key" \
-              $WINDOWS_ZIPS \
-              ${VPS_USER}@${VPS_HOST}:${VPS_PATH}/windows/
+          # Upload Windows artifacts (handle filenames with spaces)
+          WINDOWS_COUNT=$(find ./artifacts/windows -name "*.zip" -type f 2>/dev/null | wc -l)
+          if [ "$WINDOWS_COUNT" -gt 0 ]; then
+            echo "Found $WINDOWS_COUNT Windows artifact(s)"
+            find ./artifacts/windows -name "*.zip" -type f -print0 | while IFS= read -r -d '' file; do
+              echo "Uploading: $file"
+              rsync -avz --progress -e "ssh -i ~/.ssh/vps_key" "$file" ${VPS_USER}@${VPS_HOST}:${VPS_PATH}/windows/
+            done
           else
             echo "Warning: No Windows .zip artifacts found"
           fi
 
-          # Find and upload macOS artifacts
-          MACOS_FILES=$(find ./artifacts/macos -type f \( -name "*.zip" -o -name "*.dmg" \) 2>/dev/null)
-          if [ -n "$MACOS_FILES" ]; then
-            echo "Found macOS artifacts: $MACOS_FILES"
-            rsync -avz --progress -e "ssh -i ~/.ssh/vps_key" \
-              $MACOS_FILES \
-              ${VPS_USER}@${VPS_HOST}:${VPS_PATH}/macos/
+          # Upload macOS artifacts (handle filenames with spaces)
+          MACOS_COUNT=$(find ./artifacts/macos -type f \( -name "*.zip" -o -name "*.dmg" \) 2>/dev/null | wc -l)
+          if [ "$MACOS_COUNT" -gt 0 ]; then
+            echo "Found $MACOS_COUNT macOS artifact(s)"
+            find ./artifacts/macos -type f \( -name "*.zip" -o -name "*.dmg" \) -print0 | while IFS= read -r -d '' file; do
+              echo "Uploading: $file"
+              rsync -avz --progress -e "ssh -i ~/.ssh/vps_key" "$file" ${VPS_USER}@${VPS_HOST}:${VPS_PATH}/macos/
+            done
           else
             echo "Warning: No macOS artifacts found"
           fi
