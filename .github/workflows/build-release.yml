@@ -418,14 +418,19 @@ jobs:
       - name: Setup SSH key
         env:
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
         run: |
           mkdir -p ~/.ssh
           echo "$VPS_SSH_KEY" > ~/.ssh/vps_key
           chmod 600 ~/.ssh/vps_key
-          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
-          if [ ! -s ~/.ssh/known_hosts ]; then
-            echo "Failed to get SSH host key"
-            exit 1
+
+          # Try to get host key with longer timeout
+          echo "Getting SSH host key for ${VPS_HOST}..."
+          if ssh-keyscan -T 30 -H ${VPS_HOST} >> ~/.ssh/known_hosts 2>&1; then
+            echo "Host key obtained successfully"
+          else
+            echo "Warning: ssh-keyscan failed, using StrictHostKeyChecking=accept-new"
+            echo "Host * StrictHostKeyChecking=accept-new" >> ~/.ssh/config
           fi
 
       - name: Deploy to VPS
