@@ -143,12 +143,20 @@ const UpdateNotification: React.FC<UpdateNotificationProps> = ({
               {isMac ? '🍎 macOS Installation' : isWindows ? '🪟 Windows Installation' : 'Installation'}
             </p>
             {isMac ? (
-              <ol className="list-decimal list-inside space-y-1">
-                <li>Download the .zip file</li>
-                <li>Extract it (double-click)</li>
-                <li>Drag <span className="font-medium">Smart Book.app</span> to Applications</li>
-                <li>Click "Replace" when prompted</li>
-              </ol>
+              <div className="space-y-2">
+                <ol className="list-decimal list-inside space-y-1">
+                  <li>Download and extract the .zip file</li>
+                  <li>Drag <span className="font-medium">Smart Book.app</span> to Applications</li>
+                  <li>If "damaged" error appears, open Terminal and run:</li>
+                </ol>
+                <code
+                  className="block p-2 rounded text-xs font-mono select-all cursor-pointer"
+                  style={{ backgroundColor: theme.background }}
+                  title="Click to select"
+                >
+                  xattr -cr "/Applications/Smart Book.app"
+                </code>
+              </div>
             ) : isWindows ? (
               <ol className="list-decimal list-inside space-y-1">
                 <li>Download the .zip file</li>
