@@ -376,3 +376,120 @@ jobs:
             **Note**: First-time installation may take a few moments as dependencies are set up.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  deploy-to-vps:
+    name: Deploy to VPS
+    needs: release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Download macOS artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-build
+          path: ./artifacts/macos
+
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-build
+          path: ./artifacts/windows
+
+      - name: Display artifact structure
+        run: |
+          echo "=== Downloaded artifacts ==="
+          find ./artifacts -type f | head -50
+
+      - name: Generate update manifest
+        run: |
+          node scripts/generate-update-manifest.js --artifacts-dir ./artifacts
+          echo "=== Generated manifest ==="
+          cat ./artifacts/latest.json
+
+      - name: Setup SSH key
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+          if [ ! -s ~/.ssh/known_hosts ]; then
+            echo "Failed to get SSH host key"
+            exit 1
+          fi
+
+      - name: Deploy to VPS
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PATH: ${{ secrets.VPS_PATH }}
+        run: |
+          # Create release directories on VPS
+          ssh -i ~/.ssh/vps_key ${VPS_USER}@${VPS_HOST} "
+            mkdir -p ${VPS_PATH}/windows ${VPS_PATH}/macos ${VPS_PATH}/release-notes
+          "
+
+          # Find and upload Windows artifacts
+          WINDOWS_ZIPS=$(find ./artifacts/windows -name "*.zip" -type f 2>/dev/null)
+          if [ -n "$WINDOWS_ZIPS" ]; then
+            echo "Found Windows artifacts: $WINDOWS_ZIPS"
+            rsync -avz --progress -e "ssh -i ~/.ssh/vps_key" \
+              $WINDOWS_ZIPS \
+              ${VPS_USER}@${VPS_HOST}:${VPS_PATH}/windows/
+          else
+            echo "Warning: No Windows .zip artifacts found"
+          fi
+
+          # Find and upload macOS artifacts
+          MACOS_FILES=$(find ./artifacts/macos -type f \( -name "*.zip" -o -name "*.dmg" \) 2>/dev/null)
+          if [ -n "$MACOS_FILES" ]; then
+            echo "Found macOS artifacts: $MACOS_FILES"
+            rsync -avz --progress -e "ssh -i ~/.ssh/vps_key" \
+              $MACOS_FILES \
+              ${VPS_USER}@${VPS_HOST}:${VPS_PATH}/macos/
+          else
+            echo "Warning: No macOS artifacts found"
+          fi
+
+          # Upload manifest (required)
+          if [ ! -f "./artifacts/latest.json" ]; then
+            echo "Error: latest.json manifest not found"
+            exit 1
+          fi
+          rsync -avz --progress -e "ssh -i ~/.ssh/vps_key" \
+            ./artifacts/latest.json \
+            ${VPS_USER}@${VPS_HOST}:${VPS_PATH}/
+
+          echo "=== Deployment complete ==="
+          echo "Manifest URL: https://smartbook.mahmutsalman.cloud/releases/latest.json"
+
+      - name: Verify deployment
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PATH: ${{ secrets.VPS_PATH }}
+        run: |
+          echo "=== Verifying deployment ==="
+          ssh -i ~/.ssh/vps_key ${VPS_USER}@${VPS_HOST} "
+            echo 'Files in releases directory:'
+            ls -la ${VPS_PATH}/
+            echo ''
+            echo 'Windows artifacts:'
+            ls -la ${VPS_PATH}/windows/ || echo 'No Windows artifacts'
+            echo ''
+            echo 'macOS artifacts:'
+            ls -la ${VPS_PATH}/macos/ || echo 'No macOS artifacts'
+            echo ''
+            echo 'Manifest content:'
+            cat ${VPS_PATH}/latest.json
+          "

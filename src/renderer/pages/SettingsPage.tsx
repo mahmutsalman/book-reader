@@ -77,6 +77,12 @@ const SettingsPage: React.FC = () => {
   const [testingGoogleConnection, setTestingGoogleConnection] = useState(false);
   const [googleConnectionResult, setGoogleConnectionResult] = useState<{ success: boolean; message: string } | null>(null);
 
+  // Update state
+  const [currentVersion, setCurrentVersion] = useState<string>('');
+  const [checkingForUpdates, setCheckingForUpdates] = useState(false);
+  const [updateCheckResult, setUpdateCheckResult] = useState<{ success: boolean; message: string; updateAvailable?: boolean; latestVersion?: string } | null>(null);
+  const [autoCheckEnabled, setAutoCheckEnabled] = useState(true);
+
   const accentTextColor = getContrastColor(theme.accent);
   const hoverFill = theme.wordHover || addAlpha(theme.panel, 0.5);
   const inputStyle = {
@@ -389,6 +395,85 @@ const SettingsPage: React.FC = () => {
       loadVoiceModels();
     }
   }, [pythonStatus?.ready]);
+
+  // Load update preferences on mount
+  useEffect(() => {
+    const loadUpdatePreferences = async () => {
+      if (!window.electronAPI?.update) return;
+
+      try {
+        const prefsResponse = await window.electronAPI.update.getPreferences();
+        if (prefsResponse.success && prefsResponse.preferences) {
+          setAutoCheckEnabled(prefsResponse.preferences.autoCheckEnabled);
+        }
+
+        // Get current version from a quick check
+        const checkResponse = await window.electronAPI.update.check();
+        if (checkResponse.success && checkResponse.result) {
+          setCurrentVersion(checkResponse.result.currentVersion);
+        }
+      } catch (error) {
+        console.error('Failed to load update preferences:', error);
+      }
+    };
+
+    loadUpdatePreferences();
+  }, []);
+
+  const handleCheckForUpdates = async () => {
+    if (!window.electronAPI?.update) return;
+
+    setCheckingForUpdates(true);
+    setUpdateCheckResult(null);
+
+    try {
+      const response = await window.electronAPI.update.check(true); // ignoreSkipped = true for manual check
+      if (response.success && response.result) {
+        if (response.result.updateAvailable) {
+          setUpdateCheckResult({
+            success: true,
+            message: `Update available: v${response.result.latestVersion}`,
+            updateAvailable: true,
+            latestVersion: response.result.latestVersion,
+          });
+          // Open download URL if available
+          if (response.result.downloadUrl) {
+            await window.electronAPI.update.openUrl(response.result.downloadUrl);
+          }
+        } else {
+          setUpdateCheckResult({
+            success: true,
+            message: 'You are using the latest version!',
+            updateAvailable: false,
+          });
+        }
+        setCurrentVersion(response.result.currentVersion);
+      } else {
+        setUpdateCheckResult({
+          success: false,
+          message: response.error || 'Failed to check for updates',
+        });
+      }
+    } catch (error) {
+      setUpdateCheckResult({
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to check for updates',
+      });
+    } finally {
+      setCheckingForUpdates(false);
+    }
+  };
+
+  const handleAutoCheckToggle = async (enabled: boolean) => {
+    if (!window.electronAPI?.update) return;
+
+    try {
+      await window.electronAPI.update.setAutoCheck(enabled);
+      setAutoCheckEnabled(enabled);
+    } catch (error) {
+      console.error('Failed to update auto-check preference:', error);
+    }
+  };
 
   if (loading) {
     return (
@@ -1642,6 +1727,103 @@ const SettingsPage: React.FC = () => {
             </select>
             <p className="text-xs mt-1" style={{ color: theme.textSecondary }}>
               Limit sentences for faster testing or quick previews
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* App Updates Settings */}
+      <div className="card mb-6" style={cardStyle}>
+        <h3 className="text-lg font-semibold mb-4">
+          🔄 App Updates
+        </h3>
+
+        <div className="space-y-4">
+          {/* Current Version */}
+          <div
+            className="flex items-center justify-between p-3 rounded-lg"
+            style={{ backgroundColor: theme.background }}
+          >
+            <div>
+              <div className="font-medium" style={{ color: theme.text }}>
+                Current Version
+              </div>
+              <div className="text-sm" style={{ color: theme.textSecondary }}>
+                Smart Book v{currentVersion || '...'}
+              </div>
+            </div>
+          </div>
+
+          {/* Check for Updates */}
+          <div className="flex items-center gap-4">
+            <button
+              onClick={handleCheckForUpdates}
+              disabled={checkingForUpdates}
+              className="px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{
+                backgroundColor: theme.accent,
+                color: accentTextColor,
+              }}
+            >
+              {checkingForUpdates ? 'Checking...' : 'Check for Updates'}
+            </button>
+            {updateCheckResult && (
+              <span
+                className={`text-sm ${
+                  updateCheckResult.success
+                    ? updateCheckResult.updateAvailable
+                      ? 'text-blue-600'
+                      : 'text-green-600'
+                    : 'text-red-600'
+                }`}
+              >
+                {updateCheckResult.message}
+              </span>
+            )}
+          </div>
+
+          {/* Auto-Check Toggle */}
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="font-medium" style={{ color: theme.text }}>
+                Check for updates automatically
+              </div>
+              <div className="text-sm" style={{ color: theme.textSecondary }}>
+                Notifies you when a new version is available
+              </div>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                checked={autoCheckEnabled}
+                onChange={(e) => handleAutoCheckToggle(e.target.checked)}
+                className="sr-only peer"
+              />
+              <div
+                className="w-11 h-6 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all"
+                style={{
+                  backgroundColor: autoCheckEnabled ? theme.accent : theme.panelBorder,
+                  borderColor: theme.border,
+                }}
+              ></div>
+            </label>
+          </div>
+
+          {/* Info about update distribution */}
+          <div
+            className="p-3 rounded-lg text-sm"
+            style={{
+              backgroundColor: addAlpha(theme.accent, 0.08),
+              color: theme.textSecondary,
+            }}
+          >
+            <p className="font-medium mb-1" style={{ color: theme.text }}>
+              How Updates Work
+            </p>
+            <p>
+              When an update is available, you'll be notified with a download link.
+              Download the new version and replace your current installation.
+              Your books, vocabulary, and settings are preserved.
             </p>
           </div>
         </div>

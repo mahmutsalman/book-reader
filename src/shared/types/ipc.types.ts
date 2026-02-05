@@ -14,6 +14,13 @@ import type {
   SemanticAnalysis,
   SimplifiedAnalysis
 } from './meaning-analysis.types';
+import type {
+  UpdateCheckResponse,
+  UpdateOpenUrlResponse,
+  UpdateSkipVersionResponse,
+  UpdatePreferencesResponse,
+  UpdateSetPreferenceResponse,
+} from './update.types';
 
 // Generic AI provider connection test result
 export interface ConnectionResult {
@@ -187,6 +194,13 @@ export interface ElectronAPI {
   };
   window: {
     openHtml: (htmlContent: string, title: string) => Promise<void>;
+  };
+  update: {
+    check: (ignoreSkipped?: boolean) => Promise<UpdateCheckResponse>;
+    openUrl: (url: string) => Promise<UpdateOpenUrlResponse>;
+    skipVersion: (version: string) => Promise<UpdateSkipVersionResponse>;
+    getPreferences: () => Promise<UpdatePreferencesResponse>;
+    setAutoCheck: (enabled: boolean) => Promise<UpdateSetPreferenceResponse>;
   };
 }
 

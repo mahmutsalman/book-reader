@@ -213,6 +213,20 @@ const electronAPI: ElectronAPI = {
     openHtml: (htmlContent: string, title: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.WINDOW_OPEN_HTML, htmlContent, title),
   },
+
+  // App Updates
+  update: {
+    check: (ignoreSkipped?: boolean) =>
+      ipcRenderer.invoke(IPC_CHANNELS.UPDATE_CHECK, ignoreSkipped),
+    openUrl: (url: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.UPDATE_OPEN_URL, url),
+    skipVersion: (version: string) =>
+      ipcRenderer.invoke(IPC_CHANNELS.UPDATE_SKIP_VERSION, version),
+    getPreferences: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.UPDATE_GET_PREFERENCES),
+    setAutoCheck: (enabled: boolean) =>
+      ipcRenderer.invoke(IPC_CHANNELS.UPDATE_SET_AUTO_CHECK, enabled),
+  },
 };
 
 // Expose the API to the renderer process

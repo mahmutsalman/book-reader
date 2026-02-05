@@ -1,9 +1,10 @@
 {
   "name": "bookreader",
   "productName": "Smart Book",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A smart book reader with dynamic text wrapping, AI-powered word lookup, and vocabulary tracking",
   "main": ".vite/build/main.js",
+  "updateServerUrl": "https://smartbook.mahmutsalman.cloud",
   "scripts": {
     "start": "electron-forge start",
     "package": "electron-forge package",

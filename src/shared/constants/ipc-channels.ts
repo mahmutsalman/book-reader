@@ -81,6 +81,13 @@ export const IPC_CHANNELS = {
   PRE_STUDY_PROGRESS: 'pre-study:progress',
   PRE_STUDY_CANCEL: 'pre-study:cancel',
   WINDOW_OPEN_HTML: 'window:open-html',
+
+  // App Updates
+  UPDATE_CHECK: 'update:check',
+  UPDATE_OPEN_URL: 'update:open-url',
+  UPDATE_SKIP_VERSION: 'update:skip-version',
+  UPDATE_GET_PREFERENCES: 'update:get-preferences',
+  UPDATE_SET_AUTO_CHECK: 'update:set-auto-check',
 } as const;
 
 export type IPCChannel = typeof IPC_CHANNELS[keyof typeof IPC_CHANNELS];

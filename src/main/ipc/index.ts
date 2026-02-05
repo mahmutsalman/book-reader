@@ -7,6 +7,7 @@ import { registerTatoebaHandlers } from './tatoeba.ipc';
 import { registerDialogHandlers } from './dialog.ipc';
 import { registerPronunciationHandlers } from './pronunciation.ipc';
 import { registerPreStudyHandlers } from './pre-study.ipc';
+import { registerUpdateHandlers } from './update.ipc';
 
 export function registerAllIpcHandlers(): void {
   registerBookHandlers();
@@ -18,4 +19,5 @@ export function registerAllIpcHandlers(): void {
   registerDialogHandlers();
   registerPronunciationHandlers();
   registerPreStudyHandlers();
+  registerUpdateHandlers();
 }
