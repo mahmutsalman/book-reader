@@ -37,6 +37,8 @@ const UpdateNotification: React.FC<UpdateNotificationProps> = ({
   };
 
   const formattedReleaseDate = formatDate(updateInfo.releaseDate);
+  const isMac = navigator.platform.toLowerCase().includes('mac');
+  const isWindows = navigator.platform.toLowerCase().includes('win');
 
   return (
     <div
@@ -129,7 +131,7 @@ const UpdateNotification: React.FC<UpdateNotificationProps> = ({
             </div>
           )}
 
-          {/* Installation Note */}
+          {/* Installation Instructions */}
           <div
             className="p-3 rounded-lg mb-4 text-sm"
             style={{
@@ -137,12 +139,28 @@ const UpdateNotification: React.FC<UpdateNotificationProps> = ({
               color: theme.textSecondary,
             }}
           >
-            <p className="font-medium mb-1" style={{ color: theme.text }}>
-              Manual Download
+            <p className="font-medium mb-2" style={{ color: theme.text }}>
+              {isMac ? '🍎 macOS Installation' : isWindows ? '🪟 Windows Installation' : 'Installation'}
             </p>
-            <p>
-              Clicking "Download" will open the download page in your browser.
-              After downloading, replace your current installation with the new version.
+            {isMac ? (
+              <ol className="list-decimal list-inside space-y-1">
+                <li>Download the .zip file</li>
+                <li>Extract it (double-click)</li>
+                <li>Drag <span className="font-medium">Smart Book.app</span> to Applications</li>
+                <li>Click "Replace" when prompted</li>
+              </ol>
+            ) : isWindows ? (
+              <ol className="list-decimal list-inside space-y-1">
+                <li>Download the .zip file</li>
+                <li>Close Smart Book if running</li>
+                <li>Extract and replace your current folder</li>
+                <li>Run <span className="font-medium">Smart Book.exe</span></li>
+              </ol>
+            ) : (
+              <p>Download and replace your current installation.</p>
+            )}
+            <p className="mt-2 text-xs opacity-80">
+              ✓ Your books, vocabulary, and settings are preserved
             </p>
           </div>
 

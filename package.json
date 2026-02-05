@@ -1,7 +1,7 @@
 {
   "name": "bookreader",
   "productName": "Smart Book",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "A smart book reader with dynamic text wrapping, AI-powered word lookup, and vocabulary tracking",
   "main": ".vite/build/main.js",
   "updateServerUrl": "https://smartbook.mahmutsalman.cloud",

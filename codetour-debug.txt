@@ -1,0 +1,26 @@
+[20:59:06.865] === CodeTour Debug Log Started ===
+[20:59:06.865] Timestamp: 2026-01-24T20:59:06.865Z
+[20:59:06.866] Workspace folders: 1
+[20:59:06.866]   [0] BookReader: file:///Users/mahmutsalman/Documents/MyCodingProjects/Projects/ResumeProjects/BookReaderGeneral/BookReader
+[20:59:06.866] 
+[20:59:06.866] === EXTENSION ACTIVATION START ===
+[20:59:06.870] Calling discoverTours()...
+[20:59:06.870] --- discoverTours() START ---
+[20:59:06.870] SUB_TOUR_DIRECTORIES: [".vscode/tours",".github/tours",".tours"]
+[20:59:06.870] Scanning workspace folder: BookReader (file:///Users/mahmutsalman/Documents/MyCodingProjects/Projects/ResumeProjects/BookReaderGeneral/BookReader)
+[20:59:06.940]   mainTours found: 0
+[20:59:06.940]   readTourDirectory: file:///Users/mahmutsalman/Documents/MyCodingProjects/Projects/ResumeProjects/BookReaderGeneral/BookReader/.vscode/tours
+[20:59:06.940]   readTourDirectory: file:///Users/mahmutsalman/Documents/MyCodingProjects/Projects/ResumeProjects/BookReaderGeneral/BookReader/.github/tours
+[20:59:06.940]   readTourDirectory: file:///Users/mahmutsalman/Documents/MyCodingProjects/Projects/ResumeProjects/BookReaderGeneral/BookReader/.tours
+[20:59:06.978]     Directory not found or error: EntryNotFound (FileSystemError): Error: ENOENT: no such file or directory, scandir '/Users/mahmutsalman/Documents/MyCodingProjects/Projects/ResumeProjects/BookReaderGeneral/BookReader/.vscode/tours'
+[20:59:06.978]     Directory not found or error: EntryNotFound (FileSystemError): Error: ENOENT: no such file or directory, scandir '/Users/mahmutsalman/Documents/MyCodingProjects/Projects/ResumeProjects/BookReaderGeneral/BookReader/.github/tours'
+[20:59:06.978]     Directory not found or error: EntryNotFound (FileSystemError): Error: ENOENT: no such file or directory, scandir '/Users/mahmutsalman/Documents/MyCodingProjects/Projects/ResumeProjects/BookReaderGeneral/BookReader/.tours'
+[20:59:06.978]   subTours found: 0
+[20:59:06.978]   total tours for this folder: 0
+[20:59:06.979] Final store.tours.length: 0
+[20:59:06.979] Setting context codetour:hasTours = false
+[20:59:06.979] --- discoverTours() END ---
+[20:59:06.979] discoverTours() completed. store.tours.length = 0
+[20:59:06.979] store.hasTours = false
+[20:59:06.979] store.activeTour = null
+[20:59:07.298] === EXTENSION ACTIVATION COMPLETE ===
