@@ -1826,9 +1826,9 @@ const SettingsPage: React.FC = () => {
               How Updates Work
             </p>
             <p>
-              When an update is available, you'll be notified with a download link.
-              Download the new version and replace your current installation.
-              Your books, vocabulary, and settings are preserved.
+              Updates download automatically in the background.
+              A "Restart Now" button will appear at the bottom of the screen when an update is ready.
+              Your books, vocabulary, and settings are preserved across updates.
             </p>
           </div>
         </div>
