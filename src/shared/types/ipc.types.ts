@@ -196,6 +196,7 @@ export interface ElectronAPI {
     openHtml: (htmlContent: string, title: string) => Promise<void>;
   };
   getAppVersion: () => Promise<string>;
+  platform: string; // process.platform from main — use instead of navigator.userAgent
   update: {
     check: (ignoreSkipped?: boolean) => Promise<UpdateCheckResponse>;
     openUrl: (url: string) => Promise<UpdateOpenUrlResponse>;

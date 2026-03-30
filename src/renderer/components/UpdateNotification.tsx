@@ -159,10 +159,9 @@ const UpdateNotification: React.FC<UpdateNotificationProps> = ({
               </div>
             ) : isWindows ? (
               <ol className="list-decimal list-inside space-y-1">
-                <li>Download the .zip file</li>
-                <li>Close Smart Book if running</li>
-                <li>Extract and replace your current folder</li>
-                <li>Run <span className="font-medium">Smart Book.exe</span></li>
+                <li>Download <span className="font-medium">SmartBookSetup.exe</span></li>
+                <li>Run it — click <span className="font-medium">"More info" → "Run anyway"</span> if SmartScreen appears</li>
+                <li>Smart Book updates and restarts automatically</li>
               </ol>
             ) : (
               <p>Download and replace your current installation.</p>

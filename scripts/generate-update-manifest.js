@@ -58,19 +58,19 @@ function findArtifacts(artifactsDir) {
 
       if (entry.isDirectory()) {
         searchDir(fullPath);
-      } else if (entry.isFile() && entry.name.endsWith('.zip')) {
+      } else if (entry.isFile()) {
         const fileName = entry.name.toLowerCase();
 
-        // Windows: Smart-Book-*-win32-x64.zip
-        if (fileName.includes('win32') && fileName.includes('x64')) {
+        // Windows: SmartBookSetup.exe (Squirrel installer — primary Windows artifact)
+        if (fileName === 'smartbooksetup.exe') {
           artifacts['win32-x64'] = fullPath;
         }
         // macOS ARM: Smart-Book-*-darwin-arm64.zip
-        else if (fileName.includes('darwin') && fileName.includes('arm64')) {
+        else if (entry.name.endsWith('.zip') && fileName.includes('darwin') && fileName.includes('arm64')) {
           artifacts['darwin-arm64'] = fullPath;
         }
         // macOS Intel: Smart-Book-*-darwin-x64.zip
-        else if (fileName.includes('darwin') && fileName.includes('x64') && !fileName.includes('arm')) {
+        else if (entry.name.endsWith('.zip') && fileName.includes('darwin') && fileName.includes('x64') && !fileName.includes('arm')) {
           artifacts['darwin-x64'] = fullPath;
         }
       }

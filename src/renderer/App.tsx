@@ -29,8 +29,9 @@ const AppContent: React.FC = () => {
     const checkForUpdates = async () => {
       if (!window.electronAPI?.update) return;
 
-      // On Windows, Squirrel handles updates silently — don't show the manual download modal
-      if (navigator.userAgent.toLowerCase().includes('windows')) return;
+      // On Windows, Squirrel handles updates silently — don't show the manual download modal.
+      // Use process.platform (exposed via preload) — more reliable than navigator.userAgent.
+      if (window.electronAPI?.platform === 'win32') return;
 
       try {
         // Check if auto-check is enabled

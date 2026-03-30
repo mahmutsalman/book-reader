@@ -113,6 +113,14 @@ app.on('ready', async () => {
 
         autoUpdater.on('error', (err: Error) => {
           console.warn('Squirrel auto-update error (non-fatal):', err.message);
+          // Retry once after 5 minutes — handles slow/unavailable network at startup
+          setTimeout(() => {
+            try {
+              autoUpdater.checkForUpdates();
+            } catch (retryErr) {
+              console.warn('Squirrel retry also failed:', retryErr);
+            }
+          }, 5 * 60 * 1000);
         });
 
         // Check silently 10 seconds after launch so startup isn't slowed down

@@ -238,6 +238,9 @@ const electronAPI: ElectronAPI = {
       return () => ipcRenderer.removeListener('squirrel:update-downloaded', handler);
     },
   },
+
+  // Synchronous platform info — more reliable than navigator.userAgent
+  platform: process.platform,
 };
 
 // Expose the API to the renderer process
