@@ -89,6 +89,7 @@ export const IPC_CHANNELS = {
   UPDATE_GET_PREFERENCES: 'update:get-preferences',
   UPDATE_SET_AUTO_CHECK: 'update:set-auto-check',
   UPDATE_INSTALL: 'update:install', // Windows Squirrel: quit and install downloaded update
+  APP_GET_VERSION: 'app:get-version',
 } as const;
 
 export type IPCChannel = typeof IPC_CHANNELS[keyof typeof IPC_CHANNELS];

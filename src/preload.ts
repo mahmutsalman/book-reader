@@ -215,6 +215,8 @@ const electronAPI: ElectronAPI = {
   },
 
   // App Updates
+  getAppVersion: () => ipcRenderer.invoke(IPC_CHANNELS.APP_GET_VERSION),
+
   update: {
     check: (ignoreSkipped?: boolean) =>
       ipcRenderer.invoke(IPC_CHANNELS.UPDATE_CHECK, ignoreSkipped),

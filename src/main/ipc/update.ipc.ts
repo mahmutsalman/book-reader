@@ -1,4 +1,4 @@
-import { ipcMain, autoUpdater } from 'electron';
+import { ipcMain, autoUpdater, app } from 'electron';
 import { IPC_CHANNELS } from '../../shared/constants/ipc-channels';
 import { updateService } from '../services/update.service';
 import type {
@@ -104,6 +104,9 @@ export function registerUpdateHandlers(): void {
       }
     }
   );
+
+  // Get current app version
+  ipcMain.handle(IPC_CHANNELS.APP_GET_VERSION, (): string => app.getVersion());
 
   // Install downloaded Squirrel update (Windows only) — quits app and applies update
   ipcMain.handle(

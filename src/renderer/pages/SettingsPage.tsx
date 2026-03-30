@@ -66,6 +66,7 @@ const SettingsPage: React.FC = () => {
   const [loadingVoiceModels, setLoadingVoiceModels] = useState(false);
   const [downloadingModel, setDownloadingModel] = useState<string | null>(null);
   const [downloadResult, setDownloadResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [appVersion, setAppVersion] = useState<string>('');
   const [testingGroqConnection, setTestingGroqConnection] = useState(false);
   const [groqConnectionResult, setGroqConnectionResult] = useState<{ success: boolean; message: string } | null>(null);
   const [showGroqSetupModal, setShowGroqSetupModal] = useState(false);
@@ -395,6 +396,10 @@ const SettingsPage: React.FC = () => {
       loadVoiceModels();
     }
   }, [pythonStatus?.ready]);
+
+  useEffect(() => {
+    window.electronAPI?.getAppVersion?.().then((v) => setAppVersion(v)).catch(() => {});
+  }, []);
 
   // Load update preferences on mount
   useEffect(() => {
@@ -2013,6 +2018,19 @@ const SettingsPage: React.FC = () => {
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* App version footer */}
+      {appVersion && (
+        <div style={{
+          textAlign: 'center',
+          padding: '16px',
+          color: theme.textSecondary,
+          fontSize: '12px',
+          opacity: 0.6,
+        }}>
+          Smart Book v{appVersion}
         </div>
       )}
     </div>

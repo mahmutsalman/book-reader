@@ -195,6 +195,7 @@ export interface ElectronAPI {
   window: {
     openHtml: (htmlContent: string, title: string) => Promise<void>;
   };
+  getAppVersion: () => Promise<string>;
   update: {
     check: (ignoreSkipped?: boolean) => Promise<UpdateCheckResponse>;
     openUrl: (url: string) => Promise<UpdateOpenUrlResponse>;
