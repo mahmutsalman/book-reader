@@ -71,7 +71,7 @@ def generate_ipa(text: str, language: str = "en") -> Optional[str]:
         import traceback
         print(f"[IPA] Error generating IPA: {e}")
         print(f"[IPA] Traceback: {traceback.format_exc()}")
-        return None
+        raise  # re-raise so caller can include the real error in the response
 
 
 def generate_syllables(text: str, language: str = "en") -> Optional[str]:

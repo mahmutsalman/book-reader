@@ -856,11 +856,13 @@ async def get_ipa(request: IPARequest):
             )
 
     except Exception as e:
-        print(f"[Server IPA] Exception: {e}")
+        import traceback
+        tb = traceback.format_exc()
+        print(f"[Server IPA] Exception: {e}\n{tb}")
         return IPAResponse(
             success=False,
             text=request.text,
-            error=str(e)
+            error=f"{type(e).__name__}: {e} | {tb}"
         )
 
 
