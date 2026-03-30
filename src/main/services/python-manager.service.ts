@@ -53,6 +53,9 @@ class PythonManager {
 
   private async _start(): Promise<void> {
     try {
+      // Log diagnostics before attempting to start — visible in DevTools console
+      this.logStartupDiagnostics();
+
       let lastError: unknown = null;
 
       for (let attempt = 1; attempt <= STARTUP_RETRY_ATTEMPTS; attempt++) {
@@ -68,6 +71,9 @@ class PythonManager {
 
           // Start health checks
           this.startHealthChecks();
+
+          // Ensure default voice models are present (fire-and-forget)
+          this.ensureDefaultModels();
 
           // Clear any previous errors on successful start
           this.lastStartupError = null;
@@ -627,6 +633,137 @@ class PythonManager {
           setTimeout(resolve, 500);
         });
       });
+    }
+  }
+
+  /**
+   * Log startup diagnostics — checks all required files/dirs before spawning.
+   * Output is visible in DevTools console (Ctrl+Shift+I).
+   */
+  private logStartupDiagnostics(): void {
+    const fs = require('fs');
+    const isDev = !app.isPackaged;
+
+    console.log('[PythonManager] ── Startup Diagnostics ──────────────────────');
+    console.log(`[PythonManager] Platform: ${process.platform} | Packaged: ${!isDev}`);
+
+    if (isDev) {
+      const scriptPath = this.getScriptPath();
+      const serverDir = path.dirname(scriptPath);
+      const pythonPath = this.getVenvPythonPath(serverDir);
+      const generatorsDir = path.join(serverDir, 'generators');
+
+      this.diagCheck('venv Python', pythonPath, fs);
+      this.diagCheck('server.py', scriptPath, fs);
+      this.diagCheck('generators/', generatorsDir, fs);
+    } else {
+      const launcherName = process.platform === 'win32' ? 'launch-server.bat' : 'launch-server.sh';
+      const launcherPath = path.join(process.resourcesPath, launcherName);
+      const runtimeDir = path.join(process.resourcesPath, 'python-runtime');
+      const pythonExe = process.platform === 'win32'
+        ? path.join(runtimeDir, 'python.exe')
+        : path.join(runtimeDir, 'bin', 'python3');
+      const serverScript = path.join(process.resourcesPath, 'server.py');
+      const generatorsDir = path.join(process.resourcesPath, 'generators');
+      const generatorsInit = path.join(generatorsDir, '__init__.py');
+      const ttsScript = path.join(generatorsDir, 'tts.py');
+
+      this.diagCheck(launcherName, launcherPath, fs);
+      this.diagCheck('python-runtime/', runtimeDir, fs);
+      this.diagCheck('python.exe / python3', pythonExe, fs);
+      this.diagCheck('server.py', serverScript, fs);
+      this.diagCheck('generators/', generatorsDir, fs);
+      this.diagCheck('generators/__init__.py', generatorsInit, fs);
+      this.diagCheck('generators/tts.py', ttsScript, fs);
+    }
+
+    // Voice models directory (used by TTS at runtime)
+    const modelsDir = this.getModelsDirectory();
+    const modelsDirExists = fs.existsSync(modelsDir);
+    console.log(`[PythonManager] Voice models dir: ${modelsDir} — ${modelsDirExists ? '✅ exists' : '⚠️  missing (will auto-download)'}`);
+
+    if (modelsDirExists) {
+      try {
+        const files = fs.readdirSync(modelsDir).filter((f: string) => f.endsWith('.onnx'));
+        if (files.length > 0) {
+          console.log(`[PythonManager] Voice models found: ${files.join(', ')}`);
+        } else {
+          console.warn('[PythonManager] ⚠️  No .onnx voice model files — TTS will fail until downloaded');
+        }
+      } catch {
+        // ignore read errors
+      }
+    }
+
+    console.log('[PythonManager] ────────────────────────────────────────────');
+  }
+
+  private diagCheck(label: string, fullPath: string, fs: { existsSync: (p: string) => boolean }): void {
+    const exists = fs.existsSync(fullPath);
+    console.log(`[PythonManager] ${exists ? '✅' : '❌'} ${label}: ${fullPath}`);
+  }
+
+  /**
+   * Returns the directory where voice models are stored.
+   * Must match the path used by the Python TTS generator (generators/tts.py).
+   * Python uses: %APPDATA%/BookReader/models (Windows), ~/Library/Application Support/BookReader/models (macOS)
+   */
+  private getModelsDirectory(): string {
+    if (process.platform === 'win32') {
+      const appdata = process.env.APPDATA || path.join(app.getPath('home'), 'AppData', 'Roaming');
+      return path.join(appdata, 'BookReader', 'models');
+    } else if (process.platform === 'darwin') {
+      return path.join(app.getPath('home'), 'Library', 'Application Support', 'BookReader', 'models');
+    } else {
+      return path.join(app.getPath('home'), '.local', 'share', 'BookReader', 'models');
+    }
+  }
+
+  /**
+   * Checks if the default English voice model is present; downloads it if not.
+   * Fire-and-forget — called after server is ready.
+   */
+  private async ensureDefaultModels(): Promise<void> {
+    const fs = require('fs');
+    const modelsDir = this.getModelsDirectory();
+
+    // Check if any .onnx model already exists
+    let hasModel = false;
+    if (fs.existsSync(modelsDir)) {
+      try {
+        const files: string[] = fs.readdirSync(modelsDir);
+        hasModel = files.some((f: string) => f.endsWith('.onnx'));
+      } catch {
+        // ignore
+      }
+    }
+
+    if (hasModel) {
+      return;
+    }
+
+    console.log('[PythonManager] No voice models found — triggering auto-download of default English model...');
+
+    // Wait a moment for server to fully settle
+    await this.sleep(2000);
+
+    try {
+      const response = await fetch(`${this.baseUrl}/api/voice/download`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ language: 'en' }),
+        signal: AbortSignal.timeout(120000), // 2 min timeout for download
+      });
+
+      if (response.ok) {
+        console.log('[PythonManager] ✅ Default English voice model downloaded successfully');
+      } else {
+        const text = await response.text().catch(() => '');
+        console.warn(`[PythonManager] ⚠️  Voice model download returned ${response.status}: ${text}`);
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.warn(`[PythonManager] ⚠️  Voice model auto-download failed (TTS will not work): ${msg}`);
     }
   }
 
