@@ -12,6 +12,7 @@ import ReaderPage from './pages/ReaderPage';
 import VocabularyPage from './pages/VocabularyPage';
 import SettingsPage from './pages/SettingsPage';
 import UpdateNotification from './components/UpdateNotification';
+import UpdateReadyBanner from './components/UpdateReadyBanner';
 import type { UpdateCheckResult } from '../shared/types/update.types';
 
 // Inner component that uses the theme hook (must be inside SettingsProvider)
@@ -21,6 +22,7 @@ const AppContent: React.FC = () => {
 
   const [updateInfo, setUpdateInfo] = useState<UpdateCheckResult | null>(null);
   const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [showUpdateBanner, setShowUpdateBanner] = useState(false);
 
   // Check for updates on startup
   useEffect(() => {
@@ -48,6 +50,15 @@ const AppContent: React.FC = () => {
     // Delay the check slightly to not slow down startup
     const timeout = setTimeout(checkForUpdates, 3000);
     return () => clearTimeout(timeout);
+  }, []);
+
+  // Windows: listen for Squirrel "update downloaded" event from main process
+  useEffect(() => {
+    if (!window.electronAPI?.update?.onUpdateDownloaded) return;
+    const cleanup = window.electronAPI.update.onUpdateDownloaded(() => {
+      setShowUpdateBanner(true);
+    });
+    return cleanup;
   }, []);
 
   const handleDownload = useCallback(async () => {
@@ -78,6 +89,10 @@ const AppContent: React.FC = () => {
     setShowUpdateModal(false);
   }, []);
 
+  const handleInstallUpdate = useCallback(async () => {
+    await window.electronAPI?.update?.installUpdate?.();
+  }, []);
+
   return (
     <FocusModeProvider>
       <BookProvider>
@@ -93,13 +108,21 @@ const AppContent: React.FC = () => {
               </Route>
             </Routes>
 
-            {/* Update Notification Modal */}
+            {/* Update Notification Modal (macOS manual download) */}
             {showUpdateModal && updateInfo && (
               <UpdateNotification
                 updateInfo={updateInfo}
                 onDownload={handleDownload}
                 onSkip={handleSkip}
                 onRemindLater={handleRemindLater}
+              />
+            )}
+
+            {/* Windows Squirrel: update downloaded and ready to install */}
+            {showUpdateBanner && (
+              <UpdateReadyBanner
+                onInstall={handleInstallUpdate}
+                onDismiss={() => setShowUpdateBanner(false)}
               />
             )}
           </SessionVocabularyProvider>

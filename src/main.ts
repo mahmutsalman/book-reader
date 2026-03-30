@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, autoUpdater } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import { registerAllIpcHandlers } from './main/ipc';
@@ -98,6 +98,31 @@ app.on('ready', async () => {
 
     // Create window
     createWindow();
+
+    // Windows auto-update via Squirrel (production only — not in dev server mode)
+    if (process.platform === 'win32' && !MAIN_WINDOW_VITE_DEV_SERVER_URL) {
+      try {
+        autoUpdater.setFeedURL({
+          url: 'https://smartbook.mahmutsalman.cloud/releases/windows',
+        });
+
+        autoUpdater.on('update-downloaded', () => {
+          console.log('Squirrel: update downloaded, ready to install');
+          mainWindow?.webContents.send('squirrel:update-downloaded');
+        });
+
+        autoUpdater.on('error', (err: Error) => {
+          console.warn('Squirrel auto-update error (non-fatal):', err.message);
+        });
+
+        // Check silently 10 seconds after launch so startup isn't slowed down
+        setTimeout(() => {
+          autoUpdater.checkForUpdates();
+        }, 10000);
+      } catch (err) {
+        console.warn('Failed to initialize auto-updater:', err);
+      }
+    }
   } catch (error) {
     console.error('Failed to initialize app:', error);
   }

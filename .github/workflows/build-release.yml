@@ -257,7 +257,7 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           echo "=== Build outputs ==="
-          dir out\make\zip\win32\x64\*.zip
+          dir out\make\squirrel.windows\x64\
         shell: cmd
 
       - name: Upload artifacts (macOS)
@@ -275,8 +275,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: windows-build
-          path: |
-            out/make/zip/win32/x64/*.zip
+          # Squirrel output: SmartBookSetup.exe + RELEASES + *.nupkg
+          # All three are required — RELEASES references the nupkg by filename
+          path: out/make/squirrel.windows/x64/
           retention-days: 30
 
   release:
@@ -335,7 +336,7 @@ jobs:
           files: |
             ./artifacts/macos/**/*.dmg
             ./artifacts/macos/**/*.zip
-            ./artifacts/windows/**/*.zip
+            ./artifacts/windows/SmartBookSetup.exe
           prerelease: ${{ github.event.inputs.prerelease == 'true' || contains(steps.set_version.outputs.version, 'beta') || contains(steps.set_version.outputs.version, 'alpha') }}
           generate_release_notes: true
           draft: false
@@ -344,27 +345,16 @@ jobs:
             ## Smart Book Reader ${{ steps.set_version.outputs.version }}
 
             ### Downloads
-            - **Windows**:
-              - `.zip` portable - extract and run
-            - **macOS**:
-              - `.dmg` file - drag to Applications
-              - `.zip` portable - extract and run
+            - **Windows**: `SmartBookSetup.exe` — installer (first time only, updates are automatic after this)
+            - **macOS**: `.dmg` file — drag to Applications
 
-            ### Windows Installation
-            **Note**: Smart Book is not signed with a Windows code signing certificate.
+            ### Windows Installation (First Time)
+            1. Download `SmartBookSetup.exe`
+            2. Run it — if SmartScreen appears, click **"More info" → "Run anyway"** (one-time)
+            3. Smart Book installs and launches automatically
 
-            1. Download `Smart.Book-win32-x64-*.zip`
-            2. Extract to a folder (e.g., `C:\Apps\SmartBook\`)
-            3. Right-click `Smart Book.exe` → Properties
-            4. Check "Unblock" → Apply
-            5. Run `Smart Book.exe`
-
-            **If Windows SmartScreen appears:**
-            - Click "More info"
-            - Click "Run anyway"
-
-            **Why?** Code signing certificates cost $300-500/year. The portable ZIP
-            approach is free and works perfectly - just needs one-time security approval.
+            **After first install:** The app checks for updates silently on every launch.
+            A "Restart Now" banner appears at the bottom when an update is ready — no manual downloading needed.
 
             ### macOS Installation
             - Open the DMG and drag to Applications folder
@@ -444,16 +434,15 @@ jobs:
             mkdir -p ${VPS_PATH}/windows ${VPS_PATH}/macos ${VPS_PATH}/release-notes
           "
 
-          # Upload Windows artifacts (handle filenames with spaces)
-          WINDOWS_COUNT=$(find ./artifacts/windows -name "*.zip" -type f 2>/dev/null | wc -l)
-          if [ "$WINDOWS_COUNT" -gt 0 ]; then
-            echo "Found $WINDOWS_COUNT Windows artifact(s)"
-            find ./artifacts/windows -name "*.zip" -type f -print0 | while IFS= read -r -d '' file; do
-              echo "Uploading: $file"
-              rsync -avz --progress -e "ssh -i ~/.ssh/vps_key" "$file" ${VPS_USER}@${VPS_HOST}:${VPS_PATH}/windows/
-            done
+          # Upload Windows Squirrel feed (RELEASES + *.nupkg + SmartBookSetup.exe)
+          # autoUpdater fetches RELEASES from this directory to check for updates
+          if [ -f "./artifacts/windows/RELEASES" ]; then
+            echo "Uploading Windows Squirrel feed..."
+            rsync -avz --progress -e "ssh -i ~/.ssh/vps_key" \
+              ./artifacts/windows/ \
+              ${VPS_USER}@${VPS_HOST}:${VPS_PATH}/windows/
           else
-            echo "Warning: No Windows .zip artifacts found"
+            echo "Warning: No Windows Squirrel RELEASES file found"
           fi
 
           # Upload macOS artifacts (handle filenames with spaces)
@@ -491,7 +480,7 @@ jobs:
             echo 'Files in releases directory:'
             ls -la ${VPS_PATH}/
             echo ''
-            echo 'Windows artifacts:'
+            echo 'Windows Squirrel feed:'
             ls -la ${VPS_PATH}/windows/ || echo 'No Windows artifacts'
             echo ''
             echo 'macOS artifacts:'

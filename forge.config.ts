@@ -1,4 +1,5 @@
 import type { ForgeConfig } from '@electron-forge/shared-types';
+import { MakerSquirrel } from '@electron-forge/maker-squirrel';
 import { MakerZIP } from '@electron-forge/maker-zip';
 import { MakerDeb } from '@electron-forge/maker-deb';
 import { MakerRpm } from '@electron-forge/maker-rpm';
@@ -79,13 +80,20 @@ const config: ForgeConfig = {
     },
   },
   makers: [
-    // Windows: Portable ZIP only (avoids Application Control policies)
-    // The embedded Python approach triggers Windows security policies because:
-    // - Unsigned python.exe inside signed Electron app breaks trust chain
-    // - Batch file execution appears suspicious to Windows Defender
-    // Code signing certificates cost $300-500/year. ZIP distribution works perfectly
-    // with one-time security approval from users.
-    new MakerZIP({}, ['darwin', 'win32']),
+    // Windows: Squirrel installer — enables silent auto-update via Electron autoUpdater.
+    // Friends install once via SmartBookSetup.exe, then the app updates itself silently.
+    // SmartScreen may warn on first install (one-time bypass: "More info" → "Run anyway").
+    // All subsequent updates happen in-app with no user friction.
+    new MakerSquirrel({
+      name: 'SmartBook',
+      setupExe: 'SmartBookSetup.exe',
+      setupIcon: 'assets/icon.ico',
+      // Code signing (optional — add cert secrets to GitHub Actions to eliminate SmartScreen):
+      // certificateFile: process.env.WINDOWS_CERTIFICATE_FILE,
+      // certificatePassword: process.env.WINDOWS_CERTIFICATE_PASSWORD,
+    }),
+    // macOS: ZIP + DMG (ZIP used by autoUpdater feed; DMG for manual first install)
+    new MakerZIP({}, ['darwin']),
     new MakerDMG({
       format: 'ULFO',
       icon: 'assets/icon.icns',

@@ -226,6 +226,15 @@ const electronAPI: ElectronAPI = {
       ipcRenderer.invoke(IPC_CHANNELS.UPDATE_GET_PREFERENCES),
     setAutoCheck: (enabled: boolean) =>
       ipcRenderer.invoke(IPC_CHANNELS.UPDATE_SET_AUTO_CHECK, enabled),
+    // Windows Squirrel: quit app and apply the downloaded update
+    installUpdate: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.UPDATE_INSTALL),
+    // Listen for Squirrel "update downloaded and ready to install" event
+    onUpdateDownloaded: (callback: () => void) => {
+      const handler = () => callback();
+      ipcRenderer.on('squirrel:update-downloaded', handler);
+      return () => ipcRenderer.removeListener('squirrel:update-downloaded', handler);
+    },
   },
 };
 

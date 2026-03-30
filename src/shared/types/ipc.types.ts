@@ -201,6 +201,8 @@ export interface ElectronAPI {
     skipVersion: (version: string) => Promise<UpdateSkipVersionResponse>;
     getPreferences: () => Promise<UpdatePreferencesResponse>;
     setAutoCheck: (enabled: boolean) => Promise<UpdateSetPreferenceResponse>;
+    installUpdate: () => Promise<{ success: boolean; error?: string }>;
+    onUpdateDownloaded: (callback: () => void) => () => void;
   };
 }
 

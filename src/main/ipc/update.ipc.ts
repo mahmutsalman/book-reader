@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron';
+import { ipcMain, autoUpdater } from 'electron';
 import { IPC_CHANNELS } from '../../shared/constants/ipc-channels';
 import { updateService } from '../services/update.service';
 import type {
@@ -97,6 +97,26 @@ export function registerUpdateHandlers(): void {
         return { success: true };
       } catch (error) {
         console.error('Failed to set auto-check preference:', error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        };
+      }
+    }
+  );
+
+  // Install downloaded Squirrel update (Windows only) — quits app and applies update
+  ipcMain.handle(
+    IPC_CHANNELS.UPDATE_INSTALL,
+    async (): Promise<{ success: boolean; error?: string }> => {
+      if (process.platform !== 'win32') {
+        return { success: false, error: 'Auto-install is only supported on Windows' };
+      }
+      try {
+        autoUpdater.quitAndInstall();
+        return { success: true };
+      } catch (error) {
+        console.error('Failed to install update:', error);
         return {
           success: false,
           error: error instanceof Error ? error.message : 'Unknown error',
