@@ -59,6 +59,10 @@ export const DeferredWordProvider: React.FC<DeferredWordProviderProps> = ({ chil
   // Use ref to track active fetches without causing re-renders
   const activeFetchesRef = useRef<Set<string>>(new Set());
 
+  // Mirror queuedWords in a ref so read-only callbacks stay stable across renders
+  const queuedWordsRef = useRef(queuedWords);
+  queuedWordsRef.current = queuedWords;
+
   // Clean up expired entries and old cache versions periodically
   useEffect(() => {
     const cleanup = () => {
@@ -403,6 +407,8 @@ export const DeferredWordProvider: React.FC<DeferredWordProviderProps> = ({ chil
   }, []);
 
   // Check if a word or phrase has ready data (sentence-specific for both)
+  // Stable callbacks — read from ref so their identity never changes.
+  // This prevents effects that list these as deps from re-running on every word status update.
   const isWordReady = useCallback((word: string, sentence: string, bookId: number): boolean => {
     const cleanText = isPhrase(word)
       ? word.toLowerCase().trim()
@@ -410,9 +416,9 @@ export const DeferredWordProvider: React.FC<DeferredWordProviderProps> = ({ chil
     const key = isPhrase(word)
       ? generatePhraseKey(bookId, cleanText, sentence)
       : generateWordKey(bookId, cleanText, sentence);
-    const entry = queuedWords.get(key);
+    const entry = queuedWordsRef.current.get(key);
     return entry?.status === 'ready';
-  }, [queuedWords]);
+  }, []); // stable — reads latest data via ref
 
   // Get the status of a word or phrase (sentence-specific for both)
   const getWordStatus = useCallback((word: string, sentence: string, bookId: number): QueuedWordStatus | null => {
@@ -422,9 +428,9 @@ export const DeferredWordProvider: React.FC<DeferredWordProviderProps> = ({ chil
     const key = isPhrase(word)
       ? generatePhraseKey(bookId, cleanText, sentence)
       : generateWordKey(bookId, cleanText, sentence);
-    const entry = queuedWords.get(key);
+    const entry = queuedWordsRef.current.get(key);
     return entry?.status ?? null;
-  }, [queuedWords]);
+  }, []); // stable — reads latest data via ref
 
   // Get cached data for a word or phrase (sentence-specific for both)
   const getWordData = useCallback((word: string, sentence: string, bookId: number): CachedWordData | null => {
@@ -434,9 +440,9 @@ export const DeferredWordProvider: React.FC<DeferredWordProviderProps> = ({ chil
     const key = isPhrase(word)
       ? generatePhraseKey(bookId, cleanText, sentence)
       : generateWordKey(bookId, cleanText, sentence);
-    const entry = queuedWords.get(key);
+    const entry = queuedWordsRef.current.get(key);
     return entry?.data ?? null;
-  }, [queuedWords]);
+  }, []); // stable — reads latest data via ref
 
   // Clear all words for a specific book
   const clearBookWords = useCallback((bookId: number) => {
