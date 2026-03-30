@@ -99,12 +99,19 @@ app.on('ready', async () => {
     // Create window
     createWindow();
 
-    // Windows auto-update via Squirrel (production only — not in dev server mode)
-    if (process.platform === 'win32' && !MAIN_WINDOW_VITE_DEV_SERVER_URL) {
+    // Auto-update via Squirrel (production only — not in dev server mode)
+    if (!MAIN_WINDOW_VITE_DEV_SERVER_URL) {
       try {
-        autoUpdater.setFeedURL({
-          url: 'https://smartbook.mahmutsalman.cloud/releases/windows',
-        });
+        if (process.platform === 'win32') {
+          autoUpdater.setFeedURL({
+            url: 'https://smartbook.mahmutsalman.cloud/releases/windows',
+          });
+        } else if (process.platform === 'darwin') {
+          // Squirrel.Mac: dynamic endpoint that compares versions server-side
+          autoUpdater.setFeedURL({
+            url: `https://smartbook.mahmutsalman.cloud/update/darwin/${process.arch}/${app.getVersion()}`,
+          });
+        }
 
         autoUpdater.on('update-downloaded', () => {
           console.log('Squirrel: update downloaded, ready to install');

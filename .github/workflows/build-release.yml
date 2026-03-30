@@ -134,6 +134,11 @@ jobs:
         run: npm run make
         env:
           DEBUG: electron-forge:*
+          # macOS code signing + notarization (only active on macOS runner when secrets exist)
+          APPLE_IDENTITY: ${{ secrets.APPLE_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
       - name: Debug output structure (Windows)
         if: runner.os == 'Windows'

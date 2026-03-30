@@ -33,6 +33,17 @@ const config: ForgeConfig = {
       unpack: '{**/node_modules/better-sqlite3/**,**/node_modules/bindings/**,**/node_modules/file-uri-to-path/**}',
     },
     icon: 'assets/icon',
+    // macOS code signing — requires APPLE_IDENTITY secret in GitHub Actions
+    ...(process.platform === 'darwin' && process.env.APPLE_IDENTITY ? {
+      osxSign: {
+        identity: process.env.APPLE_IDENTITY,
+      },
+      osxNotarize: {
+        appleId: process.env.APPLE_ID!,
+        appleIdPassword: process.env.APPLE_APP_SPECIFIC_PASSWORD!,
+        teamId: process.env.APPLE_TEAM_ID!,
+      },
+    } : {}),
     // Include embedded Python runtime and server files
     extraResource: [
       // Bundle entire Python runtime directory
