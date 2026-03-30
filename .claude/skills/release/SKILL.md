@@ -3,15 +3,15 @@ name: release
 description: >
   Use this skill when the user wants to release a new version of Smart Book,
   trigger a build, or says things like "release", "build and release", "trigger build",
-  "publish new version", "make a release". Handles version bump, commit, push, and
-  GitHub Actions trigger — in the right order to avoid the filename/version mismatch bug.
+  "publish new version", "make a release". Handles version bump, commit, tag, and
+  push — in the right order to avoid the filename/version mismatch bug.
 ---
 
 # Smart Book Release Skill
 
-## The Rule (Never Skip)
+## The Golden Rule (Never Skip)
 
-`package.json` version MUST be bumped BEFORE the build is triggered.
+`package.json` version MUST be bumped and committed BEFORE the tag is pushed.
 `app.getVersion()` reads from `package.json`, NOT the git tag.
 If you skip this, artifact filenames say the old version and the app
 reports the wrong version in Settings forever.
@@ -20,72 +20,75 @@ reports the wrong version in Settings forever.
 
 ### 1. Determine new version
 
-Read current version from `package.json`. Ask the user for the new version
-if they haven't specified one. Suggest the next patch increment by default
-(e.g. `1.0.15` → `1.0.16`).
+Read current version from `package.json`:
+```bash
+grep '"version"' package.json
+```
+
+Ask the user for the new version if not specified.
+Default suggestion: next patch increment (e.g. `1.0.15` → `1.0.16`).
 
 ### 2. Bump package.json
 
-Use `sed` or `Edit` tool to update the `"version"` field in `package.json`.
-Verify the change with `grep '"version"' package.json`.
+```bash
+sed -i '' 's/"version": "X.X.X"/"version": "Y.Y.Y"/' package.json
+grep '"version"' package.json   # verify
+```
 
 ### 3. Commit the version bump
 
-Stage ONLY `package.json`:
 ```bash
 git add package.json
+git commit -m "chore: bump version to Y.Y.Y"
 ```
 
-Commit with:
-```bash
-git commit -m "chore: bump version to X.X.X"
-```
-
-### 4. Push to main
+### 4. Push main
 
 ```bash
 git push origin main
 ```
 
-### 5. Trigger GitHub Actions build
+### 5. Create and push the tag
 
 ```bash
-gh workflow run build-release.yml --ref main -f version=vX.X.X -f prerelease=true
+git tag vY.Y.Y
+git push origin vY.Y.Y
 ```
 
-Use the SAME version that was set in `package.json` (e.g. `v1.0.16`).
+This automatically triggers GitHub Actions via `on: push: tags: v*`.
+The run will show the commit message and version badge in the Actions UI.
 
 ### 6. Confirm the build started
 
 ```bash
-sleep 4 && gh run list --workflow=build-release.yml --limit=3
+sleep 5 && gh run list --workflow=build-release.yml --limit=3
 ```
 
-Show the user the run ID and status.
+The run title should show the commit message (e.g. "chore: bump version to Y.Y.Y"),
+NOT "Manually run by..." — if it says Manually run, you used workflow_dispatch by mistake.
 
-### 7. Verify artifact filenames (after build completes)
+### 7. Verify artifact filenames after build completes (~15 min)
 
-Once the build finishes, check:
 ```bash
-gh release view vX.X.X --json assets --jq '.assets[].name'
+gh release view vY.Y.Y --json assets --jq '.assets[].name'
 ```
 
-The artifact filenames MUST contain the new version number.
-If they still show the old version → the package.json bump was not picked up → investigate.
+Filenames MUST contain the new version number. If they show the old version,
+the package.json bump was not picked up → investigate.
 
 ## What NOT to Do
 
-- Never trigger the build before pushing the package.json bump
-- Never use `git tag` manually — the CI creates the tag via `workflow_dispatch`
-- Never skip the version bump — even for "small" fixes
-- Never bump package.json AFTER triggering the build
+- Never use `gh workflow run build-release.yml` — this triggers workflow_dispatch
+  which shows as "Manually run" with no commit info or version badge
+- Never push the tag before pushing the package.json bump commit
+- Never skip the version bump, even for small fixes
+- Never manually create a GitHub Release — the CI creates it automatically from the tag
 
-## Build takes ~15 minutes
+## After Build Completes
 
-Both macOS and Windows build in parallel on GitHub Actions.
-The deploy-to-vps job runs after both complete and updates:
-- `/releases/latest.json` — Squirrel.Mac feed for macOS
-- `/releases/windows/RELEASES` — Squirrel feed for Windows
+The deploy-to-vps job updates:
+- `/releases/latest.json` — Squirrel.Mac feed (macOS silent update)
+- `/releases/windows/RELEASES` — Squirrel feed (Windows silent update)
 
-After deploy, all running app instances will detect the update within 10 seconds
-of their next launch.
+All running app instances detect the update within 10 seconds of their next launch
+and show the "Restart Now" banner automatically.
