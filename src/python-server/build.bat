@@ -174,21 +174,21 @@ if !ERRORLEVEL! NEQ 0 (
     exit /b 1
 )
 
-echo Installing RapidOCR (bundled OCR engine)...
-"%RUNTIME_DIR%\python.exe" -m pip install "rapidocr-onnxruntime>=1.3.0"
+echo Installing OnnxOCR with PP-OCRv5 mobile models ^(bundled, no PaddlePaddle needed^)...
+"%RUNTIME_DIR%\python.exe" -m pip install "onnxocr-ppocrv5>=0.0.14"
 if !ERRORLEVEL! NEQ 0 (
-    echo Error: Failed to install RapidOCR
+    echo Error: Failed to install OnnxOCR
     exit /b 1
 )
 
-echo Pre-downloading RapidOCR models (bundled into app)...
-"%RUNTIME_DIR%\python.exe" -c "from rapidocr_onnxruntime import RapidOCR; RapidOCR(); print('[RapidOCR] Models ready')"
+echo Verifying OnnxOCR initialization...
+"%RUNTIME_DIR%\python.exe" -c "import logging, numpy as np; logging.getLogger('onnxocr').setLevel(logging.WARNING); from onnxocr.onnx_paddleocr import ONNXPaddleOcr; ONNXPaddleOcr(use_angle_cls=True, use_gpu=False, use_openvino=False); print('[OnnxOCR] PP-OCRv5 models ready')"
 if !ERRORLEVEL! NEQ 0 (
-    echo Warning: RapidOCR model pre-download failed ^(will attempt on first use^)
+    echo Warning: OnnxOCR verification failed ^(will attempt on first use^)
 )
 
 echo.
-echo [OK] Core dependencies installed (RapidOCR bundled; PaddleOCR optional via Settings UI)
+echo [OK] Core dependencies installed (OnnxOCR + PP-OCRv5 bundled; PaddleOCR optional via Settings UI)
 
 REM Verify launcher script exists (maintained separately in source control)
 echo.

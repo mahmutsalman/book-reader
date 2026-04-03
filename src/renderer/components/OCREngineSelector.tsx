@@ -20,40 +20,23 @@ interface EngineOption {
 
 const OCR_ENGINES: EngineOption[] = [
   {
-    id: 'tesseract',
-    name: 'Tesseract',
-    description: 'Installed by default - Fast and reliable for printed text',
-    features: ['Fast', 'CPU only', 'Good for printed text', '~4MB'],
+    id: 'rapidocr',
+    name: 'OnnxOCR (PP-OCRv5)',
+    description: 'Built-in — PP-OCRv5 mobile models, no download needed',
+    features: ['Built-in', 'CPU only', 'PP-OCRv5', '~19MB'],
+    recommended: true,
   },
   {
     id: 'paddleocr',
     name: 'PaddleOCR',
-    description: 'Installed by default - Optimized for comics/manga with varied fonts',
-    features: ['Very fast', 'CPU/GPU', 'Excellent for comics', '<10MB'],
-    recommended: true,
+    description: 'Optional install via Settings — requires ~50MB download',
+    features: ['Optional install', 'CPU/GPU', 'Excellent for CJK', '~50MB'],
   },
   {
-    id: 'trocr',
-    name: 'TrOCR',
-    description: '📥 Download from UI - Transformer-based, excellent for handwriting',
-    features: ['Handwriting specialist', 'GPU recommended', 'Slower', '~500MB', '📥 Downloadable'],
-    requiresGPU: true,
-    isDownloadable: true,
-  },
-  {
-    id: 'easyocr',
-    name: 'EasyOCR',
-    description: '📥 Download from UI - Good balance, supports 80+ languages',
-    features: ['80+ languages', 'CPU/GPU', 'Good overall', '~100MB', '📥 Downloadable'],
-    isDownloadable: true,
-  },
-  {
-    id: 'hybrid',
-    name: 'Hybrid (PaddleOCR + TrOCR)',
-    description: '📥 Requires TrOCR download - Auto-switches based on confidence',
-    features: ['Best quality', 'Smart fallback', 'Automatic', 'GPU optional', '📥 Requires TrOCR'],
-    recommended: true,
-    isDownloadable: true,
+    id: 'tesseract',
+    name: 'Tesseract',
+    description: 'Fallback — requires Tesseract installed on system',
+    features: ['System install', 'CPU only', 'Printed text', '~4MB'],
   },
 ];
 

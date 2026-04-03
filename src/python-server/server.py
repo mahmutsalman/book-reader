@@ -212,25 +212,27 @@ shutdown_flag = False
 _installing_ocr: Dict[str, bool] = {}
 _install_progress: Dict[str, int] = {}
 
-# RapidOCR support (bundled — no installation required)
+# OnnxOCR support (bundled — PP-OCRv5 mobile, no PaddlePaddle framework required)
 RAPIDOCR_AVAILABLE = False
 _rapid_ocr = None
 
 
 def init_rapidocr():
-    """Initialize RapidOCR at server startup using bundled package models."""
+    """Initialize OnnxOCR at server startup using bundled PP-OCRv5 mobile models."""
     global RAPIDOCR_AVAILABLE, _rapid_ocr
     try:
-        from rapidocr_onnxruntime import RapidOCR
-        _rapid_ocr = RapidOCR()
+        import logging
+        from onnxocr.onnx_paddleocr import ONNXPaddleOcr
+        logging.getLogger('onnxocr').setLevel(logging.WARNING)
+        _rapid_ocr = ONNXPaddleOcr(use_angle_cls=True, use_gpu=False, use_openvino=False)
         RAPIDOCR_AVAILABLE = True
-        print("[RapidOCR] Initialized successfully (bundled)", file=sys.stderr)
+        print("[OnnxOCR] Initialized with PP-OCRv5 mobile models (bundled)", file=sys.stderr)
     except Exception as e:
-        print(f"[RapidOCR] init failed: {e}", file=sys.stderr)
+        print(f"[OnnxOCR] init failed: {e}", file=sys.stderr)
         RAPIDOCR_AVAILABLE = False
 
 
-# Initialize RapidOCR eagerly at server startup
+# Initialize OnnxOCR eagerly at server startup
 init_rapidocr()
 
 
@@ -1723,7 +1725,10 @@ def perform_paddleocr(img, x_offset=0, y_offset=0, language: str = "en"):
 
 def perform_rapidocr(img, x_offset=0, y_offset=0):
     """
-    Perform OCR using RapidOCR (bundled) and convert results to OCRTextRegion format.
+    Perform OCR using OnnxOCR (PP-OCRv5 mobile, bundled) and convert results to OCRTextRegion format.
+
+    onnxocr output format: result[0] = [[box, (text, confidence)], ...]
+    where box is [[x1,y1],[x2,y2],[x3,y3],[x4,y4]]
 
     Returns:
         Tuple of (regions, total_extracted)
@@ -1736,13 +1741,16 @@ def perform_rapidocr(img, x_offset=0, y_offset=0):
         else:
             img_np = np.array(img)
 
-        result, _ = _rapid_ocr(img_np)
+        raw = _rapid_ocr.ocr(img_np)
     finally:
         if img_for_ocr is not None:
             img_for_ocr.close()
             del img_for_ocr
         del img_np
         gc.collect()
+
+    # onnxocr returns [[items]] — first element is the page results
+    result = raw[0] if raw and raw[0] else []
 
     if not result:
         return [], 0
@@ -1752,7 +1760,8 @@ def perform_rapidocr(img, x_offset=0, y_offset=0):
     MIN_CONFIDENCE = 0.15
 
     for item in result:
-        bbox_pts, text, score = item
+        bbox_pts, rec_result = item
+        text, score = rec_result if isinstance(rec_result, (list, tuple)) else (rec_result, 0.0)
         if not isinstance(text, str) or not text.strip():
             continue
         try:
@@ -1777,8 +1786,12 @@ def perform_rapidocr(img, x_offset=0, y_offset=0):
             'confidence_tier': confidence_tier
         }
 
-        # Split line into individual word-level regions (same as PaddleOCR path)
         word_regions = segment_region_into_words(region_dict)
+
+        # DEBUG: log raw OCR line and segmentation
+        word_texts = [wr['text'] for wr in word_regions]
+        print(f"[OnnxOCR DEBUG] raw={repr(text.strip())} → words={word_texts} (conf={confidence:.2f})")
+
         for word_region in word_regions:
             regions.append(OCRTextRegion(
                 text=word_region['text'],

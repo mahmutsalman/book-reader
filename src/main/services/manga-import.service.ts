@@ -178,34 +178,49 @@ class MangaImportService {
       // Load the WASM binary from disk and pass it directly.
       // In packaged builds, node-unrar-js is copied alongside app.asar via packageAfterCopy hook.
       const wasmCandidates = [
-        path.join(__dirname, '../../../node_modules/node-unrar-js/esm/js/unrar.wasm'),  // dev
+        path.join(__dirname, '../../../node_modules/node-unrar-js/dist/js/unrar.wasm'),  // dev
+        path.join(__dirname, '../../../node_modules/node-unrar-js/esm/js/unrar.wasm'),   // dev alt
         path.join(process.resourcesPath || '', 'unrar.wasm'),  // packaged (extraResource)
       ];
       const wasmPath = wasmCandidates.find(p => fs.existsSync(p));
       const wasmBinary = wasmPath ? fs.readFileSync(wasmPath).buffer as ArrayBuffer : undefined;
+      // createExtractorFromFile writes files directly to targetPath (outputDir).
+      // file.extraction is always undefined for this variant — scan disk after extraction.
       const extractor = await createExtractorFromFile({ filepath: cbrPath, targetPath: outputDir, wasmBinary });
       const extracted = extractor.extract();
-      const files = [...extracted.files];
+      // Consume the generator to trigger all writes to disk
+      for (const _ of extracted.files) { /* extraction happens as generator is consumed */ }
 
-      for (const file of files) {
-        const fileName = file.fileHeader.name;
-
-        // Extract ComicInfo.xml
-        if (fileName.toLowerCase() === 'comicinfo.xml') {
-          comicInfoXml = (file.extraction as unknown as Buffer)?.toString('utf-8') || null;
-          continue;
+      // Find ComicInfo.xml anywhere in the extracted directory tree
+      const findComicInfo = (dir: string): string | null => {
+        for (const entry of fs.readdirSync(dir)) {
+          const full = path.join(dir, entry);
+          if (entry.toLowerCase() === 'comicinfo.xml') return fs.readFileSync(full, 'utf-8');
+          if (fs.statSync(full).isDirectory()) {
+            const found = findComicInfo(full);
+            if (found) return found;
+          }
         }
+        return null;
+      };
+      comicInfoXml = findComicInfo(outputDir);
 
-        // Extract image files
-        const imageExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp'];
-        const ext = path.extname(fileName).toLowerCase();
-
-        if (imageExtensions.includes(ext) && file.extraction) {
-          const outputPath = path.join(outputDir, path.basename(fileName));
-          fs.writeFileSync(outputPath, file.extraction);
-          images.push(outputPath);
+      // Collect extracted image files recursively (archives often nest images in subdirectories)
+      // Then move them to the root of outputDir so path.basename() lookups work correctly.
+      const imageExtensions = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp'];
+      const scanDir = (dir: string) => {
+        for (const entry of fs.readdirSync(dir)) {
+          const full = path.join(dir, entry);
+          if (fs.statSync(full).isDirectory()) {
+            scanDir(full);
+          } else if (imageExtensions.includes(path.extname(entry).toLowerCase())) {
+            const dest = path.join(outputDir, entry);
+            if (full !== dest) fs.renameSync(full, dest);
+            images.push(dest);
+          }
         }
-      }
+      };
+      scanDir(outputDir);
 
       // Sort images naturally
       images.sort((a, b) => {

@@ -84,6 +84,8 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
     };
   } | null>(null);
   const [showOcrFeedback, setShowOcrFeedback] = useState(false);
+  // Right-click context menu for individual OCR regions
+  const [regionContextMenu, setRegionContextMenu] = useState<{ x: number; y: number; idx: number } | null>(null);
   // Translation status tracking for OCR regions
   const [regionTranslationStatus, setRegionTranslationStatus] = useState<Map<number, 'loading' | 'ready'>>(new Map());
   // Phrase ranges for multi-word selections
@@ -595,6 +597,30 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
 
     return sameLine.slice(start, end).map(r => r.text).join(' ');
   }, []);
+
+  /**
+   * Right-click on a region: show remove context menu.
+   */
+  const handleRegionContextMenu = useCallback((idx: number, event: React.MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setRegionContextMenu({ x: event.clientX, y: event.clientY, idx });
+  }, []);
+
+  /**
+   * Remove a single OCR region and persist the change.
+   */
+  const handleRemoveRegion = useCallback(async (idx: number) => {
+    setRegionContextMenu(null);
+    const updated = ocrRegions.filter((_, i) => i !== idx);
+    setOcrRegions(updated);
+    ocrOverridesRef.current.set(page.page, updated);
+    try {
+      await window.electronAPI.book.updateMangaPageOCR(bookId, page.page, updated);
+    } catch (e) {
+      console.error('[MangaImageView] Failed to persist region removal:', e);
+    }
+  }, [bookId, ocrRegions, page.page]);
 
   /**
    * Handle single region click or multi-selection.
@@ -1110,6 +1136,8 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
     setIsOcrProcessing(true);
 
     try {
+      console.log('[OCR DEBUG] Sending rect to OCR:', { rect, engine: ocrEngine, lang: bookLanguage });
+
       const response = await window.electronAPI.book.ocrMangaRegion(
         page.image_path,
         rect,
@@ -1121,6 +1149,15 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
       if (response.metadata) {
         setOcrMetadata(response.metadata);
       }
+
+      console.log('[OCR DEBUG] Raw regions from server:', response.regions.map((r: { text: string; bbox: number[]; confidence: number }) => ({
+        text: r.text,
+        words: r.text.split(/\s+/),
+        wordCount: r.text.split(/\s+/).length,
+        hasSpaces: r.text.includes(' '),
+        bbox: r.bbox,
+        conf: Math.round(r.confidence * 100) + '%',
+      })));
 
       const filteredRegions = ocrRegions.filter(region => !rectanglesOverlap(
         region.bbox,
@@ -1172,6 +1209,7 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
   }, [bookId, bookLanguage, ocrEngine, ocrRegions, page.image_path, page.page, rectanglesOverlap]);
 
   const handleSelectionStart = useCallback((event: React.MouseEvent) => {
+    console.log('[OCR DEBUG] handleSelectionStart called — ocrSelectionMode:', ocrSelectionMode, 'isOcrProcessing:', isOcrProcessing);
     if (!ocrSelectionMode || isOcrProcessing) return;
     if (!imageRef.current || !imageDimensions) return;
     if (event.button !== 0) return;
@@ -1602,6 +1640,7 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
                   }}
                   onMouseDown={(e) => handleRegionMouseDown(idx, e)}
                   onClick={(e) => handleRegionClick(region, idx, e)}
+                  onContextMenu={(e) => handleRegionContextMenu(idx, e)}
                   onMouseEnter={(e) => handleRegionMouseEnter(idx, e)}
                   onMouseLeave={() => setHoveredRegion(null)}
                 >
@@ -1668,6 +1707,50 @@ export const MangaImageView: React.FC<MangaImageViewProps> = ({
         >
           {Math.round(zoom * 100)}%
         </div>
+      )}
+
+      {/* Right-click context menu for removing an OCR region */}
+      {regionContextMenu && (
+        <>
+          <div
+            style={{ position: 'fixed', inset: 0, zIndex: 9998 }}
+            onClick={() => setRegionContextMenu(null)}
+            onContextMenu={(e) => { e.preventDefault(); setRegionContextMenu(null); }}
+          />
+          <div
+            style={{
+              position: 'fixed',
+              top: regionContextMenu.y,
+              left: regionContextMenu.x,
+              zIndex: 9999,
+              backgroundColor: '#1e1e1e',
+              border: '1px solid rgba(255,255,255,0.15)',
+              borderRadius: 8,
+              boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+              overflow: 'hidden',
+              minWidth: 160,
+            }}
+          >
+            <button
+              style={{
+                display: 'block',
+                width: '100%',
+                padding: '10px 16px',
+                background: 'none',
+                border: 'none',
+                color: '#ff6b6b',
+                fontSize: 14,
+                textAlign: 'left',
+                cursor: 'pointer',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = 'rgba(255,107,107,0.15)')}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+              onClick={() => handleRemoveRegion(regionContextMenu.idx)}
+            >
+              Remove region
+            </button>
+          </div>
+        </>
       )}
 
       {selectedRegions.length > 0 && (

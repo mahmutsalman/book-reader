@@ -11,6 +11,7 @@ interface FocusModeHeaderProps {
   onToggleSimpler: () => void;
   isManga?: boolean;
   ocrSelectionMode?: boolean;
+  ocrEngine?: string;
   onToggleOcr?: () => void;
 }
 
@@ -23,6 +24,7 @@ const FocusModeHeader: React.FC<FocusModeHeaderProps> = ({
   onToggleSimpler,
   isManga = false,
   ocrSelectionMode = false,
+  ocrEngine = 'rapidocr',
   onToggleOcr,
 }) => {
   const theme = useReaderTheme();
@@ -152,7 +154,7 @@ const FocusModeHeader: React.FC<FocusModeHeaderProps> = ({
                 event.currentTarget.style.backgroundColor = theme.panelBorder;
               }
             }}
-            title={ocrSelectionMode ? 'Exit OCR Selection Mode (Ctrl+O)' : 'OCR Selection Mode (Ctrl+O)'}
+            title={(() => { const n = ocrEngine === 'rapidocr' ? 'OnnxOCR (PP-OCRv5)' : ocrEngine.toUpperCase(); return ocrSelectionMode ? `Exit OCR Selection Mode (Ctrl+O)\nEngine: ${n}` : `OCR Selection Mode (Ctrl+O)\nEngine: ${n}`; })()}
           >
             <div className="flex items-center gap-1.5">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">

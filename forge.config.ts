@@ -47,7 +47,7 @@ const config: ForgeConfig = {
     // Include embedded Python runtime and server files
     extraResource: [
       // WASM binary for CBR extraction (node-unrar-js fetch fails in Electron main process)
-      'node_modules/node-unrar-js/esm/js/unrar.wasm',
+      'node_modules/node-unrar-js/dist/js/unrar.wasm',
 
       // Bundle entire Python runtime directory
       'src/python-server/python-runtime',

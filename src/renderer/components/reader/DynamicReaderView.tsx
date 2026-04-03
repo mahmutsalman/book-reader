@@ -227,6 +227,15 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
     }
   }, [bookData.type, ocrSelectionMode]);
 
+  // Load saved OCR engine preference from settings on mount
+  useEffect(() => {
+    window.electronAPI.settings.get('ocr_engine').then((saved) => {
+      const valid: OCREngine[] = ['rapidocr', 'paddleocr', 'tesseract'];
+      const engine = saved as OCREngine;
+      setCurrentOCREngine(valid.includes(engine) ? engine : 'rapidocr');
+    }).catch(() => {});
+  }, []);
+
   // Set CSS custom properties for theme colors (for use in CSS animations and global styles)
   useEffect(() => {
     const root = document.documentElement;
@@ -1854,25 +1863,9 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
 
           {bookData.type === 'manga' && (
             <button
-              onClick={async () => {
-                // Check if OCR is installed before activating selection mode
-                try {
-                  const res = await fetch('http://127.0.0.1:8766/api/ocr/engines');
-                  const data = await res.json();
-                  const anyReady = data.engines?.some((e: { engine: string; installed: boolean }) => e.installed);
-
-                  if (anyReady) {
-                    // An OCR engine is available, toggle selection mode
-                    setOcrSelectionMode(prev => !prev);
-                  } else {
-                    // No OCR engine available, show installation prompt
-                    setShowOcrInstallPrompt(true);
-                  }
-                } catch (err) {
-                  console.error('Failed to check OCR installation status:', err);
-                  // Fallback: show installation prompt
-                  setShowOcrInstallPrompt(true);
-                }
+              onClick={() => {
+                // RapidOCR is always built-in — toggle selection mode directly
+                setOcrSelectionMode(prev => !prev);
               }}
               onContextMenu={(e) => {
                 e.preventDefault();
@@ -1896,7 +1889,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
                   event.currentTarget.style.backgroundColor = theme.panelBorder;
                 }
               }}
-              title={ocrSelectionMode ? 'Exit OCR Selection Mode (Ctrl+O)\nRight-click to change OCR engine' : 'OCR Selection Mode (Ctrl+O)\nRight-click to change OCR engine'}
+              title={(() => { const n = currentOCREngine === 'rapidocr' ? 'OnnxOCR (PP-OCRv5)' : currentOCREngine.toUpperCase(); return ocrSelectionMode ? `Exit OCR Selection Mode (Ctrl+O)\nEngine: ${n}\nRight-click to change engine` : `OCR Selection Mode (Ctrl+O)\nEngine: ${n}\nRight-click to change engine`; })()}
               aria-pressed={ocrSelectionMode}
             >
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
@@ -1992,6 +1985,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
           }}
           isManga={bookData.type === 'manga'}
           ocrSelectionMode={ocrSelectionMode}
+          ocrEngine={currentOCREngine}
           onToggleOcr={async () => {
             try {
               const res = await fetch('http://127.0.0.1:8766/api/ocr/engines');
@@ -2292,8 +2286,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
             onChange={(engine) => {
               setCurrentOCREngine(engine);
               setShowOCREngineMenu(false);
-              // TODO: Persist to settings and notify backend
-              console.log('Selected OCR engine:', engine);
+              window.electronAPI.settings.set('ocr_engine', engine).catch(() => {});
             }}
             compact={true}
           />

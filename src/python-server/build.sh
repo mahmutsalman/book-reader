@@ -165,18 +165,20 @@ install_core_dependencies() {
         Pillow>=10.0.0 \
         scipy>=1.10.0
 
-    echo "Installing RapidOCR (bundled OCR engine)..."
-    "$PYTHON_EXE" -m pip install "rapidocr-onnxruntime>=1.3.0"
+    echo "Installing OnnxOCR with PP-OCRv5 mobile models (bundled, no PaddlePaddle needed)..."
+    "$PYTHON_EXE" -m pip install "onnxocr-ppocrv5>=0.0.14"
 
-    echo "Pre-downloading RapidOCR models (bundled into app)..."
+    echo "Verifying OnnxOCR initialization..."
     "$PYTHON_EXE" -c "
-from rapidocr_onnxruntime import RapidOCR
-ocr = RapidOCR()
-print('[RapidOCR] Models ready')
-" || echo "Warning: RapidOCR model pre-download failed (will attempt on first use)"
+import logging, numpy as np
+logging.getLogger('onnxocr').setLevel(logging.WARNING)
+from onnxocr.onnx_paddleocr import ONNXPaddleOcr
+ocr = ONNXPaddleOcr(use_angle_cls=True, use_gpu=False, use_openvino=False)
+print('[OnnxOCR] PP-OCRv5 models ready')
+" || echo "Warning: OnnxOCR verification failed (will attempt on first use)"
 
     echo ""
-    echo "✅ Core dependencies installed (RapidOCR bundled; PaddleOCR optional via Settings UI)"
+    echo "✅ Core dependencies installed (OnnxOCR + PP-OCRv5 bundled; PaddleOCR optional via Settings UI)"
 }
 
 # Create launcher script
