@@ -174,7 +174,16 @@ class MangaImportService {
     let comicInfoXml: string | null = null;
 
     try {
-      const extractor = await createExtractorFromFile({ filepath: cbrPath, targetPath: outputDir });
+      // In Electron main process, fetch-based WASM loading fails.
+      // Load the WASM binary from disk and pass it directly.
+      // In packaged builds, node-unrar-js is copied alongside app.asar via packageAfterCopy hook.
+      const wasmCandidates = [
+        path.join(__dirname, '../../../node_modules/node-unrar-js/esm/js/unrar.wasm'),  // dev
+        path.join(process.resourcesPath || '', 'unrar.wasm'),  // packaged (extraResource)
+      ];
+      const wasmPath = wasmCandidates.find(p => fs.existsSync(p));
+      const wasmBinary = wasmPath ? fs.readFileSync(wasmPath).buffer as ArrayBuffer : undefined;
+      const extractor = await createExtractorFromFile({ filepath: cbrPath, targetPath: outputDir, wasmBinary });
       const extracted = extractor.extract();
       const files = [...extracted.files];
 
@@ -183,7 +192,7 @@ class MangaImportService {
 
         // Extract ComicInfo.xml
         if (fileName.toLowerCase() === 'comicinfo.xml') {
-          comicInfoXml = file.extraction?.toString('utf-8') || null;
+          comicInfoXml = (file.extraction as unknown as Buffer)?.toString('utf-8') || null;
           continue;
         }
 
