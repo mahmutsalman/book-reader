@@ -148,7 +148,7 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
   // OCR Engine selection context menu state
   const [showOCREngineMenu, setShowOCREngineMenu] = useState(false);
   const [ocrEngineMenuPosition, setOCREngineMenuPosition] = useState({ x: 0, y: 0 });
-  const [currentOCREngine, setCurrentOCREngine] = useState<OCREngine>('paddleocr'); // Default to PaddleOCR (recommended)
+  const [currentOCREngine, setCurrentOCREngine] = useState<OCREngine>('rapidocr'); // Default to RapidOCR (built-in)
   const ocrEngineMenuRef = useRef<HTMLDivElement>(null);
 
   // Focus Mode state - isFocusMode now from context
