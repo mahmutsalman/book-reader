@@ -1990,15 +1990,16 @@ async def extract_manga_text(request: MangaOCRRequest):
                 try:
                     regions, total_extracted = perform_rapidocr(img, x_offset=0, y_offset=0)
                 except Exception as e:
+                    print(f"[OnnxOCR] Runtime exception during full-page OCR: {e}", file=sys.stderr)
                     log_debug_info("[RapidOCR] Full-page OCR exception (falling back)", {"error": str(e)})
                     if PADDLEOCR_AVAILABLE:
                         engine_used = "paddleocr"
                         fallback_reason = f"RapidOCR failed: {str(e)}; using paddleocr"
-                    elif OCR_AVAILABLE:
+                    elif OCR_AVAILABLE and check_tesseract_installed()[0]:
                         engine_used = "tesseract"
                         fallback_reason = f"RapidOCR failed: {str(e)}; using tesseract"
                     else:
-                        raise
+                        raise Exception(f"OnnxOCR failed: {str(e)}")
 
             if engine_used == "paddleocr":
                 try:
@@ -2267,15 +2268,16 @@ async def extract_manga_text_region(request: MangaOCRRegionRequest):
                 try:
                     regions, total_extracted = perform_rapidocr(cropped, x_offset=x, y_offset=y)
                 except Exception as e:
+                    print(f"[OnnxOCR] Runtime exception during region OCR: {e}", file=sys.stderr)
                     log_debug_info("[RapidOCR] Region OCR exception (falling back)", {"error": str(e)})
                     if PADDLEOCR_AVAILABLE:
                         engine_used = "paddleocr"
                         fallback_reason = f"RapidOCR failed: {str(e)}; using paddleocr"
-                    elif OCR_AVAILABLE:
+                    elif OCR_AVAILABLE and check_tesseract_installed()[0]:
                         engine_used = "tesseract"
                         fallback_reason = f"RapidOCR failed: {str(e)}; using tesseract"
                     else:
-                        raise
+                        raise Exception(f"OnnxOCR failed: {str(e)}")
 
             if engine_used == "paddleocr":
                 try:
