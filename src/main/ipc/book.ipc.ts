@@ -33,7 +33,7 @@ export function registerBookHandlers(): void {
   });
 
   // Manga/Comic Import handler
-  ipcMain.handle(IPC_CHANNELS.BOOK_IMPORT_MANGA, async (_, mangaPath: string, language: BookLanguage = 'en', ocrEngine: OCREngine = 'paddleocr') => {
+  ipcMain.handle(IPC_CHANNELS.BOOK_IMPORT_MANGA, async (_, mangaPath: string, language: BookLanguage = 'en', ocrEngine: OCREngine = 'rapidocr') => {
     return mangaImportService.importManga(mangaPath, language, ocrEngine);
   });
 
@@ -43,7 +43,7 @@ export function registerBookHandlers(): void {
   });
 
   // PNG Test Import handler
-  ipcMain.handle(IPC_CHANNELS.BOOK_IMPORT_PNG, async (_, pngPath: string, language: BookLanguage = 'en', ocrEngine: OCREngine = 'paddleocr') => {
+  ipcMain.handle(IPC_CHANNELS.BOOK_IMPORT_PNG, async (_, pngPath: string, language: BookLanguage = 'en', ocrEngine: OCREngine = 'rapidocr') => {
     return mangaImportService.importPng(pngPath, language, ocrEngine);
   });
 
@@ -82,7 +82,7 @@ export function registerBookHandlers(): void {
       imagePath: string,
       region: { x: number; y: number; width: number; height: number },
       language: BookLanguage = 'en',
-      ocrEngine: OCREngine = 'paddleocr'
+      ocrEngine: OCREngine = 'rapidocr'
     ) => {
       return mangaImportService.ocrPartialRegion(imagePath, region, language, ocrEngine);
     }

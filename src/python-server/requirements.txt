@@ -15,6 +15,9 @@ pytesseract>=0.3.10
 Pillow>=10.0.0
 scipy>=1.10.0
 
-# Note: OCR engines (PaddleOCR, EasyOCR) are NOT included in core dependencies.
-# Users install them on-demand via Settings UI to reduce initial download size.
+# Bundled OCR engine (works out of the box, no user action required)
+rapidocr-onnxruntime>=1.3.0
+
+# Note: PaddleOCR is NOT included in core dependencies.
+# Users install it on-demand via Settings UI (~800MB) for CJK language accuracy.
 # OCR packages install to user data directory: ~/Library/Application Support/BookReader/ocr-packages

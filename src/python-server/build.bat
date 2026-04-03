@@ -7,7 +7,7 @@ REM 1. Downloads and configures embedded Python for Windows
 REM 2. Installs CORE dependencies only (TTS, IPA, PDF - NO OCR)
 REM 3. Creates launcher script for production deployment
 REM
-REM OCR engines (PaddleOCR, EasyOCR) are installed on-demand by users via Settings UI
+REM RapidOCR is bundled as core dependency; PaddleOCR is installed on-demand via Settings UI
 REM
 REM Usage:
 REM   build.bat           Full build for production
@@ -174,8 +174,21 @@ if !ERRORLEVEL! NEQ 0 (
     exit /b 1
 )
 
+echo Installing RapidOCR (bundled OCR engine)...
+"%RUNTIME_DIR%\python.exe" -m pip install "rapidocr-onnxruntime>=1.3.0"
+if !ERRORLEVEL! NEQ 0 (
+    echo Error: Failed to install RapidOCR
+    exit /b 1
+)
+
+echo Pre-downloading RapidOCR models (bundled into app)...
+"%RUNTIME_DIR%\python.exe" -c "from rapidocr_onnxruntime import RapidOCR; RapidOCR(); print('[RapidOCR] Models ready')"
+if !ERRORLEVEL! NEQ 0 (
+    echo Warning: RapidOCR model pre-download failed ^(will attempt on first use^)
+)
+
 echo.
-echo [OK] Core dependencies installed (OCR excluded - install via Settings UI)
+echo [OK] Core dependencies installed (RapidOCR bundled; PaddleOCR optional via Settings UI)
 
 REM Verify launcher script exists (maintained separately in source control)
 echo.

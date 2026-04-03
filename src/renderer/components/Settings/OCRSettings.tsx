@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 interface OCREngine {
   engine: string;
   installed: boolean;
+  built_in: boolean;
   size_mb: number;
   languages: string[];
   description: string;
@@ -97,8 +98,8 @@ export const OCRSettings: React.FC = () => {
         OCR Engine Management
       </h2>
       <p style={{ marginBottom: '20px', color: '#666', lineHeight: '1.5' }}>
-        Install OCR engines for manga/comic text extraction. Engines are stored in your user data
-        directory and preserved across app updates.
+        Manage OCR engines for manga/comic text extraction. Built-in engines are always available.
+        Optional engines are stored in your user data directory and preserved across app updates.
       </p>
 
       {error && (
@@ -137,13 +138,28 @@ export const OCRSettings: React.FC = () => {
                 <p style={{ margin: '0 0 4px 0', fontSize: '14px', color: '#888' }}>
                   <strong>Languages:</strong> {engine.languages.join(', ')}
                 </p>
-                <p style={{ margin: '0', fontSize: '14px', color: '#888' }}>
-                  <strong>Download size:</strong> ~{engine.size_mb}MB
-                </p>
+                {!engine.built_in && (
+                  <p style={{ margin: '0', fontSize: '14px', color: '#888' }}>
+                    <strong>Download size:</strong> ~{engine.size_mb}MB
+                  </p>
+                )}
               </div>
 
               <div style={{ marginLeft: '20px', minWidth: '150px' }}>
-                {engine.installed ? (
+                {engine.built_in ? (
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      padding: '8px 16px',
+                      backgroundColor: '#0288d1',
+                      color: 'white',
+                      borderRadius: '4px',
+                      fontWeight: 'bold',
+                    }}
+                  >
+                    ✓ Built-in
+                  </span>
+                ) : engine.installed ? (
                   <span
                     style={{
                       display: 'inline-block',

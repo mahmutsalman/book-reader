@@ -219,7 +219,7 @@ class MangaImportService {
   /**
    * Perform OCR on a single manga page image.
    */
-  private async performOCR(imagePath: string, language: BookLanguage, ocrEngine = 'paddleocr'): Promise<OCRTextRegion[]> {
+  private async performOCR(imagePath: string, language: BookLanguage, ocrEngine = 'rapidocr'): Promise<OCRTextRegion[]> {
     try {
       console.log(`[MangaImportService] Performing OCR on: ${path.basename(imagePath)} (engine=${ocrEngine})`);
 
@@ -265,7 +265,7 @@ class MangaImportService {
     imagePath: string,
     region: { x: number; y: number; width: number; height: number },
     language: BookLanguage = 'en',
-    ocrEngine = 'paddleocr'
+    ocrEngine = 'rapidocr'
   ): Promise<{
     regions: OCRTextRegion[];
     metadata?: any;
@@ -393,7 +393,7 @@ class MangaImportService {
   async importManga(
     mangaPath: string,
     language: BookLanguage = 'en',
-    ocrEngine = 'paddleocr',
+    ocrEngine = 'rapidocr',
     onProgress?: (current: number, total: number, status: string) => void
   ): Promise<Book> {
     // Validate file exists
@@ -612,7 +612,7 @@ class MangaImportService {
   async importPng(
     pngPath: string,
     language: BookLanguage = 'en',
-    ocrEngine = 'paddleocr'
+    ocrEngine = 'rapidocr'
   ): Promise<Book> {
     const mangaId = uuidv4();
     const filename = path.basename(pngPath, path.extname(pngPath));

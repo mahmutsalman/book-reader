@@ -2,7 +2,7 @@
 export type AIProvider = 'local' | 'groq' | 'openrouter' | 'mistral' | 'google-ai';
 
 // OCR Engine type
-export type OCREngine = 'tesseract' | 'paddleocr' | 'trocr' | 'easyocr' | 'hybrid';
+export type OCREngine = 'tesseract' | 'paddleocr' | 'rapidocr' | 'trocr' | 'easyocr' | 'hybrid';
 
 // App settings
 export interface AppSettings {

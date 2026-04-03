@@ -165,8 +165,18 @@ install_core_dependencies() {
         Pillow>=10.0.0 \
         scipy>=1.10.0
 
+    echo "Installing RapidOCR (bundled OCR engine)..."
+    "$PYTHON_EXE" -m pip install "rapidocr-onnxruntime>=1.3.0"
+
+    echo "Pre-downloading RapidOCR models (bundled into app)..."
+    "$PYTHON_EXE" -c "
+from rapidocr_onnxruntime import RapidOCR
+ocr = RapidOCR()
+print('[RapidOCR] Models ready')
+" || echo "Warning: RapidOCR model pre-download failed (will attempt on first use)"
+
     echo ""
-    echo "✅ Core dependencies installed (OCR excluded - install via Settings UI)"
+    echo "✅ Core dependencies installed (RapidOCR bundled; PaddleOCR optional via Settings UI)"
 }
 
 # Create launcher script
@@ -232,6 +242,6 @@ echo ""
 echo "To test locally: ./launch-server.sh"
 echo "To package with Electron: npm run make"
 echo ""
-echo "Note: OCR engines (PaddleOCR, EasyOCR) are NOT bundled."
-echo "Users can install them via Settings UI (~800MB download)."
+echo "Note: RapidOCR is bundled and works out of the box."
+echo "PaddleOCR (optional, ~800MB) can be installed via Settings UI for CJK language accuracy."
 echo ""

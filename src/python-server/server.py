@@ -212,6 +212,28 @@ shutdown_flag = False
 _installing_ocr: Dict[str, bool] = {}
 _install_progress: Dict[str, int] = {}
 
+# RapidOCR support (bundled — no installation required)
+RAPIDOCR_AVAILABLE = False
+_rapid_ocr = None
+
+
+def init_rapidocr():
+    """Initialize RapidOCR at server startup using bundled package models."""
+    global RAPIDOCR_AVAILABLE, _rapid_ocr
+    try:
+        from rapidocr_onnxruntime import RapidOCR
+        _rapid_ocr = RapidOCR()
+        RAPIDOCR_AVAILABLE = True
+        print("[RapidOCR] Initialized successfully (bundled)", file=sys.stderr)
+    except Exception as e:
+        print(f"[RapidOCR] init failed: {e}", file=sys.stderr)
+        RAPIDOCR_AVAILABLE = False
+
+
+# Initialize RapidOCR eagerly at server startup
+init_rapidocr()
+
+
 def get_ocr_packages_dir() -> Path:
     """Get user's OCR packages directory (cross-platform)."""
     if sys.platform == 'win32':
@@ -502,7 +524,7 @@ class MangaOCRRequest(BaseModel):
     language: str = "en"
     preprocessing_profile: str = "default"  # 'default' | 'adaptive' | 'high_contrast' | 'low_contrast' | 'denoised'
     psm_mode: str = "sparse"  # 'sparse' | 'dense' | 'auto' | 'vertical'
-    ocr_engine: str = "paddleocr"  # 'tesseract' | 'paddleocr' | 'trocr' | 'easyocr' | 'hybrid'
+    ocr_engine: str = "rapidocr"  # 'rapidocr' | 'tesseract' | 'paddleocr' | 'trocr' | 'easyocr' | 'hybrid'
 
 
 class MangaOCRRegionRequest(BaseModel):
@@ -512,7 +534,7 @@ class MangaOCRRegionRequest(BaseModel):
     # For small user-selected crops, aggressive binarization + sparse PSM often hurts OCR.
     preprocessing_profile: str = "minimal"  # 'none' | 'minimal' | 'default' | 'adaptive' | 'high_contrast' | 'low_contrast' | 'denoised'
     psm_mode: str = "dense"  # 'sparse' | 'dense' | 'auto' | 'vertical'
-    ocr_engine: str = "paddleocr"  # 'tesseract' | 'paddleocr' | 'trocr' | 'easyocr' | 'hybrid'
+    ocr_engine: str = "rapidocr"  # 'rapidocr' | 'tesseract' | 'paddleocr' | 'trocr' | 'easyocr' | 'hybrid'
 
 
 class MangaOCRResponse(BaseModel):
@@ -1699,6 +1721,64 @@ def perform_paddleocr(img, x_offset=0, y_offset=0, language: str = "en"):
     return regions
 
 
+def perform_rapidocr(img, x_offset=0, y_offset=0):
+    """
+    Perform OCR using RapidOCR (bundled) and convert results to OCRTextRegion format.
+
+    Returns:
+        Tuple of (regions, total_extracted)
+    """
+    img_for_ocr = None
+    try:
+        if getattr(img, "mode", None) != "RGB":
+            img_for_ocr = img.convert("RGB")
+            img_np = np.array(img_for_ocr)
+        else:
+            img_np = np.array(img)
+
+        result, _ = _rapid_ocr(img_np)
+    finally:
+        if img_for_ocr is not None:
+            img_for_ocr.close()
+            del img_for_ocr
+        del img_np
+        gc.collect()
+
+    if not result:
+        return [], 0
+
+    regions: List[OCRTextRegion] = []
+    total_extracted = len(result)
+    MIN_CONFIDENCE = 0.15
+
+    for item in result:
+        bbox_pts, text, score = item
+        if not isinstance(text, str) or not text.strip():
+            continue
+        try:
+            confidence = float(score)
+        except (TypeError, ValueError):
+            confidence = 0.0
+        if confidence < MIN_CONFIDENCE:
+            continue
+
+        xs = [p[0] for p in bbox_pts]
+        ys = [p[1] for p in bbox_pts]
+        x = float(min(xs)) + float(x_offset)
+        y = float(min(ys)) + float(y_offset)
+        w = float(max(xs) - min(xs))
+        h = float(max(ys) - min(ys))
+
+        regions.append(OCRTextRegion(
+            text=text.strip(),
+            bbox=[x, y, w, h],
+            confidence=confidence,
+            confidence_tier=classify_confidence_tier(confidence)
+        ))
+
+    return regions, total_extracted
+
+
 def segment_region_into_words(region: dict, language: str = 'en') -> List[dict]:
     """
     Splits a PaddleOCR text region into individual word-level sub-regions.
@@ -1773,22 +1853,33 @@ async def extract_manga_text(request: MangaOCRRequest):
     Returns:
         MangaOCRResponse with OCRTextRegion array containing text and bounding boxes
     """
-    requested_engine = (request.ocr_engine or "paddleocr").lower()
+    requested_engine = (request.ocr_engine or "rapidocr").lower()
     engine_used = requested_engine
     fallback_reason = None
 
-    # Only import PaddleOCR if it's potentially needed for this request.
-    if requested_engine != "tesseract" or not OCR_AVAILABLE:
+    # Ensure PaddleOCR is imported if it may be needed
+    if requested_engine == "paddleocr":
         ensure_paddleocr_imported()
 
-    # If the client explicitly requested tesseract, verify the binary is reachable.
-    # In packaged apps PATH can be minimal; if tesseract isn't found but PaddleOCR is available,
-    # automatically fall back to PaddleOCR to keep the feature working.
-    if requested_engine == "tesseract":
+    # Resolve which engine to actually use, with fallback chain: rapidocr → paddleocr → tesseract
+    if requested_engine == "rapidocr":
+        if not RAPIDOCR_AVAILABLE:
+            if PADDLEOCR_AVAILABLE:
+                engine_used = "paddleocr"
+                fallback_reason = "RapidOCR not available; using paddleocr"
+            elif OCR_AVAILABLE:
+                engine_used = "tesseract"
+                fallback_reason = "RapidOCR not available; using tesseract"
+            else:
+                return MangaOCRResponse(success=False, error="OCR not available.")
+
+    elif requested_engine == "tesseract":
         tesseract_installed, _tess_path = check_tesseract_installed()
         if not tesseract_installed:
-            ensure_paddleocr_imported()
-            if PADDLEOCR_AVAILABLE:
+            if RAPIDOCR_AVAILABLE:
+                engine_used = "rapidocr"
+                fallback_reason = "tesseract not found; using rapidocr"
+            elif PADDLEOCR_AVAILABLE:
                 engine_used = "paddleocr"
                 fallback_reason = "tesseract not found; using paddleocr"
             else:
@@ -1797,44 +1888,39 @@ async def extract_manga_text(request: MangaOCRRequest):
                     error="OCR not available. tesseract is not installed or it's not in your PATH.",
                 )
 
-    if requested_engine in ("hybrid", "trocr", "easyocr"):
-        if PADDLEOCR_AVAILABLE:
+    elif requested_engine == "paddleocr":
+        if not PADDLEOCR_AVAILABLE:
+            if RAPIDOCR_AVAILABLE:
+                engine_used = "rapidocr"
+                fallback_reason = "PaddleOCR not available; using rapidocr"
+            elif OCR_AVAILABLE:
+                engine_used = "tesseract"
+                fallback_reason = "PaddleOCR not available; using tesseract"
+            else:
+                return MangaOCRResponse(
+                    success=False,
+                    error="OCR not available. PaddleOCR not installed and pytesseract unavailable.",
+                )
+
+    else:  # hybrid, trocr, easyocr, or unknown
+        ensure_paddleocr_imported()
+        if RAPIDOCR_AVAILABLE:
+            engine_used = "rapidocr"
+            fallback_reason = f"{requested_engine} not implemented; using rapidocr"
+        elif PADDLEOCR_AVAILABLE:
             engine_used = "paddleocr"
             fallback_reason = f"{requested_engine} not implemented; using paddleocr"
         elif OCR_AVAILABLE:
             engine_used = "tesseract"
             fallback_reason = f"{requested_engine} not implemented; using tesseract"
         else:
-            return MangaOCRResponse(success=False, error="OCR not available. Install pytesseract or paddleocr.")
-    elif requested_engine not in ("tesseract", "paddleocr"):
-        if PADDLEOCR_AVAILABLE:
-            engine_used = "paddleocr"
-            fallback_reason = f"Unknown ocr_engine '{requested_engine}'; using paddleocr"
-        elif OCR_AVAILABLE:
-            engine_used = "tesseract"
-            fallback_reason = f"Unknown ocr_engine '{requested_engine}'; using tesseract"
-        else:
-            return MangaOCRResponse(success=False, error="OCR not available. Install pytesseract or paddleocr.")
-
-    if engine_used == "paddleocr" and not PADDLEOCR_AVAILABLE:
-        if OCR_AVAILABLE:
-            tesseract_installed, _tess_path = check_tesseract_installed()
-            if tesseract_installed:
-                engine_used = "tesseract"
-                fallback_reason = "PaddleOCR not available; using tesseract"
-            else:
-                return MangaOCRResponse(
-                    success=False,
-                    error=f"OCR not available. PaddleOCR import failed: {PADDLEOCR_IMPORT_ERROR}. Tesseract is not installed or not in PATH.",
-                )
-        else:
-            return MangaOCRResponse(
-                success=False,
-                error="OCR not available. PaddleOCR not installed and pytesseract unavailable.",
-            )
+            return MangaOCRResponse(success=False, error="OCR not available.")
 
     if engine_used == "tesseract" and not OCR_AVAILABLE:
-        if PADDLEOCR_AVAILABLE:
+        if RAPIDOCR_AVAILABLE:
+            engine_used = "rapidocr"
+            fallback_reason = "Tesseract not available; using rapidocr"
+        elif PADDLEOCR_AVAILABLE:
             engine_used = "paddleocr"
             fallback_reason = "Tesseract not available; using paddleocr"
         else:
@@ -1843,8 +1929,10 @@ async def extract_manga_text(request: MangaOCRRequest):
     if engine_used == "tesseract":
         tesseract_installed, _tess_path = check_tesseract_installed()
         if not tesseract_installed:
-            ensure_paddleocr_imported()
-            if PADDLEOCR_AVAILABLE:
+            if RAPIDOCR_AVAILABLE:
+                engine_used = "rapidocr"
+                fallback_reason = "tesseract not found; using rapidocr"
+            elif PADDLEOCR_AVAILABLE:
                 engine_used = "paddleocr"
                 fallback_reason = "tesseract not found; using paddleocr"
             else:
@@ -1873,6 +1961,20 @@ async def extract_manga_text(request: MangaOCRRequest):
 
             regions: List[OCRTextRegion] = []
             total_extracted = 0
+
+            if engine_used == "rapidocr":
+                try:
+                    regions, total_extracted = perform_rapidocr(img, x_offset=0, y_offset=0)
+                except Exception as e:
+                    log_debug_info("[RapidOCR] Full-page OCR exception (falling back)", {"error": str(e)})
+                    if PADDLEOCR_AVAILABLE:
+                        engine_used = "paddleocr"
+                        fallback_reason = f"RapidOCR failed: {str(e)}; using paddleocr"
+                    elif OCR_AVAILABLE:
+                        engine_used = "tesseract"
+                        fallback_reason = f"RapidOCR failed: {str(e)}; using tesseract"
+                    else:
+                        raise
 
             if engine_used == "paddleocr":
                 try:
@@ -1991,61 +2093,74 @@ async def extract_manga_text_region(request: MangaOCRRegionRequest):
     """
     Extract text from a specific region of a manga/comic page image.
     """
-    requested_engine = (request.ocr_engine or "paddleocr").lower()
+    requested_engine = (request.ocr_engine or "rapidocr").lower()
     engine_used = requested_engine
     fallback_reason = None
 
-    # Only import PaddleOCR if it's potentially needed for this request.
-    if requested_engine != "tesseract" or not OCR_AVAILABLE:
+    # Ensure PaddleOCR is imported if it may be needed
+    if requested_engine == "paddleocr":
         ensure_paddleocr_imported()
 
-    # If the client explicitly requested tesseract, verify the binary is reachable.
-    if requested_engine == "tesseract":
-        tesseract_installed, _tess_path = check_tesseract_installed()
-        if not tesseract_installed:
-            ensure_paddleocr_imported()
+    # Resolve which engine to actually use, with fallback chain: rapidocr → paddleocr → tesseract
+    if requested_engine == "rapidocr":
+        if not RAPIDOCR_AVAILABLE:
             if PADDLEOCR_AVAILABLE:
                 engine_used = "paddleocr"
-                fallback_reason = "tesseract not found; using paddleocr"
+                fallback_reason = "RapidOCR not available; using paddleocr"
+            elif OCR_AVAILABLE:
+                engine_used = "tesseract"
+                fallback_reason = "RapidOCR not available; using tesseract"
+            else:
+                return MangaOCRResponse(success=False, error="OCR not available.")
 
-    if requested_engine in ("hybrid", "trocr", "easyocr"):
-        if PADDLEOCR_AVAILABLE:
+    elif requested_engine == "tesseract":
+        tesseract_installed, _tess_path = check_tesseract_installed()
+        if not tesseract_installed:
+            if RAPIDOCR_AVAILABLE:
+                engine_used = "rapidocr"
+                fallback_reason = "tesseract not found; using rapidocr"
+            elif PADDLEOCR_AVAILABLE:
+                engine_used = "paddleocr"
+                fallback_reason = "tesseract not found; using paddleocr"
+            else:
+                return MangaOCRResponse(
+                    success=False,
+                    error="OCR not available. tesseract is not installed or it's not in your PATH.",
+                )
+
+    elif requested_engine == "paddleocr":
+        if not PADDLEOCR_AVAILABLE:
+            if RAPIDOCR_AVAILABLE:
+                engine_used = "rapidocr"
+                fallback_reason = "PaddleOCR not available; using rapidocr"
+            elif OCR_AVAILABLE:
+                engine_used = "tesseract"
+                fallback_reason = "PaddleOCR not available; using tesseract"
+            else:
+                return MangaOCRResponse(
+                    success=False,
+                    error="OCR not available. PaddleOCR not installed and pytesseract unavailable.",
+                )
+
+    else:  # hybrid, trocr, easyocr, or unknown
+        ensure_paddleocr_imported()
+        if RAPIDOCR_AVAILABLE:
+            engine_used = "rapidocr"
+            fallback_reason = f"{requested_engine} not implemented; using rapidocr"
+        elif PADDLEOCR_AVAILABLE:
             engine_used = "paddleocr"
             fallback_reason = f"{requested_engine} not implemented; using paddleocr"
         elif OCR_AVAILABLE:
             engine_used = "tesseract"
             fallback_reason = f"{requested_engine} not implemented; using tesseract"
         else:
-            return MangaOCRResponse(success=False, error="OCR not available. Install pytesseract or paddleocr.")
-    elif requested_engine not in ("tesseract", "paddleocr"):
-        if PADDLEOCR_AVAILABLE:
-            engine_used = "paddleocr"
-            fallback_reason = f"Unknown ocr_engine '{requested_engine}'; using paddleocr"
-        elif OCR_AVAILABLE:
-            engine_used = "tesseract"
-            fallback_reason = f"Unknown ocr_engine '{requested_engine}'; using tesseract"
-        else:
-            return MangaOCRResponse(success=False, error="OCR not available. Install pytesseract or paddleocr.")
-
-    if engine_used == "paddleocr" and not PADDLEOCR_AVAILABLE:
-        if OCR_AVAILABLE:
-            tesseract_installed, _tess_path = check_tesseract_installed()
-            if tesseract_installed:
-                engine_used = "tesseract"
-                fallback_reason = "PaddleOCR not available; using tesseract"
-            else:
-                return MangaOCRResponse(
-                    success=False,
-                    error=f"OCR not available. PaddleOCR import failed: {PADDLEOCR_IMPORT_ERROR}. Tesseract is not installed or not in PATH.",
-                )
-        else:
-            return MangaOCRResponse(
-                success=False,
-                error="OCR not available. PaddleOCR not installed and pytesseract unavailable.",
-            )
+            return MangaOCRResponse(success=False, error="OCR not available.")
 
     if engine_used == "tesseract" and not OCR_AVAILABLE:
-        if PADDLEOCR_AVAILABLE:
+        if RAPIDOCR_AVAILABLE:
+            engine_used = "rapidocr"
+            fallback_reason = "Tesseract not available; using rapidocr"
+        elif PADDLEOCR_AVAILABLE:
             engine_used = "paddleocr"
             fallback_reason = "Tesseract not available; using paddleocr"
         else:
@@ -2054,8 +2169,10 @@ async def extract_manga_text_region(request: MangaOCRRegionRequest):
     if engine_used == "tesseract":
         tesseract_installed, _tess_path = check_tesseract_installed()
         if not tesseract_installed:
-            ensure_paddleocr_imported()
-            if PADDLEOCR_AVAILABLE:
+            if RAPIDOCR_AVAILABLE:
+                engine_used = "rapidocr"
+                fallback_reason = "tesseract not found; using rapidocr"
+            elif PADDLEOCR_AVAILABLE:
                 engine_used = "paddleocr"
                 fallback_reason = "tesseract not found; using paddleocr"
             else:
@@ -2122,6 +2239,20 @@ async def extract_manga_text_region(request: MangaOCRRegionRequest):
             ocr_data = None
 
             # Route to the selected OCR engine
+            if engine_used == "rapidocr":
+                try:
+                    regions, total_extracted = perform_rapidocr(cropped, x_offset=x, y_offset=y)
+                except Exception as e:
+                    log_debug_info("[RapidOCR] Region OCR exception (falling back)", {"error": str(e)})
+                    if PADDLEOCR_AVAILABLE:
+                        engine_used = "paddleocr"
+                        fallback_reason = f"RapidOCR failed: {str(e)}; using paddleocr"
+                    elif OCR_AVAILABLE:
+                        engine_used = "tesseract"
+                        fallback_reason = f"RapidOCR failed: {str(e)}; using tesseract"
+                    else:
+                        raise
+
             if engine_used == "paddleocr":
                 try:
                     regions, total_extracted = perform_paddleocr_with_stats(cropped, x_offset=x, y_offset=y, language=request.language)
@@ -2265,6 +2396,7 @@ async def extract_manga_text_region(request: MangaOCRRegionRequest):
 class OCREngineInfo(BaseModel):
     engine: str
     installed: bool
+    built_in: bool = False
     size_mb: int
     languages: List[str]
     description: str
@@ -2282,11 +2414,20 @@ async def get_ocr_engines():
     """List available OCR engines and installation status."""
     engines = [
         OCREngineInfo(
+            engine="rapidocr",
+            installed=RAPIDOCR_AVAILABLE,
+            built_in=True,
+            size_mb=0,
+            languages=["en"],
+            description="RapidOCR - Built-in fast OCR, works out of the box (English)"
+        ),
+        OCREngineInfo(
             engine="paddleocr",
             installed=is_ocr_installed("paddleocr"),
+            built_in=False,
             size_mb=800,
             languages=["en", "ja", "zh", "ko"],
-            description="PaddleOCR - Fast neural OCR (recommended)"
+            description="PaddleOCR - High-accuracy OCR for CJK languages (optional, ~800MB)"
         ),
     ]
     return {"success": True, "engines": engines}
@@ -2417,10 +2558,11 @@ if __name__ == "__main__":
     port = int(os.environ.get("PORT", DEFAULT_PORT))
     print(f"[Server] Starting BookReader Pronunciation Server on port {port}...")
     print(f"[Server] Press Ctrl+C to stop gracefully")
+    print(f"[OCR] RapidOCR available: {RAPIDOCR_AVAILABLE} (bundled)")
     print(f"[OCR] pytesseract available: {OCR_AVAILABLE}")
     if not OCR_AVAILABLE and OCR_IMPORT_ERROR:
         print(f"[OCR] pytesseract/PIL error: {OCR_IMPORT_ERROR}")
-    print("[OCR] PaddleOCR: lazy import (loads on first OCR request)")
+    print("[OCR] PaddleOCR: lazy import (loads on first OCR request if installed)")
 
     uvicorn.run(
         app,
