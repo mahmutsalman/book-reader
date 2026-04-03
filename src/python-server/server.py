@@ -214,21 +214,26 @@ _install_progress: Dict[str, int] = {}
 
 # OnnxOCR support (bundled — PP-OCRv5 mobile, no PaddlePaddle framework required)
 RAPIDOCR_AVAILABLE = False
+RAPIDOCR_INIT_ERROR: Optional[str] = None
 _rapid_ocr = None
 
 
 def init_rapidocr():
     """Initialize OnnxOCR at server startup using bundled PP-OCRv5 mobile models."""
-    global RAPIDOCR_AVAILABLE, _rapid_ocr
+    global RAPIDOCR_AVAILABLE, RAPIDOCR_INIT_ERROR, _rapid_ocr
     try:
         import logging
+        import traceback
         from onnxocr.onnx_paddleocr import ONNXPaddleOcr
         logging.getLogger('onnxocr').setLevel(logging.WARNING)
         _rapid_ocr = ONNXPaddleOcr(use_angle_cls=True, use_gpu=False, use_openvino=False)
         RAPIDOCR_AVAILABLE = True
+        RAPIDOCR_INIT_ERROR = None
         print("[OnnxOCR] Initialized with PP-OCRv5 mobile models (bundled)", file=sys.stderr)
     except Exception as e:
-        print(f"[OnnxOCR] init failed: {e}", file=sys.stderr)
+        tb = traceback.format_exc()
+        RAPIDOCR_INIT_ERROR = f"{type(e).__name__}: {e}\n{tb}"
+        print(f"[OnnxOCR] init failed: {e}\n{tb}", file=sys.stderr)
         RAPIDOCR_AVAILABLE = False
 
 
@@ -2456,7 +2461,10 @@ async def get_ocr_engines():
             description="PaddleOCR - High-accuracy OCR for CJK languages (optional, ~800MB)"
         ),
     ]
-    return {"success": True, "engines": engines}
+    result = {"success": True, "engines": engines}
+    if not RAPIDOCR_AVAILABLE and RAPIDOCR_INIT_ERROR:
+        result["rapidocr_init_error"] = RAPIDOCR_INIT_ERROR
+    return result
 
 @app.post("/api/ocr/install")
 async def install_ocr(request: InstallOCRRequest, background_tasks: BackgroundTasks):
