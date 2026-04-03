@@ -174,6 +174,13 @@ if !ERRORLEVEL! NEQ 0 (
     exit /b 1
 )
 
+echo Installing OpenCV ^(required by OnnxOCR, not auto-declared as dependency^)...
+"%RUNTIME_DIR%\python.exe" -m pip install "opencv-python-headless>=4.8.0"
+if !ERRORLEVEL! NEQ 0 (
+    echo Error: Failed to install OpenCV
+    exit /b 1
+)
+
 echo Installing OnnxOCR with PP-OCRv5 mobile models ^(bundled, no PaddlePaddle needed^)...
 "%RUNTIME_DIR%\python.exe" -m pip install "onnxocr-ppocrv5>=0.0.14"
 if !ERRORLEVEL! NEQ 0 (

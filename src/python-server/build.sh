@@ -165,6 +165,9 @@ install_core_dependencies() {
         Pillow>=10.0.0 \
         scipy>=1.10.0
 
+    echo "Installing OpenCV (required by OnnxOCR, not auto-declared as dependency)..."
+    "$PYTHON_EXE" -m pip install "opencv-python-headless>=4.8.0"
+
     echo "Installing OnnxOCR with PP-OCRv5 mobile models (bundled, no PaddlePaddle needed)..."
     "$PYTHON_EXE" -m pip install "onnxocr-ppocrv5>=0.0.14"
 
