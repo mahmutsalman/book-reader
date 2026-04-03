@@ -1990,6 +1990,22 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
               updateSetting('is_meaning_mode', false);
             }
           }}
+          isManga={bookData.type === 'manga'}
+          ocrSelectionMode={ocrSelectionMode}
+          onToggleOcr={async () => {
+            try {
+              const res = await fetch('http://127.0.0.1:8766/api/ocr/engines');
+              const data = await res.json();
+              const anyReady = data.engines?.some((e: { engine: string; installed: boolean }) => e.installed);
+              if (anyReady) {
+                setOcrSelectionMode(prev => !prev);
+              } else {
+                setShowOcrInstallPrompt(true);
+              }
+            } catch {
+              setShowOcrInstallPrompt(true);
+            }
+          }}
         />
       )}
 

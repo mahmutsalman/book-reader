@@ -9,6 +9,9 @@ interface FocusModeHeaderProps {
   onToggleGrammar: () => void;
   onToggleMeaning: () => void;
   onToggleSimpler: () => void;
+  isManga?: boolean;
+  ocrSelectionMode?: boolean;
+  onToggleOcr?: () => void;
 }
 
 const FocusModeHeader: React.FC<FocusModeHeaderProps> = ({
@@ -18,6 +21,9 @@ const FocusModeHeader: React.FC<FocusModeHeaderProps> = ({
   onToggleGrammar,
   onToggleMeaning,
   onToggleSimpler,
+  isManga = false,
+  ocrSelectionMode = false,
+  onToggleOcr,
 }) => {
   const theme = useReaderTheme();
   const accentTextColor = getContrastColor(theme.accent);
@@ -124,6 +130,40 @@ const FocusModeHeader: React.FC<FocusModeHeaderProps> = ({
             {isSimplerMode && <span className="ml-1 text-xs">●</span>}
           </div>
         </button>
+
+        {/* OCR Button — manga only */}
+        {isManga && onToggleOcr && (
+          <button
+            onClick={onToggleOcr}
+            className="px-3 py-1.5 rounded-md text-sm font-medium transition-all cursor-pointer"
+            style={{
+              backgroundColor: ocrSelectionMode ? theme.accent : theme.panelBorder,
+              color: ocrSelectionMode ? accentTextColor : theme.textSecondary,
+              border: `1px solid ${ocrSelectionMode ? theme.accent : theme.border}`,
+              boxShadow: ocrSelectionMode ? `0 6px 14px ${addAlpha(theme.accent, 0.25)}` : 'none',
+            }}
+            onMouseEnter={(event) => {
+              if (!ocrSelectionMode) {
+                event.currentTarget.style.backgroundColor = hoverFill;
+              }
+            }}
+            onMouseLeave={(event) => {
+              if (!ocrSelectionMode) {
+                event.currentTarget.style.backgroundColor = theme.panelBorder;
+              }
+            }}
+            title={ocrSelectionMode ? 'Exit OCR Selection Mode (Ctrl+O)' : 'OCR Selection Mode (Ctrl+O)'}
+          >
+            <div className="flex items-center gap-1.5">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+                <rect x="4" y="4" width="16" height="16" rx="2" ry="2" />
+                <path d="M9 9h1v1H9zM14 9h1v1h-1zM9 14h6" />
+              </svg>
+              <span>OCR</span>
+              {ocrSelectionMode && <span className="ml-1 text-xs">●</span>}
+            </div>
+          </button>
+        )}
       </div>
     </div>
   );
