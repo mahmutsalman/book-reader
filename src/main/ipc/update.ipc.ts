@@ -108,12 +108,12 @@ export function registerUpdateHandlers(): void {
   // Get current app version
   ipcMain.handle(IPC_CHANNELS.APP_GET_VERSION, (): string => app.getVersion());
 
-  // Install downloaded Squirrel update (Windows only) — quits app and applies update
+  // Install downloaded Squirrel update (Windows + macOS) — quits app and applies update
   ipcMain.handle(
     IPC_CHANNELS.UPDATE_INSTALL,
     async (): Promise<{ success: boolean; error?: string }> => {
-      if (process.platform !== 'win32') {
-        return { success: false, error: 'Auto-install is only supported on Windows' };
+      if (process.platform !== 'win32' && process.platform !== 'darwin') {
+        return { success: false, error: 'Auto-install is only supported on Windows and macOS' };
       }
       try {
         autoUpdater.quitAndInstall();

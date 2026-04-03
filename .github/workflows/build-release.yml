@@ -474,6 +474,25 @@ jobs:
           echo "=== Deployment complete ==="
           echo "Manifest URL: https://smartbook.mahmutsalman.cloud/releases/latest.json"
 
+      - name: Deploy Squirrel.Mac update server
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PATH: ${{ secrets.VPS_PATH }}
+        run: |
+          # Upload the server script and setup script to VPS
+          rsync -avz -e "ssh -i ~/.ssh/vps_key" \
+            scripts/vps-update-server.js \
+            scripts/vps-setup-update-server.sh \
+            ${VPS_USER}@${VPS_HOST}:/tmp/smartbook-scripts/
+
+          # Run the setup script on the VPS (idempotent — safe to run on every deploy)
+          ssh -i ~/.ssh/vps_key ${VPS_USER}@${VPS_HOST} "
+            export RELEASES_DIR=${VPS_PATH}
+            chmod +x /tmp/smartbook-scripts/vps-setup-update-server.sh
+            bash /tmp/smartbook-scripts/vps-setup-update-server.sh
+          "
+
       - name: Verify deployment
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
@@ -493,4 +512,7 @@ jobs:
             echo ''
             echo 'Manifest content:'
             cat ${VPS_PATH}/latest.json
+            echo ''
+            echo 'Squirrel.Mac update server test:'
+            curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3001/update/darwin/arm64/0.0.1 || echo 'server not running'
           "
