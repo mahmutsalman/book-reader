@@ -94,6 +94,9 @@ out/
 # User notes
 .notes/
 
+# VS Code tours
+.tours/
+
 # Claude Code local instructions (personal, not committed)
 CLAUDE.local.md
 

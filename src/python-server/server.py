@@ -15,6 +15,13 @@ import signal
 import shutil
 import inspect
 import gc
+
+# Force UTF-8 stdout/stderr on Windows — OnnxOCR prints characters like → that
+# break the default charmap (cp1252) encoding, causing UnicodeEncodeError during OCR.
+if sys.platform == 'win32':
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 from contextlib import asynccontextmanager
 from typing import Optional, List, Dict
 from pathlib import Path

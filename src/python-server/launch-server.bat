@@ -49,6 +49,9 @@ if defined APPDATA (
 REM Disable CUDA for CPU-only PaddlePaddle builds
 set PADDLE_NO_CUDA=1
 
+REM Force UTF-8 I/O so Python can print characters like → without UnicodeEncodeError
+set PYTHONIOENCODING=utf-8
+
 REM Change to script directory before running (helps with relative imports)
 cd /d "%SCRIPT_DIR%"
 
