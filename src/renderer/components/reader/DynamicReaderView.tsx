@@ -1859,13 +1859,13 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
                 try {
                   const res = await fetch('http://127.0.0.1:8766/api/ocr/engines');
                   const data = await res.json();
-                  const paddleOcr = data.engines?.find((e: { engine: string; installed: boolean }) => e.engine === 'paddleocr');
+                  const anyReady = data.engines?.some((e: { engine: string; installed: boolean }) => e.installed);
 
-                  if (paddleOcr?.installed) {
-                    // OCR is installed, toggle selection mode
+                  if (anyReady) {
+                    // An OCR engine is available, toggle selection mode
                     setOcrSelectionMode(prev => !prev);
                   } else {
-                    // OCR not installed, show installation prompt
+                    // No OCR engine available, show installation prompt
                     setShowOcrInstallPrompt(true);
                   }
                 } catch (err) {

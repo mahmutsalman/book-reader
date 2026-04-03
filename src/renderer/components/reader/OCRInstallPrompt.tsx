@@ -114,7 +114,7 @@ export const OCRInstallPrompt: React.FC<OCRInstallPromptProps> = ({ onClose, onI
           {!installing ? (
             <>
               <p className="mb-4" style={{ color: theme.text }}>
-                OCR (text recognition) requires PaddleOCR engine to be installed.
+                OCR (text recognition) requires an OCR engine. Install PaddleOCR for full language support.
               </p>
               <div
                 className="mb-4 p-3 rounded-lg"
