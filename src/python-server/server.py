@@ -1769,12 +1769,23 @@ def perform_rapidocr(img, x_offset=0, y_offset=0):
         w = float(max(xs) - min(xs))
         h = float(max(ys) - min(ys))
 
-        regions.append(OCRTextRegion(
-            text=text.strip(),
-            bbox=[x, y, w, h],
-            confidence=confidence,
-            confidence_tier=classify_confidence_tier(confidence)
-        ))
+        confidence_tier = classify_confidence_tier(confidence)
+        region_dict = {
+            'text': text.strip(),
+            'bbox': [x, y, w, h],
+            'confidence': confidence,
+            'confidence_tier': confidence_tier
+        }
+
+        # Split line into individual word-level regions (same as PaddleOCR path)
+        word_regions = segment_region_into_words(region_dict)
+        for word_region in word_regions:
+            regions.append(OCRTextRegion(
+                text=word_region['text'],
+                bbox=word_region['bbox'],
+                confidence=word_region['confidence'],
+                confidence_tier=word_region['confidence_tier']
+            ))
 
     return regions, total_extracted
 
