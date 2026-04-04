@@ -144,6 +144,12 @@ jobs:
           security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 
+          # Skip if certificate secret is not set
+          if [ -z "$APPLE_CERTIFICATE" ]; then
+            echo "APPLE_CERTIFICATE secret not set — skipping certificate import"
+            exit 0
+          fi
+
           # Import the certificate
           echo "$APPLE_CERTIFICATE" | base64 --decode > /tmp/certificate.p12
           security import /tmp/certificate.p12 \
