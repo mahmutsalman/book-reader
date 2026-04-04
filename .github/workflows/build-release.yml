@@ -22,6 +22,7 @@ permissions:
 jobs:
   build:
     name: Build ${{ matrix.os }}
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
