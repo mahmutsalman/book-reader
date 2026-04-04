@@ -175,11 +175,39 @@ jobs:
         run: npm run make
         env:
           DEBUG: electron-forge:*
-          # macOS code signing + notarization (only active on macOS runner when secrets exist)
           APPLE_IDENTITY: ${{ secrets.APPLE_IDENTITY }}
+
+      - name: Notarize macOS app
+        if: runner.os == 'macOS'
+        timeout-minutes: 30
+        env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          # Find the ZIP to notarize
+          ZIP_PATH=$(find out/make -name "*.zip" | head -1)
+          if [ -z "$ZIP_PATH" ]; then
+            echo "No ZIP found to notarize"
+            exit 1
+          fi
+          echo "Notarizing: $ZIP_PATH ($(du -sh "$ZIP_PATH" | cut -f1))"
+
+          # Submit and wait — output is visible here
+          xcrun notarytool submit "$ZIP_PATH" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait \
+            --timeout 25m \
+            --verbose
+
+          # Staple the ticket to the DMG so it works offline
+          DMG_PATH=$(find out/make -name "*.dmg" | head -1)
+          if [ -n "$DMG_PATH" ]; then
+            echo "Stapling: $DMG_PATH"
+            xcrun stapler staple "$DMG_PATH"
+          fi
 
       - name: Debug output structure (Windows)
         if: runner.os == 'Windows'

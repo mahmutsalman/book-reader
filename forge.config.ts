@@ -41,11 +41,7 @@ const config: ForgeConfig = {
         entitlements: 'entitlements.plist',
         entitlementsInherit: 'entitlements.plist',
       },
-      osxNotarize: {
-        appleId: process.env.APPLE_ID!,
-        appleIdPassword: process.env.APPLE_APP_SPECIFIC_PASSWORD!,
-        teamId: process.env.APPLE_TEAM_ID!,
-      },
+      // Notarization is handled as a separate CI step for better visibility + timeout control
     } : {}),
     // Include embedded Python runtime and server files
     extraResource: [
