@@ -84,11 +84,11 @@ export const IPC_CHANNELS = {
 
   // App Updates
   UPDATE_CHECK: 'update:check',
-  UPDATE_OPEN_URL: 'update:open-url',
+  UPDATE_TRIGGER_DOWNLOAD: 'update:trigger-download', // Kick off Squirrel download from renderer
   UPDATE_SKIP_VERSION: 'update:skip-version',
   UPDATE_GET_PREFERENCES: 'update:get-preferences',
   UPDATE_SET_AUTO_CHECK: 'update:set-auto-check',
-  UPDATE_INSTALL: 'update:install', // Windows Squirrel: quit and install downloaded update
+  UPDATE_INSTALL: 'update:install', // Windows/macOS Squirrel: quit and install downloaded update
   APP_GET_VERSION: 'app:get-version',
 } as const;
 

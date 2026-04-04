@@ -3,11 +3,12 @@ import { IPC_CHANNELS } from '../../shared/constants/ipc-channels';
 import { updateService } from '../services/update.service';
 import type {
   UpdateCheckResponse,
-  UpdateOpenUrlResponse,
   UpdateSkipVersionResponse,
   UpdatePreferencesResponse,
   UpdateSetPreferenceResponse,
 } from '../../shared/types/update.types';
+
+declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string | undefined;
 
 export function registerUpdateHandlers(): void {
   // Check for updates
@@ -27,25 +28,18 @@ export function registerUpdateHandlers(): void {
     }
   );
 
-  // Open download URL in browser (with URL validation)
+  // Trigger Squirrel download from renderer (e.g. user manually checks for updates in Settings)
   ipcMain.handle(
-    IPC_CHANNELS.UPDATE_OPEN_URL,
-    async (_event, url: string): Promise<UpdateOpenUrlResponse> => {
+    IPC_CHANNELS.UPDATE_TRIGGER_DOWNLOAD,
+    async (): Promise<{ success: boolean; error?: string }> => {
       try {
-        // Validate URL before passing to service
-        const parsed = new URL(url);
-        if (!['https:', 'http:'].includes(parsed.protocol)) {
-          return { success: false, error: 'Invalid URL protocol' };
+        if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
+          return { success: false, error: 'Auto-update not available in dev mode' };
         }
-        const allowedDomains = ['smartbook.mahmutsalman.cloud', 'github.com'];
-        if (!allowedDomains.some(d => parsed.hostname === d || parsed.hostname.endsWith('.' + d))) {
-          return { success: false, error: 'URL not from allowed domain' };
-        }
-
-        await updateService.openDownloadUrl(url);
+        autoUpdater.checkForUpdates();
         return { success: true };
       } catch (error) {
-        console.error('Failed to open download URL:', error);
+        console.error('Failed to trigger update download:', error);
         return {
           success: false,
           error: error instanceof Error ? error.message : 'Unknown error',

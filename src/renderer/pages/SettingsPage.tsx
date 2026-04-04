@@ -437,14 +437,12 @@ const SettingsPage: React.FC = () => {
         if (response.result.updateAvailable) {
           setUpdateCheckResult({
             success: true,
-            message: `Update available: v${response.result.latestVersion}`,
+            message: `Update available: v${response.result.latestVersion} — downloading in the background…`,
             updateAvailable: true,
             latestVersion: response.result.latestVersion,
           });
-          // Open download URL if available
-          if (response.result.downloadUrl) {
-            await window.electronAPI.update.openUrl(response.result.downloadUrl);
-          }
+          // Kick off Squirrel download (no-op if already downloading)
+          await window.electronAPI.update.triggerDownload?.();
         } else {
           setUpdateCheckResult({
             success: true,

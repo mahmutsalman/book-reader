@@ -220,8 +220,8 @@ const electronAPI: ElectronAPI = {
   update: {
     check: (ignoreSkipped?: boolean) =>
       ipcRenderer.invoke(IPC_CHANNELS.UPDATE_CHECK, ignoreSkipped),
-    openUrl: (url: string) =>
-      ipcRenderer.invoke(IPC_CHANNELS.UPDATE_OPEN_URL, url),
+    triggerDownload: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.UPDATE_TRIGGER_DOWNLOAD),
     skipVersion: (version: string) =>
       ipcRenderer.invoke(IPC_CHANNELS.UPDATE_SKIP_VERSION, version),
     getPreferences: () =>

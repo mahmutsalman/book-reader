@@ -1,4 +1,4 @@
-import { app, shell } from 'electron';
+import { app } from 'electron';
 import * as https from 'https';
 import * as http from 'http';
 import type {
@@ -96,22 +96,6 @@ function getPlatformKey(): keyof UpdateManifest['platforms'] | null {
   }
 
   return null;
-}
-
-// Allowed domains for external URL opening
-const ALLOWED_DOWNLOAD_DOMAINS = ['smartbook.mahmutsalman.cloud', 'github.com'];
-
-/**
- * Validate URL for external opening
- */
-function validateExternalUrl(url: string): void {
-  const parsed = new URL(url);
-  if (!['https:', 'http:'].includes(parsed.protocol)) {
-    throw new Error('Invalid URL protocol');
-  }
-  if (!ALLOWED_DOWNLOAD_DOMAINS.some(d => parsed.hostname === d || parsed.hostname.endsWith('.' + d))) {
-    throw new Error('URL not from allowed domain');
-  }
 }
 
 /**
@@ -265,14 +249,6 @@ class UpdateService {
         error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
-  }
-
-  /**
-   * Open download URL in default browser (with validation)
-   */
-  async openDownloadUrl(url: string): Promise<void> {
-    validateExternalUrl(url);
-    await shell.openExternal(url);
   }
 
   /**

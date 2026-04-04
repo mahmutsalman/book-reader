@@ -11,87 +11,22 @@ import LibraryPage from './pages/LibraryPage';
 import ReaderPage from './pages/ReaderPage';
 import VocabularyPage from './pages/VocabularyPage';
 import SettingsPage from './pages/SettingsPage';
-import UpdateNotification from './components/UpdateNotification';
 import UpdateReadyBanner from './components/UpdateReadyBanner';
-import type { UpdateCheckResult } from '../shared/types/update.types';
 
 // Inner component that uses the theme hook (must be inside SettingsProvider)
 const AppContent: React.FC = () => {
   // Apply theme based on settings
   useTheme();
 
-  const [updateInfo, setUpdateInfo] = useState<UpdateCheckResult | null>(null);
-  const [showUpdateModal, setShowUpdateModal] = useState(false);
   const [showUpdateBanner, setShowUpdateBanner] = useState(false);
 
-  // Check for updates on startup
-  useEffect(() => {
-    const checkForUpdates = async () => {
-      if (!window.electronAPI?.update) return;
-
-      // Squirrel handles updates silently on both Windows and macOS now — no manual modal needed.
-      // Use process.platform (exposed via preload) — more reliable than navigator.userAgent.
-      if (window.electronAPI?.platform === 'win32') return;
-      if (window.electronAPI?.platform === 'darwin') return;
-
-      try {
-        // Check if auto-check is enabled
-        const prefsResponse = await window.electronAPI.update.getPreferences();
-        if (!prefsResponse.success || !prefsResponse.preferences?.autoCheckEnabled) {
-          return;
-        }
-
-        // Check for updates
-        const response = await window.electronAPI.update.check();
-        if (response.success && response.result?.updateAvailable) {
-          setUpdateInfo(response.result);
-          setShowUpdateModal(true);
-        }
-      } catch (error) {
-        console.error('Failed to check for updates:', error);
-      }
-    };
-
-    // Delay the check slightly to not slow down startup
-    const timeout = setTimeout(checkForUpdates, 3000);
-    return () => clearTimeout(timeout);
-  }, []);
-
-  // Windows: listen for Squirrel "update downloaded" event from main process
+  // Listen for Squirrel "update downloaded" event from main process (Windows + macOS)
   useEffect(() => {
     if (!window.electronAPI?.update?.onUpdateDownloaded) return;
     const cleanup = window.electronAPI.update.onUpdateDownloaded(() => {
       setShowUpdateBanner(true);
     });
     return cleanup;
-  }, []);
-
-  const handleDownload = useCallback(async () => {
-    if (!window.electronAPI?.update || !updateInfo?.downloadUrl) return;
-
-    try {
-      await window.electronAPI.update.openUrl(updateInfo.downloadUrl);
-    } catch (error) {
-      console.error('Failed to open download URL:', error);
-    } finally {
-      setShowUpdateModal(false);
-    }
-  }, [updateInfo]);
-
-  const handleSkip = useCallback(async () => {
-    if (!window.electronAPI?.update || !updateInfo?.latestVersion) return;
-
-    try {
-      await window.electronAPI.update.skipVersion(updateInfo.latestVersion);
-    } catch (error) {
-      console.error('Failed to skip version:', error);
-    } finally {
-      setShowUpdateModal(false);
-    }
-  }, [updateInfo]);
-
-  const handleRemindLater = useCallback(() => {
-    setShowUpdateModal(false);
   }, []);
 
   const handleInstallUpdate = useCallback(async () => {
@@ -113,17 +48,7 @@ const AppContent: React.FC = () => {
               </Route>
             </Routes>
 
-            {/* Update Notification Modal (macOS manual download) */}
-            {showUpdateModal && updateInfo && (
-              <UpdateNotification
-                updateInfo={updateInfo}
-                onDownload={handleDownload}
-                onSkip={handleSkip}
-                onRemindLater={handleRemindLater}
-              />
-            )}
-
-            {/* Windows Squirrel: update downloaded and ready to install */}
+            {/* Squirrel update downloaded and ready to install (Windows + macOS) */}
             {showUpdateBanner && (
               <UpdateReadyBanner
                 onInstall={handleInstallUpdate}

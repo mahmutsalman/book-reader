@@ -16,7 +16,6 @@ import type {
 } from './meaning-analysis.types';
 import type {
   UpdateCheckResponse,
-  UpdateOpenUrlResponse,
   UpdateSkipVersionResponse,
   UpdatePreferencesResponse,
   UpdateSetPreferenceResponse,
@@ -199,7 +198,7 @@ export interface ElectronAPI {
   platform: string; // process.platform from main — use instead of navigator.userAgent
   update: {
     check: (ignoreSkipped?: boolean) => Promise<UpdateCheckResponse>;
-    openUrl: (url: string) => Promise<UpdateOpenUrlResponse>;
+    triggerDownload: () => Promise<{ success: boolean; error?: string }>;
     skipVersion: (version: string) => Promise<UpdateSkipVersionResponse>;
     getPreferences: () => Promise<UpdatePreferencesResponse>;
     setAutoCheck: (enabled: boolean) => Promise<UpdateSetPreferenceResponse>;

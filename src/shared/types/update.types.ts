@@ -50,11 +50,6 @@ export interface UpdateCheckResponse {
   error?: string;
 }
 
-export interface UpdateOpenUrlResponse {
-  success: boolean;
-  error?: string;
-}
-
 export interface UpdateSkipVersionResponse {
   success: boolean;
   error?: string;
