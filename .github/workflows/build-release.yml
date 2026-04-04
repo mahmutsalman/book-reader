@@ -22,7 +22,7 @@ permissions:
 jobs:
   build:
     name: Build ${{ matrix.os }}
-    timeout-minutes: 90
+    timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
@@ -179,7 +179,7 @@ jobs:
 
       - name: Notarize macOS app
         if: runner.os == 'macOS'
-        timeout-minutes: 30
+        timeout-minutes: 90
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
@@ -193,14 +193,25 @@ jobs:
           fi
           echo "Notarizing: $ZIP_PATH ($(du -sh "$ZIP_PATH" | cut -f1))"
 
-          # Submit and wait — output is visible here
-          xcrun notarytool submit "$ZIP_PATH" \
+          # Submit and wait — 80m gives Apple plenty of time for large bundles
+          SUBMISSION_OUTPUT=$(xcrun notarytool submit "$ZIP_PATH" \
             --apple-id "$APPLE_ID" \
             --password "$APPLE_APP_SPECIFIC_PASSWORD" \
             --team-id "$APPLE_TEAM_ID" \
             --wait \
-            --timeout 25m \
-            --verbose
+            --timeout 80m \
+            --verbose 2>&1)
+          echo "$SUBMISSION_OUTPUT"
+
+          # Extract submission ID and fetch Apple's log (shows exactly what they checked)
+          SUBMISSION_ID=$(echo "$SUBMISSION_OUTPUT" | grep -oE 'id: [a-f0-9-]{36}' | head -1 | cut -d' ' -f2)
+          if [ -n "$SUBMISSION_ID" ]; then
+            echo "Fetching notarization log for submission: $SUBMISSION_ID"
+            xcrun notarytool log "$SUBMISSION_ID" \
+              --apple-id "$APPLE_ID" \
+              --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+              --team-id "$APPLE_TEAM_ID" || true
+          fi
 
           # Staple the ticket to the DMG so it works offline
           DMG_PATH=$(find out/make -name "*.dmg" | head -1)
