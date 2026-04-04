@@ -41,11 +41,9 @@ const config: ForgeConfig = {
         entitlements: 'entitlements.plist',
         entitlementsInherit: 'entitlements.plist',
       },
-      osxNotarize: {
-        appleId: process.env.APPLE_ID!,
-        appleIdPassword: process.env.APPLE_APP_SPECIFIC_PASSWORD!,
-        teamId: process.env.APPLE_TEAM_ID!,
-      },
+      // Notarization disabled — signing alone removes the "damaged" error.
+      // Users see "unidentified developer" (right-click → Open to bypass).
+      // Re-enable osxNotarize once we confirm notarytool credentials work locally.
     } : {}),
     // Include embedded Python runtime and server files
     extraResource: [
