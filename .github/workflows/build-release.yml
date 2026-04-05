@@ -314,17 +314,26 @@ jobs:
           fi
           echo "✅ Notarization accepted!"
 
-          # Wait for Apple's CloudKit to propagate the notarization ticket.
-          # Stapling immediately after "Accepted" causes "Record not found" (Error 65)
-          # because the ticket hasn't reached Apple's CDN yet. 90s is safe.
-          echo "Waiting 90s for notarization ticket to propagate before stapling..."
-          sleep 90
-
-          # Staple the ticket to the DMG so it works offline
+          # Staple the ticket to the DMG so it works offline.
+          # Apple's CloudKit CDN propagation is unpredictably slow — "Accepted" does not
+          # mean the ticket is immediately available. Retry every 30s for up to 5 minutes.
           DMG_PATH=$(find out/make -name "*.dmg" | head -1)
           if [ -n "$DMG_PATH" ]; then
-            echo "Stapling: $DMG_PATH"
-            xcrun stapler staple "$DMG_PATH"
+            STAPLE_OK=0
+            for i in 1 2 3 4 5 6 7 8 9 10; do
+              echo "Staple attempt $i/10: $DMG_PATH"
+              if xcrun stapler staple "$DMG_PATH"; then
+                echo "✅ Stapling succeeded on attempt $i"
+                STAPLE_OK=1
+                break
+              fi
+              echo "Ticket not ready yet — waiting 30s before retry..."
+              sleep 30
+            done
+            if [ $STAPLE_OK -eq 0 ]; then
+              echo "ERROR: Stapling failed after 10 attempts"
+              exit 1
+            fi
           fi
 
       - name: Debug output structure (Windows)
