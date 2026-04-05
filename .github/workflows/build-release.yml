@@ -22,7 +22,7 @@ permissions:
 jobs:
   build:
     name: Build ${{ matrix.os }}
-    timeout-minutes: 120
+    timeout-minutes: 180
     strategy:
       fail-fast: false
       matrix:
@@ -179,7 +179,7 @@ jobs:
 
       - name: Notarize macOS app
         if: runner.os == 'macOS'
-        timeout-minutes: 90
+        timeout-minutes: 150
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
@@ -192,25 +192,53 @@ jobs:
             exit 1
           fi
           echo "Notarizing: $ZIP_PATH ($(du -sh "$ZIP_PATH" | cut -f1))"
+          echo "Note: bundle has 277 native binaries — Apple scan takes ~90-120 min"
 
-          # Submit and wait — 80m gives Apple plenty of time for large bundles
-          SUBMISSION_OUTPUT=$(xcrun notarytool submit "$ZIP_PATH" \
+          # Submit without --wait so the upload output is immediately visible.
+          # The Python runtime has 277 .so/.dylib files (761MB) that Apple scans
+          # one by one, which takes far longer than a typical app.
+          xcrun notarytool submit "$ZIP_PATH" \
             --apple-id "$APPLE_ID" \
             --password "$APPLE_APP_SPECIFIC_PASSWORD" \
             --team-id "$APPLE_TEAM_ID" \
-            --wait \
-            --timeout 80m \
-            --verbose 2>&1)
-          echo "$SUBMISSION_OUTPUT"
+            2>&1 | tee /tmp/notarize_submit.txt
 
-          # Extract submission ID and fetch Apple's log (shows exactly what they checked)
-          SUBMISSION_ID=$(echo "$SUBMISSION_OUTPUT" | grep -oE 'id: [a-f0-9-]{36}' | head -1 | cut -d' ' -f2)
-          if [ -n "$SUBMISSION_ID" ]; then
-            echo "Fetching notarization log for submission: $SUBMISSION_ID"
-            xcrun notarytool log "$SUBMISSION_ID" \
+          SUBMISSION_ID=$(grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' /tmp/notarize_submit.txt | head -1)
+          if [ -z "$SUBMISSION_ID" ]; then
+            echo "ERROR: Failed to get submission ID from Apple"
+            exit 1
+          fi
+          echo "Submission ID: $SUBMISSION_ID — polling every 60s for up to 140 minutes..."
+
+          # Poll until Apple finishes (Accepted / Invalid / Rejected)
+          DEADLINE=$(($(date +%s) + 8400))  # 140 minutes
+          FINAL_STATUS="In Progress"
+          while [ "$(date +%s)" -lt "$DEADLINE" ]; do
+            sleep 60
+            INFO=$(xcrun notarytool info "$SUBMISSION_ID" \
               --apple-id "$APPLE_ID" \
               --password "$APPLE_APP_SPECIFIC_PASSWORD" \
-              --team-id "$APPLE_TEAM_ID" || true
+              --team-id "$APPLE_TEAM_ID" 2>&1)
+            CURRENT=$(echo "$INFO" | grep -i 'status:' | tail -1 | awk '{print $NF}')
+            echo "$(date -u '+%H:%M:%S UTC') — $CURRENT"
+            if [ "$CURRENT" = "Accepted" ] || [ "$CURRENT" = "Invalid" ] || [ "$CURRENT" = "Rejected" ]; then
+              FINAL_STATUS="$CURRENT"
+              break
+            fi
+          done
+
+          echo "Final notarization status: $FINAL_STATUS"
+
+          # Always fetch Apple's detailed log (shows every file checked + any issues)
+          echo "Fetching Apple notarization log..."
+          xcrun notarytool log "$SUBMISSION_ID" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" || true
+
+          if [ "$FINAL_STATUS" != "Accepted" ]; then
+            echo "ERROR: Notarization not accepted (status: $FINAL_STATUS)"
+            exit 1
           fi
 
           # Staple the ticket to the DMG so it works offline
