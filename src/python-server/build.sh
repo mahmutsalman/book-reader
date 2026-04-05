@@ -164,11 +164,14 @@ install_core_dependencies() {
         pytesseract>=0.3.10 \
         Pillow>=10.0.0
 
+    echo "Installing ONNX Runtime (inference engine for OCR — no OpenCV, notarization-safe)..."
+    "$PYTHON_EXE" -m pip install "onnxruntime>=1.16.0"
+
     echo ""
-    echo "✅ Core dependencies installed (TTS, IPA, PDF)"
-    echo "   OCR engines (OnnxOCR/PaddleOCR) are installed on-demand via Settings UI."
-    echo "   This keeps the bundled runtime small (~60 native binaries vs 277+),"
-    echo "   which is required for macOS notarization to complete in reasonable time."
+    echo "✅ Core dependencies installed (TTS, IPA, PDF, ONNX Runtime)"
+    echo "   onnxruntime is bundled (~5-8 native files) — safe for notarization."
+    echo "   OpenCV is NOT bundled — it installs on-demand to user data dir when"
+    echo "   user first uses OCR (via Settings or the inline reader prompt)."
 }
 
 # Create launcher script

@@ -22,7 +22,7 @@ export const OCRInstallPrompt: React.FC<OCRInstallPromptProps> = ({ onClose, onI
       const res = await fetch('http://127.0.0.1:8766/api/ocr/install', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ engine: 'paddleocr' })
+        body: JSON.stringify({ engine: 'rapidocr' })
       });
 
       const data = await res.json();
@@ -37,7 +37,7 @@ export const OCRInstallPrompt: React.FC<OCRInstallPromptProps> = ({ onClose, onI
       const interval = setInterval(async () => {
         try {
           const progressRes = await fetch(
-            'http://127.0.0.1:8766/api/ocr/install/progress/paddleocr'
+            'http://127.0.0.1:8766/api/ocr/install/progress/rapidocr'
           );
           const progressData = await progressRes.json();
 
@@ -51,7 +51,6 @@ export const OCRInstallPrompt: React.FC<OCRInstallPromptProps> = ({ onClose, onI
               onClose();
             }, 1000);
           } else if (progressData.progress < 0) {
-            // Installation failed
             clearInterval(interval);
             setInstalling(false);
             setError('Installation failed. Please try again from Settings.');
@@ -114,7 +113,7 @@ export const OCRInstallPrompt: React.FC<OCRInstallPromptProps> = ({ onClose, onI
           {!installing ? (
             <>
               <p className="mb-4" style={{ color: theme.text }}>
-                OCR (text recognition) requires an OCR engine. Install PaddleOCR for full language support.
+                OCR text recognition needs a one-time setup. OnnxOCR is fast and lightweight — install it now and you're good to go.
               </p>
               <div
                 className="mb-4 p-3 rounded-lg"
@@ -123,11 +122,14 @@ export const OCRInstallPrompt: React.FC<OCRInstallPromptProps> = ({ onClose, onI
                   border: `1px solid ${addAlpha(theme.accent, 0.2)}`,
                 }}
               >
-                <p className="text-sm mb-2" style={{ color: theme.text }}>
-                  <strong>Download size:</strong> ~800MB
+                <p className="text-sm mb-1" style={{ color: theme.text }}>
+                  <strong>OnnxOCR</strong> — recommended
+                </p>
+                <p className="text-sm mb-2" style={{ color: theme.textSecondary }}>
+                  ~100MB download · English, Japanese, Chinese, Korean · Fast
                 </p>
                 <p className="text-sm" style={{ color: theme.textSecondary }}>
-                  OCR packages are stored in your user data directory and persist across app updates.
+                  Installs to your user folder and persists across app updates.
                 </p>
               </div>
 
@@ -150,7 +152,7 @@ export const OCRInstallPrompt: React.FC<OCRInstallPromptProps> = ({ onClose, onI
                   className="w-full py-3 rounded-lg font-medium transition-opacity hover:opacity-90"
                   style={{ backgroundColor: theme.accent, color: accentTextColor }}
                 >
-                  Install Now (~800MB)
+                  Install OnnxOCR (~100MB)
                 </button>
                 <button
                   onClick={handleGoToSettings}
@@ -167,7 +169,7 @@ export const OCRInstallPrompt: React.FC<OCRInstallPromptProps> = ({ onClose, onI
                     e.currentTarget.style.backgroundColor = 'transparent';
                   }}
                 >
-                  Go to Settings
+                  More options in Settings
                 </button>
                 <button
                   onClick={onClose}
@@ -181,7 +183,7 @@ export const OCRInstallPrompt: React.FC<OCRInstallPromptProps> = ({ onClose, onI
           ) : (
             <div className="space-y-4">
               <p className="text-center font-medium" style={{ color: theme.text }}>
-                Installing PaddleOCR...
+                Installing OnnxOCR...
               </p>
               <div
                 className="w-full h-8 rounded-lg overflow-hidden"

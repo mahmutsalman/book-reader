@@ -262,11 +262,21 @@ def get_ocr_packages_dir() -> Path:
     return ocr_dir
 
 def is_ocr_installed(engine: str) -> bool:
-    """Check if OCR engine is installed in standard site-packages."""
+    """Check if OCR engine is installed (bundled runtime or user data dir)."""
     try:
         if engine == 'paddleocr':
             import paddleocr
             return True
+        if engine == 'rapidocr':
+            # Considered installed if it initialized successfully at startup,
+            # or if the package is importable now (e.g. after a fresh install)
+            if RAPIDOCR_AVAILABLE:
+                return True
+            try:
+                from onnxocr.onnx_paddleocr import ONNXPaddleOcr  # noqa: F401
+                return True
+            except ImportError:
+                return False
         return False
     except ImportError:
         return False
@@ -2453,11 +2463,11 @@ async def get_ocr_engines():
     engines = [
         OCREngineInfo(
             engine="rapidocr",
-            installed=RAPIDOCR_AVAILABLE,
-            built_in=True,
-            size_mb=0,
-            languages=["en"],
-            description="RapidOCR - Built-in fast OCR, works out of the box (English)"
+            installed=is_ocr_installed("rapidocr"),
+            built_in=False,
+            size_mb=100,
+            languages=["en", "ja", "zh", "ko"],
+            description="OnnxOCR (PP-OCRv5) - Fast OCR, installs to your user data folder (~100MB)"
         ),
         OCREngineInfo(
             engine="paddleocr",
@@ -2465,7 +2475,7 @@ async def get_ocr_engines():
             built_in=False,
             size_mb=800,
             languages=["en", "ja", "zh", "ko"],
-            description="PaddleOCR - High-accuracy OCR for CJK languages (optional, ~800MB)"
+            description="PaddleOCR - High-accuracy OCR for CJK languages (~800MB)"
         ),
     ]
     result = {"success": True, "engines": engines}
@@ -2501,82 +2511,93 @@ async def install_ocr(request: InstallOCRRequest, background_tasks: BackgroundTa
     )
 
 def install_ocr_sync(engine: str):
-    """Background OCR installation from pre-bundled wheels."""
+    """Background OCR installation into user data directory (not inside app bundle)."""
     try:
         ocr_dir = get_ocr_packages_dir()
         _install_progress[engine] = 10
 
-        # Find bundled OCR wheels directory
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        wheels_dir = os.path.join(script_dir, 'ocr-wheels')
-
-        # Check if bundled wheels exist
-        has_bundled_wheels = os.path.exists(wheels_dir) and os.path.isdir(wheels_dir)
-
-        if has_bundled_wheels:
-            print(f"[OCR] Installing from bundled wheels: {wheels_dir}")
-        else:
-            print(f"[OCR] Bundled wheels not found, will download from PyPI")
-
-        # Install main packages and let pip handle dependencies
-        packages = [
-            'paddleocr>=2.7.0',
-            'paddlepaddle>=2.5.0'
-        ]
-
-        for i, pkg in enumerate(packages):
-            _install_progress[engine] = 20 + (70 * i // len(packages))
-
-            # Build pip install command
-            # Note: Install directly to Python's site-packages (no --target)
-            # PaddlePaddle has complex native dependencies that require standard installation
-            pip_cmd = [
-                sys.executable, "-m", "pip", "install",
-                pkg
+        if engine == 'rapidocr':
+            # OnnxOCR (PP-OCRv5) — ~100MB, installs to user data dir via --target
+            # This keeps the signed app bundle clean (no new native files inside .app)
+            packages = [
+                'opencv-python-headless>=4.8.0',
+                'onnxocr-ppocrv5>=0.0.14',
             ]
+            for i, pkg in enumerate(packages):
+                _install_progress[engine] = 20 + (60 * i // len(packages))
+                print(f"[OCR] Installing {pkg} to {ocr_dir}...")
+                result = subprocess.run(
+                    [
+                        sys.executable, "-m", "pip", "install",
+                        "--target", str(ocr_dir),
+                        "--prefer-binary",
+                        "--only-binary", ":all:",
+                        pkg,
+                    ],
+                    capture_output=True, text=True, timeout=600
+                )
+                if result.returncode != 0:
+                    raise Exception(f"Failed to install {pkg}: {result.stderr}")
+
+            _install_progress[engine] = 90
+
+            # Re-add ocr_dir to sys.path so it's importable in this process immediately
+            if str(ocr_dir) not in sys.path:
+                sys.path.insert(0, str(ocr_dir))
+
+            # Re-initialize rapidocr with the newly installed package
+            init_rapidocr()
+
+            _install_progress[engine] = 100
+            print(f"[OCR] OnnxOCR installed successfully. RAPIDOCR_AVAILABLE={RAPIDOCR_AVAILABLE}")
+
+        else:
+            # PaddleOCR — ~800MB, install to Python site-packages (requires write access)
+            # Find bundled OCR wheels directory (Windows only)
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            wheels_dir = os.path.join(script_dir, 'ocr-wheels')
+            has_bundled_wheels = os.path.exists(wheels_dir) and os.path.isdir(wheels_dir)
 
             if has_bundled_wheels:
-                # Install from bundled wheels (prefer offline, allow online fallback)
-                pip_cmd.extend([
-                    "--find-links", wheels_dir,  # Look in bundled wheels first
-                    # Don't use --no-index, allow PyPI fallback for missing dependencies
-                    "--prefer-binary",           # Prefer wheels over source
-                ])
+                print(f"[OCR] Installing from bundled wheels: {wheels_dir}")
             else:
-                # Fallback: Download from PyPI (online mode)
-                pip_cmd.extend([
-                    "--prefer-binary",           # Prefer pre-built wheels
-                    "--only-binary", ":all:"     # Don't build from source
-                ])
+                print(f"[OCR] Bundled wheels not found, downloading from PyPI")
 
-            result = subprocess.run(
-                pip_cmd,
-                capture_output=True,
-                text=True,
-                timeout=600
-            )
+            packages = ['paddleocr>=2.7.0', 'paddlepaddle>=2.5.0']
 
-            if result.returncode != 0:
-                error_msg = result.stderr
-                # Check for common Windows build errors
-                if "Microsoft Visual C++" in error_msg or "error: Microsoft" in error_msg:
-                    raise Exception(
-                        "Installation requires Microsoft C++ Build Tools. "
-                        "This is a Windows limitation. "
-                        "Alternative: Use EasyOCR instead (no build tools required)."
-                    )
-                raise Exception(f"Failed to install {pkg}: {error_msg}")
+            for i, pkg in enumerate(packages):
+                _install_progress[engine] = 20 + (70 * i // len(packages))
 
-        _install_progress[engine] = 100
-        print(f"[OCR] Successfully installed {engine}")
+                pip_cmd = [sys.executable, "-m", "pip", "install", pkg]
+                if has_bundled_wheels:
+                    pip_cmd.extend(["--find-links", wheels_dir, "--prefer-binary"])
+                else:
+                    pip_cmd.extend(["--prefer-binary", "--only-binary", ":all:"])
 
-        # Configure Windows DLL paths for newly installed packages
-        if sys.platform == 'win32' and engine == 'paddleocr':
-            try:
-                configure_windows_dll_paths()
-                print(f"[OCR] Windows DLL paths configured for PaddlePaddle")
-            except Exception as dll_error:
-                print(f"[OCR] Warning: DLL path configuration failed: {dll_error}")
+                result = subprocess.run(
+                    pip_cmd, capture_output=True, text=True, timeout=600
+                )
+
+                if result.returncode != 0:
+                    error_msg = result.stderr
+                    if "Microsoft Visual C++" in error_msg or "error: Microsoft" in error_msg:
+                        raise Exception(
+                            "Installation requires Microsoft C++ Build Tools. "
+                            "This is a Windows limitation."
+                        )
+                    raise Exception(f"Failed to install {pkg}: {error_msg}")
+
+            _install_progress[engine] = 100
+            print(f"[OCR] Successfully installed {engine}")
+
+            # Configure Windows DLL paths for newly installed packages
+            if sys.platform == 'win32' and engine == 'paddleocr':
+                try:
+                    configure_windows_dll_paths()
+                    print(f"[OCR] Windows DLL paths configured for PaddlePaddle")
+                except Exception as dll_error:
+                    print(f"[OCR] Warning: DLL path configuration failed: {dll_error}")
+
     except Exception as e:
         print(f"[OCR] Installation failed: {e}")
         _install_progress[engine] = -1
