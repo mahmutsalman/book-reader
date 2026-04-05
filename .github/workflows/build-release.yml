@@ -210,47 +210,28 @@ jobs:
           fi
           echo "Notarizing: $ZIP_PATH ($(du -sh "$ZIP_PATH" | cut -f1))"
 
+          # Submit and wait — --wait polls internally, --timeout 2h handles slow Apple servers
           xcrun notarytool submit "$ZIP_PATH" \
             --apple-id "$APPLE_ID" \
             --password "$APPLE_APP_SPECIFIC_PASSWORD" \
             --team-id "$APPLE_TEAM_ID" \
-            2>&1 | tee /tmp/notarize_submit.txt
+            --wait \
+            --timeout 7200 \
+            2>&1 | tee /tmp/notarize_result.txt
 
-          SUBMISSION_ID=$(grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' /tmp/notarize_submit.txt | head -1)
-          if [ -z "$SUBMISSION_ID" ]; then
-            echo "ERROR: Failed to get submission ID from Apple"
-            exit 1
-          fi
-          echo "Submission ID: $SUBMISSION_ID — polling every 60s for up to 45 minutes..."
-
-          # Poll until Apple finishes (Accepted / Invalid / Rejected)
-          DEADLINE=$(($(date +%s) + 2700))  # 45 minutes
-          FINAL_STATUS="In Progress"
-          while [ "$(date +%s)" -lt "$DEADLINE" ]; do
-            sleep 60
-            INFO=$(xcrun notarytool info "$SUBMISSION_ID" \
+          # Fetch Apple's detailed log (shows every file checked + any issues)
+          SUBMISSION_ID=$(grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' /tmp/notarize_result.txt | head -1)
+          if [ -n "$SUBMISSION_ID" ]; then
+            echo "Fetching Apple notarization log..."
+            xcrun notarytool log "$SUBMISSION_ID" \
               --apple-id "$APPLE_ID" \
               --password "$APPLE_APP_SPECIFIC_PASSWORD" \
-              --team-id "$APPLE_TEAM_ID" 2>&1)
-            CURRENT=$(echo "$INFO" | grep -i 'status:' | tail -1 | awk '{print $NF}')
-            echo "$(date -u '+%H:%M:%S UTC') — $CURRENT"
-            if [ "$CURRENT" = "Accepted" ] || [ "$CURRENT" = "Invalid" ] || [ "$CURRENT" = "Rejected" ]; then
-              FINAL_STATUS="$CURRENT"
-              break
-            fi
-          done
+              --team-id "$APPLE_TEAM_ID" || true
+          fi
 
-          echo "Final notarization status: $FINAL_STATUS"
-
-          # Always fetch Apple's detailed log (shows every file checked + any issues)
-          echo "Fetching Apple notarization log..."
-          xcrun notarytool log "$SUBMISSION_ID" \
-            --apple-id "$APPLE_ID" \
-            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
-            --team-id "$APPLE_TEAM_ID" || true
-
-          if [ "$FINAL_STATUS" != "Accepted" ]; then
-            echo "ERROR: Notarization not accepted (status: $FINAL_STATUS)"
+          # Check result
+          if ! grep -q "status: Accepted" /tmp/notarize_result.txt; then
+            echo "ERROR: Notarization not accepted"
             exit 1
           fi
 
