@@ -162,26 +162,13 @@ install_core_dependencies() {
     "$PYTHON_EXE" -m pip install \
         PyMuPDF>=1.23.0 \
         pytesseract>=0.3.10 \
-        Pillow>=10.0.0 \
-        scipy>=1.10.0
-
-    echo "Installing OpenCV (required by OnnxOCR, not auto-declared as dependency)..."
-    "$PYTHON_EXE" -m pip install "opencv-python-headless>=4.8.0"
-
-    echo "Installing OnnxOCR with PP-OCRv5 mobile models (bundled, no PaddlePaddle needed)..."
-    "$PYTHON_EXE" -m pip install "onnxocr-ppocrv5>=0.0.14"
-
-    echo "Verifying OnnxOCR initialization..."
-    "$PYTHON_EXE" -c "
-import logging, numpy as np
-logging.getLogger('onnxocr').setLevel(logging.WARNING)
-from onnxocr.onnx_paddleocr import ONNXPaddleOcr
-ocr = ONNXPaddleOcr(use_angle_cls=True, use_gpu=False, use_openvino=False)
-print('[OnnxOCR] PP-OCRv5 models ready')
-" || echo "Warning: OnnxOCR verification failed (will attempt on first use)"
+        Pillow>=10.0.0
 
     echo ""
-    echo "✅ Core dependencies installed (OnnxOCR + PP-OCRv5 bundled; PaddleOCR optional via Settings UI)"
+    echo "✅ Core dependencies installed (TTS, IPA, PDF)"
+    echo "   OCR engines (OnnxOCR/PaddleOCR) are installed on-demand via Settings UI."
+    echo "   This keeps the bundled runtime small (~60 native binaries vs 277+),"
+    echo "   which is required for macOS notarization to complete in reasonable time."
 }
 
 # Create launcher script
@@ -247,6 +234,6 @@ echo ""
 echo "To test locally: ./launch-server.sh"
 echo "To package with Electron: npm run make"
 echo ""
-echo "Note: RapidOCR is bundled and works out of the box."
-echo "PaddleOCR (optional, ~800MB) can be installed via Settings UI for CJK language accuracy."
+echo "Note: OCR engines are NOT bundled (OnnxOCR/PaddleOCR install on-demand via Settings UI)."
+echo "This keeps the runtime small enough for macOS notarization to succeed."
 echo ""
