@@ -159,17 +159,21 @@ install_core_dependencies() {
         gruut>=2.3.0
 
     echo "Installing PDF processing..."
+    # NOTE: Pillow is intentionally excluded from the bundle.
+    # Pillow's macOS wheel bundles 18+ system dylibs (libjpeg, libpng, libwebp, etc.)
+    # which bloat the binary count and cause Apple notarization to hang indefinitely.
+    # Pillow is only used for OCR image preprocessing (already optional/on-demand).
+    # It will be installed automatically when user installs OCR engines via Settings.
+    # NOTE: onnxruntime is also excluded — it will be added back once Option B
+    # (ppocr_lite.py with bundled ONNX models) is implemented.
     "$PYTHON_EXE" -m pip install \
         PyMuPDF>=1.23.0 \
-        pytesseract>=0.3.10 \
-        Pillow>=10.0.0
-
-    echo "Installing ONNX Runtime (inference engine for OCR — no OpenCV, notarization-safe)..."
-    "$PYTHON_EXE" -m pip install "onnxruntime>=1.16.0"
+        pytesseract>=0.3.10
 
     echo ""
-    echo "✅ Core dependencies installed (TTS, IPA, PDF, ONNX Runtime)"
-    echo "   onnxruntime is bundled (~5-8 native files) — safe for notarization."
+    echo "✅ Core dependencies installed (TTS, IPA, PDF)"
+    echo "   Binary count: ~35 native files (notarization-safe)."
+    echo "   Pillow/onnxruntime NOT bundled — install on-demand with OCR engines."
     echo "   OpenCV is NOT bundled — it installs on-demand to user data dir when"
     echo "   user first uses OCR (via Settings or the inline reader prompt)."
 }

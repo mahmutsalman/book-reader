@@ -177,9 +177,26 @@ jobs:
           DEBUG: electron-forge:*
           APPLE_IDENTITY: ${{ secrets.APPLE_IDENTITY }}
 
+      - name: Count native binaries before notarization (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          echo "=== Native binary count in Python runtime ==="
+          RUNTIME_DIR="src/python-server/python-runtime"
+          NATIVE_COUNT=$(find "$RUNTIME_DIR" \( -name "*.dylib" -o -name "*.so" \) | wc -l | tr -d ' ')
+          echo "Native binaries (.dylib + .so): $NATIVE_COUNT"
+          echo ""
+          echo "=== Top directories by binary count ==="
+          find "$RUNTIME_DIR" \( -name "*.dylib" -o -name "*.so" \) \
+            | sed 's|/[^/]*$||' | sort | uniq -c | sort -rn | head -15
+          echo ""
+          echo "=== Largest native files ==="
+          find "$RUNTIME_DIR" \( -name "*.dylib" -o -name "*.so" \) \
+            -exec ls -lh {} \; | sort -k5 -rh | head -10
+        shell: bash
+
       - name: Notarize macOS app
         if: runner.os == 'macOS'
-        timeout-minutes: 150
+        timeout-minutes: 60
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
@@ -192,11 +209,7 @@ jobs:
             exit 1
           fi
           echo "Notarizing: $ZIP_PATH ($(du -sh "$ZIP_PATH" | cut -f1))"
-          echo "Note: bundle has 277 native binaries — Apple scan takes ~90-120 min"
 
-          # Submit without --wait so the upload output is immediately visible.
-          # The Python runtime has 277 .so/.dylib files (761MB) that Apple scans
-          # one by one, which takes far longer than a typical app.
           xcrun notarytool submit "$ZIP_PATH" \
             --apple-id "$APPLE_ID" \
             --password "$APPLE_APP_SPECIFIC_PASSWORD" \
@@ -208,10 +221,10 @@ jobs:
             echo "ERROR: Failed to get submission ID from Apple"
             exit 1
           fi
-          echo "Submission ID: $SUBMISSION_ID — polling every 60s for up to 140 minutes..."
+          echo "Submission ID: $SUBMISSION_ID — polling every 60s for up to 45 minutes..."
 
           # Poll until Apple finishes (Accepted / Invalid / Rejected)
-          DEADLINE=$(($(date +%s) + 8400))  # 140 minutes
+          DEADLINE=$(($(date +%s) + 2700))  # 45 minutes
           FINAL_STATUS="In Progress"
           while [ "$(date +%s)" -lt "$DEADLINE" ]; do
             sleep 60
