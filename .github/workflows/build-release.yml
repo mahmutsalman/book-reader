@@ -171,6 +171,49 @@ jobs:
           echo "Certificate imported successfully"
           security find-identity -v -p codesigning "$KEYCHAIN_PATH" | head -5
 
+      - name: Pre-sign Python runtime binaries (macOS)
+        if: runner.os == 'macOS'
+        env:
+          APPLE_IDENTITY: ${{ secrets.APPLE_IDENTITY }}
+        run: |
+          if [ -z "$APPLE_IDENTITY" ]; then
+            echo "APPLE_IDENTITY not set — skipping Python binary pre-signing"
+            exit 0
+          fi
+
+          RUNTIME_DIR="src/python-server/python-runtime"
+          echo "=== Pre-signing Python runtime native binaries ==="
+          echo "This prevents Apple from hanging on unsigned nested binaries during notarization"
+
+          # Sign all .so and .dylib files with hardened runtime + secure timestamp
+          SIGNED=0
+          FAILED=0
+          while IFS= read -r -d '' f; do
+            if codesign --force --sign "$APPLE_IDENTITY" \
+                --options runtime \
+                --timestamp \
+                "$f" 2>/dev/null; then
+              SIGNED=$((SIGNED + 1))
+            else
+              echo "  Warning: could not sign $f"
+              FAILED=$((FAILED + 1))
+            fi
+          done < <(find "$RUNTIME_DIR" \( -name "*.so" -o -name "*.dylib" \) -print0)
+
+          # Sign Python executables (bin/python3, bin/pip3, etc.)
+          while IFS= read -r -d '' f; do
+            if file "$f" | grep -q "Mach-O"; then
+              codesign --force --sign "$APPLE_IDENTITY" \
+                --options runtime \
+                --timestamp \
+                "$f" 2>/dev/null && SIGNED=$((SIGNED + 1)) || true
+            fi
+          done < <(find "$RUNTIME_DIR/bin" -type f -print0 2>/dev/null)
+
+          echo "✅ Pre-signed $SIGNED binaries ($FAILED warnings)"
+          echo "Native binary count after pre-sign:"
+          find "$RUNTIME_DIR" \( -name "*.so" -o -name "*.dylib" \) | wc -l
+
       - name: Build Electron app
         run: npm run make
         env:
@@ -196,7 +239,7 @@ jobs:
 
       - name: Notarize macOS app
         if: runner.os == 'macOS'
-        timeout-minutes: 60
+        timeout-minutes: 120
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
