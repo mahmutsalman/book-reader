@@ -253,30 +253,66 @@ jobs:
           fi
           echo "Notarizing: $ZIP_PATH ($(du -sh "$ZIP_PATH" | cut -f1))"
 
-          # Submit and wait — --wait polls internally, --timeout 2h handles slow Apple servers
+          # Submit WITHOUT --wait so we get the submission ID immediately.
+          # Using --wait holds a single long-lived HTTP connection which breaks when
+          # the GitHub macOS runner loses network (happens after ~40min of uptime).
+          # Instead we poll manually — each poll is a fresh request that survives blips.
           xcrun notarytool submit "$ZIP_PATH" \
             --apple-id "$APPLE_ID" \
             --password "$APPLE_APP_SPECIFIC_PASSWORD" \
             --team-id "$APPLE_TEAM_ID" \
-            --wait \
-            --timeout 7200 \
-            2>&1 | tee /tmp/notarize_result.txt
+            --output-format json > /tmp/notarize_submit.json 2>&1
+          cat /tmp/notarize_submit.json
 
-          # Fetch Apple's detailed log (shows every file checked + any issues)
-          SUBMISSION_ID=$(grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' /tmp/notarize_result.txt | head -1)
-          if [ -n "$SUBMISSION_ID" ]; then
-            echo "Fetching Apple notarization log..."
-            xcrun notarytool log "$SUBMISSION_ID" \
-              --apple-id "$APPLE_ID" \
-              --password "$APPLE_APP_SPECIFIC_PASSWORD" \
-              --team-id "$APPLE_TEAM_ID" || true
-          fi
-
-          # Check result
-          if ! grep -q "status: Accepted" /tmp/notarize_result.txt; then
-            echo "ERROR: Notarization not accepted"
+          SUBMISSION_ID=$(python3 -c "import sys,json; print(json.load(open('/tmp/notarize_submit.json'))['id'])" 2>/dev/null || true)
+          if [ -z "$SUBMISSION_ID" ]; then
+            echo "ERROR: Could not get submission ID from notarytool output"
             exit 1
           fi
+          echo "Submission ID: $SUBMISSION_ID"
+
+          # Poll until Accepted/Invalid/Rejected — retries on network errors
+          MAX_WAIT=7200
+          POLL_INTERVAL=30
+          ELAPSED=0
+          FINAL_STATUS=""
+
+          while [ $ELAPSED -lt $MAX_WAIT ]; do
+            sleep $POLL_INTERVAL
+            ELAPSED=$((ELAPSED + POLL_INTERVAL))
+
+            STATUS=$(xcrun notarytool info "$SUBMISSION_ID" \
+              --apple-id "$APPLE_ID" \
+              --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+              --team-id "$APPLE_TEAM_ID" \
+              --output-format json 2>/dev/null \
+              | python3 -c "import sys,json; print(json.load(sys.stdin).get('status',''))" 2>/dev/null \
+              || echo "network-error")
+
+            echo "[${ELAPSED}s] Status: $STATUS"
+
+            if [ "$STATUS" = "Accepted" ]; then
+              FINAL_STATUS="Accepted"
+              break
+            elif [ "$STATUS" = "Invalid" ] || [ "$STATUS" = "Rejected" ]; then
+              FINAL_STATUS="$STATUS"
+              break
+            fi
+            # "In Progress" or "network-error" → keep polling
+          done
+
+          # Fetch Apple's detailed log regardless of result
+          echo "Fetching Apple notarization log..."
+          xcrun notarytool log "$SUBMISSION_ID" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" 2>/dev/null || true
+
+          if [ "$FINAL_STATUS" != "Accepted" ]; then
+            echo "ERROR: Notarization not accepted (final status: $FINAL_STATUS)"
+            exit 1
+          fi
+          echo "✅ Notarization accepted!"
 
           # Staple the ticket to the DMG so it works offline
           DMG_PATH=$(find out/make -name "*.dmg" | head -1)
