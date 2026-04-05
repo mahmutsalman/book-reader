@@ -505,11 +505,16 @@ jobs:
               # Generate version from timestamp
               VERSION="v$(date +'%Y.%m.%d')-build.${{ github.run_number }}"
             fi
-            echo "Creating tag $VERSION"
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
-            git tag -a "$VERSION" -m "Auto-generated release $VERSION"
-            git push origin "$VERSION"
+            # Only create the tag if it doesn't already exist (re-runs reuse the same version)
+            if git ls-remote --tags origin "refs/tags/$VERSION" | grep -q "$VERSION"; then
+              echo "Tag $VERSION already exists — reusing it"
+            else
+              echo "Creating tag $VERSION"
+              git tag -a "$VERSION" -m "Auto-generated release $VERSION"
+              git push origin "$VERSION"
+            fi
             echo "version=$VERSION" >> $GITHUB_OUTPUT
           else
             echo "version=${{ github.ref_name }}" >> $GITHUB_OUTPUT
