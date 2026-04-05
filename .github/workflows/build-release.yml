@@ -314,6 +314,12 @@ jobs:
           fi
           echo "✅ Notarization accepted!"
 
+          # Wait for Apple's CloudKit to propagate the notarization ticket.
+          # Stapling immediately after "Accepted" causes "Record not found" (Error 65)
+          # because the ticket hasn't reached Apple's CDN yet. 90s is safe.
+          echo "Waiting 90s for notarization ticket to propagate before stapling..."
+          sleep 90
+
           # Staple the ticket to the DMG so it works offline
           DMG_PATH=$(find out/make -name "*.dmg" | head -1)
           if [ -n "$DMG_PATH" ]; then
