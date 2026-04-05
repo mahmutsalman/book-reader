@@ -245,19 +245,22 @@ jobs:
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
-          # Find the ZIP to notarize
-          ZIP_PATH=$(find out/make -name "*.zip" | head -1)
-          if [ -z "$ZIP_PATH" ]; then
-            echo "No ZIP found to notarize"
+          # Notarize the DMG directly (not the ZIP) so the ticket matches what we staple.
+          # If you notarize a ZIP but staple the DMG, xcrun stapler returns Error 65
+          # "Record not found" because Apple issues the ticket for the submitted file's
+          # identity — a ZIP ticket cannot be stapled onto a DMG.
+          DMG_PATH=$(find out/make -name "*.dmg" | head -1)
+          if [ -z "$DMG_PATH" ]; then
+            echo "No DMG found to notarize"
             exit 1
           fi
-          echo "Notarizing: $ZIP_PATH ($(du -sh "$ZIP_PATH" | cut -f1))"
+          echo "Notarizing: $DMG_PATH ($(du -sh "$DMG_PATH" | cut -f1))"
 
           # Submit WITHOUT --wait so we get the submission ID immediately.
           # Using --wait holds a single long-lived HTTP connection which breaks when
           # the GitHub macOS runner loses network (happens after ~40min of uptime).
           # Instead we poll manually — each poll is a fresh request that survives blips.
-          xcrun notarytool submit "$ZIP_PATH" \
+          xcrun notarytool submit "$DMG_PATH" \
             --apple-id "$APPLE_ID" \
             --password "$APPLE_APP_SPECIFIC_PASSWORD" \
             --team-id "$APPLE_TEAM_ID" \
@@ -317,7 +320,6 @@ jobs:
           # Staple the ticket to the DMG so it works offline.
           # Apple's CloudKit CDN propagation is unpredictably slow — "Accepted" does not
           # mean the ticket is immediately available. Retry every 30s for up to 5 minutes.
-          DMG_PATH=$(find out/make -name "*.dmg" | head -1)
           if [ -n "$DMG_PATH" ]; then
             STAPLE_OK=0
             for i in 1 2 3 4 5 6 7 8 9 10; do
