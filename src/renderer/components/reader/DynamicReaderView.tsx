@@ -263,13 +263,16 @@ const DynamicReaderView: React.FC<DynamicReaderViewProps> = ({ book, bookData, i
   }, [theme]);
 
   // Debounced reflow when zoom changes
+  // Only depends on zoom — reflowPages is now stable across navigations,
+  // so including it would not cause spurious reflows, but keeping deps minimal
+  // makes the intent explicit: reflow only when zoom actually changes.
   useEffect(() => {
     const timer = setTimeout(() => {
       reflowPages();
     }, REFLOW_SETTINGS.DEBOUNCE_MS);
 
     return () => clearTimeout(timer);
-  }, [zoom, reflowPages]);
+  }, [zoom]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Keep refs in sync with state (for use in page change effect without causing loops)
   useEffect(() => {

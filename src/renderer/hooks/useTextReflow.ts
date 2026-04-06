@@ -187,16 +187,18 @@ export function useTextReflow({
     // For manga, skip text-based reflow - pages are fixed (one per image)
     if (isManga) {
       const totalMangaPages = bookData.pages.length;
-      const currentIndex = Math.min(state.currentPageIndex, totalMangaPages - 1);
-      const currentMangaPage = bookData.pages[currentIndex];
-
-      setState(prev => ({
-        ...prev,
-        currentPageIndex: currentIndex,
-        totalPages: totalMangaPages,
-        originalPage: currentIndex + 1,
-        chapterName: currentMangaPage?.chapter || null,
-      }));
+      // Use functional setState so we don't need state.currentPageIndex in deps
+      setState(prev => {
+        const currentIndex = Math.min(prev.currentPageIndex, totalMangaPages - 1);
+        const currentMangaPage = bookData.pages[currentIndex];
+        return {
+          ...prev,
+          currentPageIndex: currentIndex,
+          totalPages: totalMangaPages,
+          originalPage: currentIndex + 1,
+          chapterName: currentMangaPage?.chapter || null,
+        };
+      });
       return;
     }
 
@@ -231,6 +233,10 @@ export function useTextReflow({
       }
     }
 
+    // Sync ref to the new paginated offset so navigation stays consistent
+    // with the current pagination scale (important after zoom changes shift all offsets)
+    characterOffsetRef.current = offsets[newPageIndex] ?? characterOffsetRef.current;
+
     // Update state
     const currentPage = pages[newPageIndex] || '';
     const currentOffset = offsets[newPageIndex] || 0;
@@ -242,11 +248,11 @@ export function useTextReflow({
       currentPageIndex: newPageIndex,
       totalPages: pages.length,
       totalCharacters: fullTextRef.current.length,
-      characterOffset: characterOffsetRef.current, // Sync state with ref
+      characterOffset: characterOffsetRef.current,
       chapterName: originalPage?.chapter || null,
       originalPage: originalPage?.page || 1,
     }));
-  }, [containerRef, fontSize, isManga, bookData.pages, state.currentPageIndex]); // Added manga dependencies
+  }, [containerRef, fontSize, isManga, bookData.pages]); // state.currentPageIndex removed — manga uses setState(prev=>) instead
 
   // Reflow on mount and when dependencies change
   // Note: Window resize listener removed intentionally to keep word count stable.
