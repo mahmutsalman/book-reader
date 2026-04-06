@@ -110,22 +110,10 @@ class PythonManager {
     const fs = require('fs');
 
     if (isDev) {
-      // Development: Use venv Python to run the script
+      // Development: Use venv Python if available, otherwise fall back to system python3/python
       const scriptPath = this.getScriptPath();
       const serverDir = path.dirname(scriptPath);
-      const pythonPath = this.getVenvPythonPath(serverDir);
-
-      console.log(`[PythonManager] Development mode - using venv Python`);
-      console.log(`[PythonManager] Python: ${pythonPath}`);
-      console.log(`[PythonManager] Script: ${scriptPath}`);
-
-      // Check if Python executable exists
-      if (!fs.existsSync(pythonPath)) {
-        const error = `Python executable not found at: ${pythonPath}`;
-        console.error(`[PythonManager] ${error}`);
-        this.lastStartupError = error;
-        throw new Error(error);
-      }
+      const venvPythonPath = this.getVenvPythonPath(serverDir);
 
       // Check if script exists
       if (!fs.existsSync(scriptPath)) {
@@ -134,6 +122,21 @@ class PythonManager {
         this.lastStartupError = error;
         throw new Error(error);
       }
+
+      // Resolve Python executable: prefer venv, fall back to system python3 / python
+      let pythonPath: string;
+      if (fs.existsSync(venvPythonPath)) {
+        pythonPath = venvPythonPath;
+        console.log(`[PythonManager] Development mode - using venv Python`);
+      } else {
+        // venv not set up — find a system Python
+        pythonPath = this.findSystemPython();
+        console.log(`[PythonManager] Development mode - venv not found, using system Python`);
+        console.log(`[PythonManager] Hint: run 'cd src/python-server && python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt' to set up the venv`);
+      }
+
+      console.log(`[PythonManager] Python: ${pythonPath}`);
+      console.log(`[PythonManager] Script: ${scriptPath}`);
 
       this.process = spawn(pythonPath, [scriptPath], {
         cwd: serverDir,
@@ -442,6 +445,29 @@ class PythonManager {
   }
 
   /**
+   * Find a usable system Python when the venv is not set up (development fallback).
+   * Returns the first candidate that exists on disk, or 'python3' as a last resort
+   * (spawn will fail with a clear ENOENT if it's not on PATH either).
+   */
+  private findSystemPython(): string {
+    const fs = require('fs');
+
+    const candidates = process.platform === 'win32'
+      ? ['python.exe', 'python3.exe']
+      : ['/usr/bin/python3', '/usr/local/bin/python3', '/opt/homebrew/bin/python3', '/usr/bin/python'];
+
+    for (const candidate of candidates) {
+      // Absolute path — check existence directly
+      if (candidate.startsWith('/') && fs.existsSync(candidate)) {
+        return candidate;
+      }
+    }
+
+    // On Windows or when no absolute path matched, fall through to PATH resolution
+    return process.platform === 'win32' ? 'python' : 'python3';
+  }
+
+  /**
    * Get launcher script path (production only).
    */
   private getLauncherPath(): string {
@@ -650,10 +676,15 @@ class PythonManager {
     if (isDev) {
       const scriptPath = this.getScriptPath();
       const serverDir = path.dirname(scriptPath);
-      const pythonPath = this.getVenvPythonPath(serverDir);
+      const venvPythonPath = this.getVenvPythonPath(serverDir);
       const generatorsDir = path.join(serverDir, 'generators');
 
-      this.diagCheck('venv Python', pythonPath, fs);
+      if (fs.existsSync(venvPythonPath)) {
+        this.diagCheck('venv Python', venvPythonPath, fs);
+      } else {
+        const fallback = this.findSystemPython();
+        console.log(`[PythonManager] ⚠️  venv Python: ${venvPythonPath} (not found — will use system: ${fallback})`);
+      }
       this.diagCheck('server.py', scriptPath, fs);
       this.diagCheck('generators/', generatorsDir, fs);
     } else {
