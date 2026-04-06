@@ -164,6 +164,18 @@ npm run make       # Build for current platform
 npm run publish    # Build + publish
 ```
 
+### First-time dev setup (Python server)
+
+The Python venv is gitignored — create it once per machine after cloning:
+
+```bash
+cd src/python-server
+python3 -m venv venv
+venv/bin/pip install -r requirements.txt
+```
+
+Without this the Python server (TTS, IPA, OCR, PDF) will fail to start in dev mode.
+
 Platform builds always happen on **GitHub Actions** (not locally for cross-platform):
 - macOS: `macos-latest` runner → DMG + ZIP
 - Windows: `windows-latest` runner → Squirrel installer
