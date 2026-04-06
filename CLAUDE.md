@@ -168,7 +168,14 @@ Platform builds always happen on **GitHub Actions** (not locally for cross-platf
 - macOS: `macos-latest` runner → DMG + ZIP
 - Windows: `windows-latest` runner → Squirrel installer
 
-Trigger a release: push a `v*` tag OR manually trigger workflow with version input.
+**Triggering a release (Claude does this):**
+1. Bump version in `package.json`
+2. Commit the bump
+3. Tag and push — this triggers the build automatically:
+```bash
+git tag v1.X.X && git push origin main && git push origin v1.X.X
+```
+Note: tag push creates a **full release** (shows as Latest). Using `workflow_dispatch` with `prerelease=true` creates a pre-release that won't show as Latest.
 
 VPS: `smartbook.mahmutsalman.cloud` — serves update feeds and installers.
 VPS secrets in GitHub: `VPS_SSH_KEY`, `VPS_HOST`, `VPS_USER`, `VPS_PATH`
