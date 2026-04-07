@@ -31,20 +31,23 @@ export class LMStudioService implements AIServiceInterface {
     this.model = model;
   }
 
-  async getWordDefinition(word: string, context: string, language = 'en'): Promise<{
+  async getWordDefinition(word: string, context: string, language = 'en', explanationLanguage = 'en'): Promise<{
     definition: string;
     wordTranslation?: string;
     wordType?: string;
     germanArticle?: string;
   }> {
+    const explanationLangName = this.getExplanationLanguageName(explanationLanguage);
+
     if (language === 'en') {
       // English: get definition and word type
       const prompt = `Define the word "${word}" as it is used in the following context. Also identify its part of speech.
+Provide your DEFINITION in ${explanationLangName}.
 
 Context: "${context}"
 
 Format your response EXACTLY like this:
-DEFINITION: [2-3 sentence definition suitable for a language learner]
+DEFINITION: [2-3 sentence definition suitable for a language learner, written in ${explanationLangName}]
 TYPE: [part of speech: noun, verb, adjective, adverb, preposition, conjunction, interjection, pronoun, article, phrasal verb, idiom, or collocation]`;
 
       const response = await this.chat(prompt);
@@ -69,24 +72,25 @@ TYPE: [part of speech: noun, verb, adjective, adverb, preposition, conjunction, 
     // German: get definition + translation + type + article (for nouns)
     if (language === 'de') {
       const prompt = `For the German word "${word}" in this context, provide:
-1. A definition in English explaining what this word means (2-3 sentences, write the definition in ENGLISH)
-2. The English translation of the word (single word or short phrase)
+1. A definition in ${explanationLangName} explaining what this word means (2-3 sentences, write the definition in ${explanationLangName.toUpperCase()})
+2. The ${explanationLangName} translation of the word (single word or short phrase)
 3. The part of speech (noun, verb, adjective, adverb, preposition, conjunction, interjection, pronoun, article, phrasal verb, idiom, or collocation)
 4. If it's a noun, provide the definite article (der, die, or das)
 
 Context: "${context}"
 
 Format your response EXACTLY like this:
-DEFINITION: [definition in English]
-ENGLISH: [English translation of the word]
+DEFINITION: [definition in ${explanationLangName}]
+TRANSLATION: [${explanationLangName} translation of the word]
 TYPE: [part of speech]
 ARTICLE: [der/die/das - ONLY if it's a noun, otherwise leave empty or omit]`;
 
       const response = await this.chat(prompt);
 
       // Parse the response
-      const defMatch = response.match(/DEFINITION:\s*(.+?)(?=ENGLISH:|TYPE:|ARTICLE:|$)/is);
-      const engMatch = response.match(/ENGLISH:\s*(.+?)(?=TYPE:|ARTICLE:|$)/is);
+      const defMatch = response.match(/DEFINITION:\s*(.+?)(?=TRANSLATION:|ENGLISH:|TYPE:|ARTICLE:|$)/is);
+      const engMatch = response.match(/TRANSLATION:\s*(.+?)(?=TYPE:|ARTICLE:|$)/is)
+                    ?? response.match(/ENGLISH:\s*(.+?)(?=TYPE:|ARTICLE:|$)/is);
       const typeMatch = response.match(/TYPE:\s*([^\n]+)/i);
       const articleMatch = response.match(/ARTICLE:\s*([^\n]+)/i);
 
@@ -95,7 +99,7 @@ ARTICLE: [der/die/das - ONLY if it's a noun, otherwise leave empty or omit]`;
       if (!defMatch) {
         // Remove labeled lines from fallback
         definition = definition
-          .replace(/^(DEFINITION|ENGLISH|TYPE|ARTICLE):\s*[^\n]*\n?/gim, '')
+          .replace(/^(DEFINITION|TRANSLATION|ENGLISH|TYPE|ARTICLE):\s*[^\n]*\n?/gim, '')
           .trim();
       }
       const wordTranslation = engMatch ? engMatch[1].trim() : undefined;
@@ -105,25 +109,26 @@ ARTICLE: [der/die/das - ONLY if it's a noun, otherwise leave empty or omit]`;
       return { definition, wordTranslation, wordType, germanArticle };
     }
 
-    // Other non-English languages: get English definition + English translation of the word + word type
+    // Other non-English languages: get definition + translation of the word + word type
     const languageName = this.getLanguageName(language);
     const prompt = `For the ${languageName} word "${word}" in this context, provide:
-1. A definition in English explaining what this word means (2-3 sentences, write the definition in ENGLISH)
-2. The English translation of the word (single word or short phrase)
+1. A definition in ${explanationLangName} explaining what this word means (2-3 sentences, write the definition in ${explanationLangName.toUpperCase()})
+2. The ${explanationLangName} translation of the word (single word or short phrase)
 3. The part of speech (noun, verb, adjective, adverb, preposition, conjunction, interjection, pronoun, article, phrasal verb, idiom, or collocation)
 
 Context: "${context}"
 
 Format your response EXACTLY like this:
-DEFINITION: [definition in English]
-ENGLISH: [English translation of the word]
+DEFINITION: [definition in ${explanationLangName}]
+TRANSLATION: [${explanationLangName} translation of the word]
 TYPE: [part of speech]`;
 
     const response = await this.chat(prompt);
 
     // Parse the response
-    const defMatch = response.match(/DEFINITION:\s*(.+?)(?=ENGLISH:|TYPE:|$)/is);
-    const engMatch = response.match(/ENGLISH:\s*(.+?)(?=TYPE:|$)/is);
+    const defMatch = response.match(/DEFINITION:\s*(.+?)(?=TRANSLATION:|ENGLISH:|TYPE:|$)/is);
+    const engMatch = response.match(/TRANSLATION:\s*(.+?)(?=TYPE:|$)/is)
+                  ?? response.match(/ENGLISH:\s*(.+?)(?=TYPE:|$)/is);
     const typeMatch = response.match(/TYPE:\s*([^\n]+)/i);
 
     // Extract definition, with fallback that removes other labels
@@ -131,7 +136,7 @@ TYPE: [part of speech]`;
     if (!defMatch) {
       // Remove labeled lines from fallback
       definition = definition
-        .replace(/^(DEFINITION|ENGLISH|TYPE):\s*[^\n]*\n?/gim, '')
+        .replace(/^(DEFINITION|TRANSLATION|ENGLISH|TYPE):\s*[^\n]*\n?/gim, '')
         .trim();
     }
     const wordTranslation = engMatch ? engMatch[1].trim() : undefined;
@@ -218,6 +223,20 @@ TYPE: [part of speech]`;
       ko: 'Korean',
     };
     return names[code] || 'the source';
+  }
+
+  private getExplanationLanguageName(code: string): string {
+    const names: Record<string, string> = {
+      en: 'English',
+      tr: 'Turkish',
+      de: 'German',
+      fr: 'French',
+      it: 'Italian',
+      ru: 'Russian',
+      es: 'Spanish',
+      la: 'Latin',
+    };
+    return names[code] ?? 'English';
   }
 
   async getIPAPronunciation(word: string, language = 'en'): Promise<{ ipa: string; syllables: string }> {
@@ -605,7 +624,7 @@ Answer:`;
    * Get the meaning of a phrase (phrasal verb, collocation, idiom) in context
    * Also detects if the phrase is a phrasal verb
    */
-  async getPhraseMeaning(phrase: string, context: string, language = 'en'): Promise<{
+  async getPhraseMeaning(phrase: string, context: string, language = 'en', explanationLanguage = 'en'): Promise<{
     meaning: string;
     phraseTranslation?: string;
     isPhrasalVerb: boolean;
@@ -616,19 +635,21 @@ Answer:`;
   }> {
     const isEnglish = language === 'en';
     const languageName = isEnglish ? 'English' : this.getLanguageName(language);
+    const explanationLangName = this.getExplanationLanguageName(explanationLanguage);
+    const needsTranslation = !isEnglish || explanationLanguage !== 'en';
 
     // Use structured format for all languages to ensure consistent parsing
     const prompt = `For the ${languageName} phrase "${phrase}" in this context, analyze and provide:
 
-1. A clear explanation of what this phrase means (focus on idiomatic usage if applicable)
-${!isEnglish ? '2. The English translation of the phrase' : ''}
-${isEnglish ? '2' : '3'}. Is this a PHRASAL VERB? A phrasal verb is a verb combined with a preposition or adverb that creates a meaning different from the original verb (e.g., "give up" = surrender, "look forward to" = anticipate, "break down" = stop working)
-${isEnglish ? '3' : '4'}. If it IS a phrasal verb, identify the base verb and particle(s)
+1. A clear explanation in ${explanationLangName} of what this phrase means (focus on idiomatic usage if applicable)
+${needsTranslation ? `2. The ${explanationLangName} translation of the phrase` : ''}
+${needsTranslation ? '3' : '2'}. Is this a PHRASAL VERB? A phrasal verb is a verb combined with a preposition or adverb that creates a meaning different from the original verb (e.g., "give up" = surrender, "look forward to" = anticipate, "break down" = stop working)
+${needsTranslation ? '4' : '3'}. If it IS a phrasal verb, identify the base verb and particle(s)
 
 Context: "${context}"
 
 Format your response EXACTLY like this:
-MEANING: [explanation of the phrase meaning]${!isEnglish ? '\nENGLISH: [English translation]' : ''}
+MEANING: [explanation of the phrase meaning in ${explanationLangName}]${needsTranslation ? `\nTRANSLATION: [${explanationLangName} translation]` : ''}
 IS_PHRASAL_VERB: [yes/no]
 BASE_VERB: [base verb if phrasal verb, otherwise leave empty]
 PARTICLE: [particle(s) if phrasal verb, otherwise leave empty]`;
@@ -636,8 +657,9 @@ PARTICLE: [particle(s) if phrasal verb, otherwise leave empty]`;
     const response = await this.chat(prompt);
 
     // Parse the response - look for MEANING: label first
-    const meaningMatch = response.match(/MEANING:\s*(.+?)(?=ENGLISH:|IS_PHRASAL_VERB:|$)/is);
-    const engMatch = response.match(/ENGLISH:\s*(.+?)(?=IS_PHRASAL_VERB:|$)/is);
+    const meaningMatch = response.match(/MEANING:\s*(.+?)(?=TRANSLATION:|ENGLISH:|IS_PHRASAL_VERB:|$)/is);
+    const engMatch = response.match(/TRANSLATION:\s*(.+?)(?=IS_PHRASAL_VERB:|$)/is)
+                  ?? response.match(/ENGLISH:\s*(.+?)(?=IS_PHRASAL_VERB:|$)/is);
     const isPhrasalMatch = response.match(/IS_PHRASAL_VERB:\s*(\w+)/i);
     const baseVerbMatch = response.match(/BASE_VERB:\s*([^\n]+)/i);
     const particleMatch = response.match(/PARTICLE:\s*([^\n]+)/i);
@@ -973,11 +995,13 @@ DEFINITION: brief definition`;
     };
   }
 
-  async getGrammarAnalysis(text: string, sentence: string, language = 'en'): Promise<GrammarAnalysis> {
+  async getGrammarAnalysis(text: string, sentence: string, language = 'en', explanationLanguage = 'en'): Promise<GrammarAnalysis> {
     const languageName = this.getLanguageName(language);
+    const explanationLangName = this.getExplanationLanguageName(explanationLanguage);
     const isEnglish = language === 'en';
 
     const prompt = `You are a ${languageName} grammar tutor for a B2-level learner who wants to master advanced grammar through reading.
+Provide all explanations, descriptions, and text fields in ${explanationLangName}.
 
 Analyze this ${languageName} sentence:
 "${sentence}"
@@ -1072,11 +1096,13 @@ IMPORTANT:
     word: string,
     sentence: string,
     viewContent: string,
-    language = 'en'
+    language = 'en',
+    explanationLanguage = 'en'
   ): Promise<SimplerAnalysis> {
+    const explanationLangName = this.getExplanationLanguageName(explanationLanguage);
     const languageInstruction = language === 'en'
-      ? ''
-      : `The text is in ${language}. Provide all responses in English.`;
+      ? `Provide all explanations in ${explanationLangName}.`
+      : `The text is in ${this.getLanguageName(language)}. Provide all responses in ${explanationLangName}.`;
     const isPhrase = word.trim().includes(' ');
     const viewSnippet = viewContent.length > 5000 ? viewContent.slice(0, 5000) : viewContent;
     const simplerInstruction = isPhrase

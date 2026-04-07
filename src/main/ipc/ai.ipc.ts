@@ -4,6 +4,7 @@ import { getAIService, getLMStudioService, getGroqService, getOpenRouterService,
 import { GroqService } from '../services/groq.service';
 import type { MeaningAnalysisType } from '../../shared/types/meaning-analysis.types';
 import type { SimplerAnalysisResponse } from '../../shared/types/ipc.types';
+import { settingsRepository } from '../../database/repositories';
 
 export function registerAIHandlers(): void {
   // Get word definition - uses selected AI provider
@@ -12,7 +13,8 @@ export function registerAIHandlers(): void {
     async (_, word: string, context: string, language = 'en') => {
       try {
         const service = await getAIService();
-        const result = await service.getWordDefinition(word, context, language);
+        const explanationLanguage = await settingsRepository.get('explanation_language');
+        const result = await service.getWordDefinition(word, context, language, explanationLanguage ?? 'en');
         return {
           word,
           shortDefinition: result.shortDefinition,
@@ -115,7 +117,8 @@ export function registerAIHandlers(): void {
       console.log('[PHRASE IPC] getPhraseMeaning request:', { phrase, context, language });
       try {
         const service = await getAIService();
-        const result = await service.getPhraseMeaning(phrase, context, language);
+        const explanationLanguage = await settingsRepository.get('explanation_language');
+        const result = await service.getPhraseMeaning(phrase, context, language, explanationLanguage ?? 'en');
         console.log('[PHRASE IPC] getPhraseMeaning response:', { phrase, shortMeaning: result.shortMeaning, meaning: result.meaning });
         return {
           phrase,
@@ -141,7 +144,8 @@ export function registerAIHandlers(): void {
     async (_, text: string, sentence: string, language = 'en') => {
       try {
         const service = await getAIService();
-        const result = await service.getGrammarAnalysis(text, sentence, language);
+        const explanationLanguage = await settingsRepository.get('explanation_language');
+        const result = await service.getGrammarAnalysis(text, sentence, language, explanationLanguage ?? 'en');
         return {
           success: true,
           text,
@@ -173,13 +177,15 @@ export function registerAIHandlers(): void {
     ) => {
       try {
         const service = await getAIService();
+        const explanationLanguage = await settingsRepository.get('explanation_language');
         const result = await service.getContextualMeaning(
           pageContent,
           analysisType,
           language,
           15000,
           focusWord,
-          focusSentence
+          focusSentence,
+          explanationLanguage ?? 'en'
         );
         return {
           success: true,
@@ -210,7 +216,8 @@ export function registerAIHandlers(): void {
     ): Promise<SimplerAnalysisResponse> => {
       try {
         const service = await getAIService();
-        const analysis = await service.getSimplerAnalysis(word, sentence, viewContent, language);
+        const explanationLanguage = await settingsRepository.get('explanation_language');
+        const analysis = await service.getSimplerAnalysis(word, sentence, viewContent, language, explanationLanguage ?? 'en');
         return {
           success: true,
           analysis,

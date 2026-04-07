@@ -41,6 +41,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   is_simpler_mode: false,        // Default: simpler mode off
   // Vocabulary view persistence
   vocab_last_book_id: 0,         // Default: all books
+  // Word explanation language
+  explanation_language: 'en',    // Default: English
 };
 
 // Zoom level constraints

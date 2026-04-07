@@ -25,7 +25,8 @@ export interface AIServiceInterface {
   getWordDefinition(
     word: string,
     context: string,
-    language: string
+    language: string,
+    explanationLanguage?: string
   ): Promise<{
     definition: string;
     wordTranslation?: string;
@@ -96,7 +97,8 @@ export interface AIServiceInterface {
   getPhraseMeaning(
     phrase: string,
     context: string,
-    language: string
+    language: string,
+    explanationLanguage?: string
   ): Promise<{
     meaning: string;
     phraseTranslation?: string;
@@ -121,7 +123,8 @@ export interface AIServiceInterface {
   getGrammarAnalysis(
     text: string,
     sentence: string,
-    language: string
+    language: string,
+    explanationLanguage?: string
   ): Promise<GrammarAnalysis>;
 
   /**
@@ -134,8 +137,9 @@ export interface AIServiceInterface {
     analysisType: MeaningAnalysisType,
     language: string,
     timeout?: number,
-    focusWord?: string,      // Optional: word/phrase for word-level analysis
-    focusSentence?: string   // Optional: sentence containing the focus word
+    focusWord?: string,           // Optional: word/phrase for word-level analysis
+    focusSentence?: string,       // Optional: sentence containing the focus word
+    explanationLanguage?: string
   ): Promise<MeaningAnalysis>;
 
   /**
@@ -146,6 +150,7 @@ export interface AIServiceInterface {
     word: string,
     sentence: string,
     viewContent: string,
-    language: string
+    language: string,
+    explanationLanguage?: string
   ): Promise<SimplerAnalysis>;
 }

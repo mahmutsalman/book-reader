@@ -186,21 +186,24 @@ export class MistralService implements AIServiceInterface {
     }
   }
 
-  async getWordDefinition(word: string, context: string, language = 'en'): Promise<{
+  async getWordDefinition(word: string, context: string, language = 'en', explanationLanguage = 'en'): Promise<{
     shortDefinition: string;
     definition: string;
     wordTranslation?: string;
     wordType?: string;
     germanArticle?: string;
   }> {
+    const explanationLangName = this.getExplanationLanguageName(explanationLanguage);
+
     if (language === 'en') {
       const prompt = `Define the word "${word}" as it is used in the following context. Also identify its part of speech.
+Provide your SHORT and DEFINITION in ${explanationLangName}.
 
 Context: "${context}"
 
 Format your response EXACTLY like this:
-SHORT: [1-3 word concise meaning]
-DEFINITION: [2-3 sentence definition suitable for a language learner]
+SHORT: [1-3 word concise meaning in ${explanationLangName}]
+DEFINITION: [2-3 sentence definition suitable for a language learner, written in ${explanationLangName}]
 TYPE: [part of speech: noun, verb, adjective, adverb, preposition, conjunction, interjection, pronoun, article, phrasal verb, idiom, or collocation]`;
 
       const response = await this.chat(prompt);
@@ -221,32 +224,33 @@ TYPE: [part of speech: noun, verb, adjective, adverb, preposition, conjunction, 
 
     if (language === 'de') {
       const prompt = `For the German word "${word}" in this context, provide:
-1. A SHORT definition (1-3 words in English showing core meaning)
-2. A full definition in English explaining what this word means (2-3 sentences, write the definition in ENGLISH)
-3. The English translation of the word (single word or short phrase)
+1. A SHORT definition (1-3 words in ${explanationLangName} showing core meaning)
+2. A full definition in ${explanationLangName} explaining what this word means (2-3 sentences, write the definition in ${explanationLangName.toUpperCase()})
+3. The ${explanationLangName} translation of the word (single word or short phrase)
 4. The part of speech (noun, verb, adjective, adverb, preposition, conjunction, interjection, pronoun, article, phrasal verb, idiom, or collocation)
 5. If it's a noun, provide the definite article (der, die, or das)
 
 Context: "${context}"
 
 Format your response EXACTLY like this:
-SHORT: [1-3 word concise meaning in English]
-DEFINITION: [definition in English]
-ENGLISH: [English translation of the word]
+SHORT: [1-3 word concise meaning in ${explanationLangName}]
+DEFINITION: [definition in ${explanationLangName}]
+TRANSLATION: [${explanationLangName} translation of the word]
 TYPE: [part of speech]
 ARTICLE: [der/die/das - ONLY if it's a noun, otherwise leave empty or omit]`;
 
       const response = await this.chat(prompt);
-      const shortMatch = response.match(/SHORT:\s*(.+?)(?=DEFINITION:|ENGLISH:|TYPE:|ARTICLE:|$)/is);
-      const defMatch = response.match(/DEFINITION:\s*(.+?)(?=ENGLISH:|TYPE:|ARTICLE:|$)/is);
-      const engMatch = response.match(/ENGLISH:\s*(.+?)(?=TYPE:|ARTICLE:|$)/is);
+      const shortMatch = response.match(/SHORT:\s*(.+?)(?=DEFINITION:|TRANSLATION:|ENGLISH:|TYPE:|ARTICLE:|$)/is);
+      const defMatch = response.match(/DEFINITION:\s*(.+?)(?=TRANSLATION:|ENGLISH:|TYPE:|ARTICLE:|$)/is);
+      const engMatch = response.match(/TRANSLATION:\s*(.+?)(?=TYPE:|ARTICLE:|$)/is)
+                    ?? response.match(/ENGLISH:\s*(.+?)(?=TYPE:|ARTICLE:|$)/is);
       const typeMatch = response.match(/TYPE:\s*([^\n]+)/i);
       const articleMatch = response.match(/ARTICLE:\s*([^\n]+)/i);
 
       const shortDefinition = shortMatch ? shortMatch[1].trim() : '';
       let definition = defMatch ? defMatch[1].trim() : response;
       if (!defMatch) {
-        definition = definition.replace(/^(SHORT|DEFINITION|ENGLISH|TYPE|ARTICLE):\s*[^\n]*\n?/gim, '').trim();
+        definition = definition.replace(/^(SHORT|DEFINITION|TRANSLATION|ENGLISH|TYPE|ARTICLE):\s*[^\n]*\n?/gim, '').trim();
       }
       const wordTranslation = engMatch ? engMatch[1].trim() : undefined;
       const wordType = typeMatch ? this.normalizeWordType(typeMatch[1].trim()) : undefined;
@@ -258,29 +262,30 @@ ARTICLE: [der/die/das - ONLY if it's a noun, otherwise leave empty or omit]`;
     // Other non-English languages
     const languageName = this.getLanguageName(language);
     const prompt = `For the ${languageName} word "${word}" in this context, provide:
-1. A SHORT definition (1-3 words in English showing core meaning)
-2. A full definition in English explaining what this word means (2-3 sentences, write the definition in ENGLISH)
-3. The English translation of the word (single word or short phrase)
+1. A SHORT definition (1-3 words in ${explanationLangName} showing core meaning)
+2. A full definition in ${explanationLangName} explaining what this word means (2-3 sentences, write the definition in ${explanationLangName.toUpperCase()})
+3. The ${explanationLangName} translation of the word (single word or short phrase)
 4. The part of speech (noun, verb, adjective, adverb, preposition, conjunction, interjection, pronoun, article, phrasal verb, idiom, or collocation)
 
 Context: "${context}"
 
 Format your response EXACTLY like this:
-SHORT: [1-3 word concise meaning in English]
-DEFINITION: [definition in English]
-ENGLISH: [English translation of the word]
+SHORT: [1-3 word concise meaning in ${explanationLangName}]
+DEFINITION: [definition in ${explanationLangName}]
+TRANSLATION: [${explanationLangName} translation of the word]
 TYPE: [part of speech]`;
 
     const response = await this.chat(prompt);
-    const shortMatch = response.match(/SHORT:\s*(.+?)(?=DEFINITION:|ENGLISH:|TYPE:|$)/is);
-    const defMatch = response.match(/DEFINITION:\s*(.+?)(?=ENGLISH:|TYPE:|$)/is);
-    const engMatch = response.match(/ENGLISH:\s*(.+?)(?=TYPE:|$)/is);
+    const shortMatch = response.match(/SHORT:\s*(.+?)(?=DEFINITION:|TRANSLATION:|ENGLISH:|TYPE:|$)/is);
+    const defMatch = response.match(/DEFINITION:\s*(.+?)(?=TRANSLATION:|ENGLISH:|TYPE:|$)/is);
+    const engMatch = response.match(/TRANSLATION:\s*(.+?)(?=TYPE:|$)/is)
+                  ?? response.match(/ENGLISH:\s*(.+?)(?=TYPE:|$)/is);
     const typeMatch = response.match(/TYPE:\s*([^\n]+)/i);
 
     const shortDefinition = shortMatch ? shortMatch[1].trim() : '';
     let definition = defMatch ? defMatch[1].trim() : response;
     if (!defMatch) {
-      definition = definition.replace(/^(SHORT|DEFINITION|ENGLISH|TYPE):\s*[^\n]*\n?/gim, '').trim();
+      definition = definition.replace(/^(SHORT|DEFINITION|TRANSLATION|ENGLISH|TYPE):\s*[^\n]*\n?/gim, '').trim();
     }
     const wordTranslation = engMatch ? engMatch[1].trim() : undefined;
     const wordType = typeMatch ? this.normalizeWordType(typeMatch[1].trim()) : undefined;
@@ -579,7 +584,7 @@ Simplified ${languageName} sentence:`;
     return response;
   }
 
-  async getPhraseMeaning(phrase: string, context: string, language = 'en'): Promise<{
+  async getPhraseMeaning(phrase: string, context: string, language = 'en', explanationLanguage = 'en'): Promise<{
     shortMeaning: string;
     meaning: string;
     phraseTranslation?: string;
@@ -591,28 +596,31 @@ Simplified ${languageName} sentence:`;
   }> {
     const isEnglish = language === 'en';
     const languageName = isEnglish ? 'English' : this.getLanguageName(language);
+    const explanationLangName = this.getExplanationLanguageName(explanationLanguage);
+    const needsTranslation = !isEnglish || explanationLanguage !== 'en';
 
     const prompt = `For the ${languageName} phrase "${phrase}" in this context, analyze and provide:
 
-1. A SHORT explanation (1-3 words or very brief phrase showing what it means in this context)
-2. A clear detailed explanation of what this phrase means (focus on idiomatic usage if applicable)
-${!isEnglish ? '3. The English translation of the phrase' : ''}
-${isEnglish ? '3' : '4'}. Is this a PHRASAL VERB? A phrasal verb is a verb combined with a preposition or adverb that creates a meaning different from the original verb (e.g., "give up" = surrender, "look forward to" = anticipate, "break down" = stop working)
-${isEnglish ? '4' : '5'}. If it IS a phrasal verb, identify the base verb and particle(s)
+1. A SHORT explanation (1-3 words or very brief phrase showing what it means in this context, written in ${explanationLangName})
+2. A clear detailed explanation of what this phrase means in ${explanationLangName} (focus on idiomatic usage if applicable)
+${needsTranslation ? `3. The ${explanationLangName} translation of the phrase` : ''}
+${needsTranslation ? '4' : '3'}. Is this a PHRASAL VERB? A phrasal verb is a verb combined with a preposition or adverb that creates a meaning different from the original verb (e.g., "give up" = surrender, "look forward to" = anticipate, "break down" = stop working)
+${needsTranslation ? '5' : '4'}. If it IS a phrasal verb, identify the base verb and particle(s)
 
 Context: "${context}"
 
 Format your response EXACTLY like this:
-SHORT: [1-3 word brief meaning]
-MEANING: [detailed explanation of the phrase meaning]${!isEnglish ? '\nENGLISH: [English translation]' : ''}
+SHORT: [1-3 word brief meaning in ${explanationLangName}]
+MEANING: [detailed explanation in ${explanationLangName}]${needsTranslation ? `\nTRANSLATION: [${explanationLangName} translation]` : ''}
 IS_PHRASAL_VERB: [yes/no]
 BASE_VERB: [base verb if phrasal verb, otherwise leave empty]
 PARTICLE: [particle(s) if phrasal verb, otherwise leave empty]`;
 
     const response = await this.chat(prompt);
-    const shortMatch = response.match(/SHORT:\s*(.+?)(?=MEANING:|ENGLISH:|IS_PHRASAL_VERB:|$)/is);
-    const meaningMatch = response.match(/MEANING:\s*(.+?)(?=ENGLISH:|IS_PHRASAL_VERB:|$)/is);
-    const engMatch = response.match(/ENGLISH:\s*(.+?)(?=IS_PHRASAL_VERB:|$)/is);
+    const shortMatch = response.match(/SHORT:\s*(.+?)(?=MEANING:|TRANSLATION:|ENGLISH:|IS_PHRASAL_VERB:|$)/is);
+    const meaningMatch = response.match(/MEANING:\s*(.+?)(?=TRANSLATION:|ENGLISH:|IS_PHRASAL_VERB:|$)/is);
+    const engMatch = response.match(/TRANSLATION:\s*(.+?)(?=IS_PHRASAL_VERB:|$)/is)
+                  ?? response.match(/ENGLISH:\s*(.+?)(?=IS_PHRASAL_VERB:|$)/is);
     const isPhrasalMatch = response.match(/IS_PHRASAL_VERB:\s*(\w+)/i);
     const baseVerbMatch = response.match(/BASE_VERB:\s*([^\n]+)/i);
     const particleMatch = response.match(/PARTICLE:\s*([^\n]+)/i);
@@ -810,11 +818,13 @@ IMPORTANT:
     };
   }
 
-  async getGrammarAnalysis(text: string, sentence: string, language = 'en'): Promise<GrammarAnalysis> {
+  async getGrammarAnalysis(text: string, sentence: string, language = 'en', explanationLanguage = 'en'): Promise<GrammarAnalysis> {
     const languageName = this.getLanguageName(language);
+    const explanationLangName = this.getExplanationLanguageName(explanationLanguage);
     const isEnglish = language === 'en';
 
     const prompt = `You are a ${languageName} grammar tutor for a B2-level learner who wants to master advanced grammar through reading.
+Provide all explanations, descriptions, and text fields in ${explanationLangName}.
 
 Analyze this ${languageName} sentence:
 "${sentence}"
@@ -979,15 +989,18 @@ IMPORTANT:
     analysisType: MeaningAnalysisType,
     language = 'en',
     timeout = 15000, // 15 second timeout
-    focusWord?: string,      // Optional: The selected word/phrase for micro analysis
-    focusSentence?: string   // Optional: The sentence containing the focus word
+    focusWord?: string,           // Optional: The selected word/phrase for micro analysis
+    focusSentence?: string,       // Optional: The sentence containing the focus word
+    explanationLanguage = 'en'
   ): Promise<MeaningAnalysis> {
     const languageName = this.getLanguageName(language);
+    const explanationLangName = this.getExplanationLanguageName(explanationLanguage);
     const isEnglish = language === 'en';
 
     // Build prompt based on analysis type
     const prompts: Record<MeaningAnalysisType, string> = {
       narrative: `You are analyzing ${languageName} literature for a B2-level reader.
+Write your entire analysis in ${explanationLangName}.
 
 Analyze this passage for narrative context:
 """
@@ -1018,6 +1031,7 @@ IMPORTANT:
 - Keep explanations clear and concise${focusWord ? '\n- For word-specific fields, focus ONLY on the selected word/phrase' : ''}`,
 
       literary: `You are a literary analyst helping a B2-level reader appreciate ${languageName} literature.
+Write your entire analysis in ${explanationLangName}.
 
 Analyze this passage for literary techniques:
 """
@@ -1054,6 +1068,7 @@ IMPORTANT:
 - Explain the effect of each device${focusWord ? '\n- For word-specific fields, focus ONLY on the selected word/phrase' : ''}`,
 
       semantic: `You are a language expert helping a B2-level reader understand ${languageName} nuances.
+Write your entire analysis in ${explanationLangName}.
 
 Analyze this passage for semantic depth:
 """
@@ -1088,6 +1103,7 @@ IMPORTANT:
 - If no cultural context is relevant, say so briefly${focusWord ? '\n- For word-specific fields, focus ONLY on the selected word/phrase' : ''}`,
 
       simplified: `You are a language teacher explaining ${languageName} text to a B2-level learner.
+Write your entire analysis in ${explanationLangName}.
 
 Break down this passage for a language learner:
 """
@@ -1224,11 +1240,13 @@ IMPORTANT:
     word: string,
     sentence: string,
     viewContent: string,
-    language = 'en'
+    language = 'en',
+    explanationLanguage = 'en'
   ): Promise<SimplerAnalysis> {
+    const explanationLangName = this.getExplanationLanguageName(explanationLanguage);
     const languageInstruction = language === 'en'
-      ? ''
-      : `The text is in ${language}. Provide all responses in English.`;
+      ? `Provide all explanations in ${explanationLangName}.`
+      : `The text is in ${this.getLanguageName(language)}. Provide all responses in ${explanationLangName}.`;
     const isPhrase = word.trim().includes(' ');
     const viewSnippet = viewContent.length > 5000 ? viewContent.slice(0, 5000) : viewContent;
     const simplerInstruction = isPhrase
@@ -1342,6 +1360,20 @@ If you provide multiple lines, separate them with "\\n".`;
       ko: 'Korean',
     };
     return names[code] || 'the source';
+  }
+
+  private getExplanationLanguageName(code: string): string {
+    const names: Record<string, string> = {
+      en: 'English',
+      tr: 'Turkish',
+      de: 'German',
+      fr: 'French',
+      it: 'Italian',
+      ru: 'Russian',
+      es: 'Spanish',
+      la: 'Latin',
+    };
+    return names[code] ?? 'English';
   }
 
   private normalizeWordType(type: string): string {

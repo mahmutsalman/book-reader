@@ -45,6 +45,8 @@ export interface AppSettings {
   is_simpler_mode: boolean;          // Persist simpler mode toggle
   // Vocabulary view persistence
   vocab_last_book_id: number;        // Last selected book id in vocabulary (0 = all books)
+  // Word explanation language
+  explanation_language: string;      // Language AI uses for definitions/explanations (default: 'en')
 }
 
 // Settings update

@@ -1515,6 +1515,37 @@ const SettingsPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Word Explanation Language */}
+      <div className="card mb-6" style={cardStyle}>
+        <h3 className="text-lg font-semibold mb-4">
+          🗣️ Word Explanation Language
+        </h3>
+        <div className="space-y-4">
+          <div>
+            <p className="text-sm mb-3" style={{ color: theme.textSecondary }}>
+              Choose the language AI uses for word definitions, phrase meanings, and analysis.
+            </p>
+            <select
+              value={settings.explanation_language}
+              onChange={(e) => updateSetting('explanation_language', e.target.value)}
+              className="w-full px-4 py-2 border rounded-lg focus:outline-none"
+              style={inputStyle}
+              onFocus={handleInputFocus}
+              onBlur={handleInputBlur}
+            >
+              <option value="en">English (default)</option>
+              <option value="tr">Turkish</option>
+              <option value="de">German</option>
+              <option value="fr">French</option>
+              <option value="it">Italian</option>
+              <option value="ru">Russian</option>
+              <option value="es">Spanish</option>
+              <option value="la">Latin</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
       {/* Tatoeba Settings */}
       <div className="card mb-6" style={cardStyle}>
         <h3 className="text-lg font-semibold mb-4">
