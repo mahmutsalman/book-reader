@@ -93,7 +93,7 @@ function generateManifest(version, artifacts, changelog = []) {
       const platformDir = platform.startsWith('darwin') ? 'macos' : 'windows';
 
       platforms[platform] = {
-        url: `${UPDATE_SERVER_URL}/releases/${platformDir}/${fileName}`,
+        url: `${UPDATE_SERVER_URL}/releases/${platformDir}/${encodeURIComponent(fileName)}`,
         sha512: calculateSha512(filePath),
         size: getFileSize(filePath),
       };

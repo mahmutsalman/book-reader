@@ -443,6 +443,17 @@ const SettingsPage: React.FC = () => {
           });
           // Kick off Squirrel download (no-op if already downloading)
           await window.electronAPI.update.triggerDownload?.();
+
+          // Update message when download completes (one-time listener)
+          const cleanup = window.electronAPI.update.onUpdateDownloaded?.(() => {
+            setUpdateCheckResult({
+              success: true,
+              message: "Update ready! Click 'Restart Now' at the bottom of the screen.",
+              updateAvailable: true,
+              latestVersion: response.result.latestVersion,
+            });
+            cleanup?.();
+          });
         } else {
           setUpdateCheckResult({
             success: true,

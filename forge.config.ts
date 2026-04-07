@@ -101,6 +101,7 @@ const config: ForgeConfig = {
       name: 'SmartBook',
       setupExe: 'SmartBookSetup.exe',
       setupIcon: 'assets/icon.ico',
+      loadingGif: 'assets/installer-loading.gif',
       // Code signing (optional — add cert secrets to GitHub Actions to eliminate SmartScreen):
       // certificateFile: process.env.WINDOWS_CERTIFICATE_FILE,
       // certificatePassword: process.env.WINDOWS_CERTIFICATE_PASSWORD,
