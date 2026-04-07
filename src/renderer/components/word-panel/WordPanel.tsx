@@ -14,6 +14,7 @@ import LoopPlayButton from './LoopPlayButton';
 import SlowLoopPlayButton from './SlowLoopPlayButton';
 import { useAudioCache, AudioType } from '../../hooks/useAudioCache';
 import { useReaderTheme } from '../../hooks/useReaderTheme';
+import { addAlpha } from '../../utils/colorUtils';
 
 interface SelectedWord {
   word: string;
@@ -687,7 +688,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
       >
         {/* Header */}
         <div
-          className="px-3 py-2.5 flex items-center justify-between"
+          className="px-4 py-3 flex items-center justify-between"
           style={{
             backgroundColor: theme.panel,
             color: theme.text,
@@ -699,7 +700,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 {/* Display word with German article if available */}
-                <h2 className="font-semibold" style={{ fontSize: '1.1em' }}>
+                <h2 className="font-semibold tracking-tight" style={{ fontSize: '1.25em', letterSpacing: '-0.01em' }}>
                   {wordData.germanArticle
                     ? `${wordData.germanArticle} ${capitalizeGermanNoun(selectedWord.word)}`
                     : selectedWord.word}
@@ -737,11 +738,14 @@ const WordPanel: React.FC<WordPanelProps> = ({
               </div>
               {/* Only show IPA and syllables for single words, not phrases */}
               {!selectedWord.isPhrase && (wordData.ipa || wordData.syllables) && (
-                <div className="flex items-center gap-2" style={{ fontSize: '0.9em' }}>
+                <div className="flex items-center gap-1.5 mt-0.5" style={{ fontSize: '0.85em' }}>
                   {wordData.ipa && (
                     <span className="font-mono" style={{ color: theme.textSecondary }}>
                       /{wordData.ipa}/
                     </span>
+                  )}
+                  {wordData.ipa && wordData.syllables && (
+                    <span style={{ color: theme.textSecondary, opacity: 0.4 }}>·</span>
                   )}
                   {wordData.syllables && (
                     <span style={{ color: theme.textSecondary }}>
@@ -753,11 +757,11 @@ const WordPanel: React.FC<WordPanelProps> = ({
               {/* Word type badge - on its own line to avoid crowding IPA */}
               {!selectedWord.isPhrase && wordData.wordType && (
                 <span
-                  className="px-2 py-0.5 rounded-full inline-block mt-1"
+                  className="px-2 py-0.5 rounded-full inline-block mt-1.5 font-medium"
                   style={{
-                    backgroundColor: theme.background,
-                    color: theme.text,
-                    fontSize: '0.8em'
+                    backgroundColor: addAlpha(theme.accent, 0.12),
+                    color: theme.accent,
+                    fontSize: '0.72em'
                   }}
                 >
                   {wordData.wordType}
@@ -792,7 +796,7 @@ const WordPanel: React.FC<WordPanelProps> = ({
 
         {/* Content */}
         <div
-          className="flex-1 overflow-auto p-3 space-y-3 reader-scrollbar"
+          className="flex-1 overflow-auto px-4 py-4 space-y-5 reader-scrollbar"
           style={{ fontSize: `${panelFontSize}px` }}
         >
           {/* Simpler Mode Content */}
@@ -1634,23 +1638,18 @@ const WordPanel: React.FC<WordPanelProps> = ({
             <>
               {/* Definition / Phrase Meaning */}
               <section>
-                <h3 className="font-semibold mb-2" style={{ color: theme.text }}>
-                  {selectedWord.isPhrase ? '📖 Phrase Meaning' : '📖 Definition'}
+                <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: theme.textSecondary }}>
+                  <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/>
+                  </svg>
+                  {selectedWord.isPhrase ? 'Phrase Meaning' : 'Definition'}
                 </h3>
 
                 {/* Short Definition - Prominent Display */}
                 {(wordData.shortDefinition || (selectedWord.isPhrase && wordData.shortMeaning)) && (
-                  <div
-                    className="mb-3 p-3 rounded-lg border-l-4"
-                    style={{
-                      backgroundColor: theme.panel,
-                      borderLeftColor: theme.accent
-                    }}
-                  >
-                    <p className="text-lg font-bold" style={{ color: theme.accent }}>
-                      {selectedWord.isPhrase ? wordData.shortMeaning : wordData.shortDefinition}
-                    </p>
-                  </div>
+                  <p className="text-lg font-semibold mb-2 leading-snug" style={{ color: theme.accent }}>
+                    {selectedWord.isPhrase ? wordData.shortMeaning : wordData.shortDefinition}
+                  </p>
                 )}
 
                 {/* English translation of word/phrase (for non-English books) - shown prominently */}
@@ -1661,18 +1660,10 @@ const WordPanel: React.FC<WordPanelProps> = ({
                   </p>
                 )}
 
-                {/* Detailed Definition - Below short version */}
-                <div className="mt-3">
-                  <p className="text-sm mb-1 font-medium" style={{ color: theme.textSecondary }}>
-                    Detailed Explanation:
-                  </p>
-                  <p
-                    className="p-3 rounded-lg"
-                    style={{ backgroundColor: theme.panel, color: theme.text }}
-                  >
-                    {wordData.definition || (selectedWord.isPhrase ? wordData.meaning : null) || 'No definition available'}
-                  </p>
-                </div>
+                {/* Detailed Definition */}
+                <p className="leading-relaxed" style={{ color: theme.text }}>
+                  {wordData.definition || (selectedWord.isPhrase ? wordData.meaning : null) || 'No definition available'}
+                </p>
 
                 {/* Retry button for rate limit errors */}
                 {retryingModel ? (
@@ -1710,8 +1701,13 @@ const WordPanel: React.FC<WordPanelProps> = ({
               {/* Original Sentence - hidden for manga/comic books */}
               {bookType === 'text' && (
               <section>
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="font-semibold" style={{ color: theme.text }}>📝 Original Sentence</h3>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider" style={{ color: theme.textSecondary }}>
+                    <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+                    </svg>
+                    Original Sentence
+                  </h3>
                   <div className="flex items-center gap-0.5">
                     <PronunciationButton
                       text={normalizeForTTS(selectedWord.sentence)}
@@ -1827,8 +1823,8 @@ const WordPanel: React.FC<WordPanelProps> = ({
                   </div>
                 ) : (
                   <p
-                    className="p-3 rounded-lg italic"
-                    style={{ backgroundColor: theme.panel, color: theme.text }}
+                    className="leading-relaxed italic pl-3 border-l-2"
+                    style={{ color: theme.text, borderLeftColor: addAlpha(theme.accent, 0.4) }}
                   >
                     "{highlightWord(selectedWord.sentence, selectedWord.word)}"
                   </p>
@@ -1846,8 +1842,13 @@ const WordPanel: React.FC<WordPanelProps> = ({
               {/* Simplified Sentence - only for single words, hidden for manga/comic books */}
               {bookType === 'text' && !selectedWord.isPhrase && wordData.simplifiedSentence && (
                 <section>
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="font-semibold" style={{ color: theme.text }}>✨ Simplified</h3>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider" style={{ color: theme.textSecondary }}>
+                      <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 3l1.88 5.76H20l-4.94 3.58 1.88 5.66L12 14.76l-4.94 3.24 1.88-5.66L4 8.76h6.12z"/>
+                      </svg>
+                      Simplified
+                    </h3>
                     <div className="flex items-center gap-0.5">
                       <PronunciationButton
                         text={wordData.simplifiedSentence}
@@ -1873,8 +1874,8 @@ const WordPanel: React.FC<WordPanelProps> = ({
                     </div>
                   </div>
                   <p
-                    className="p-3 rounded-lg"
-                    style={{ backgroundColor: theme.panel, color: theme.text }}
+                    className="leading-relaxed pl-3 border-l-2"
+                    style={{ color: theme.text, borderLeftColor: addAlpha(theme.accent, 0.4) }}
                   >
                     {wordData.wordEquivalent
                       ? highlightWord(wordData.simplifiedSentence, wordData.wordEquivalent)
@@ -1893,8 +1894,12 @@ const WordPanel: React.FC<WordPanelProps> = ({
               {/* Other Occurrences - only for single words, hidden for manga/comic books */}
               {bookType === 'text' && !selectedWord.isPhrase && wordData.occurrences && wordData.occurrences.length > 1 && (
                 <section>
-                  <h3 className="font-semibold mb-2" style={{ color: theme.text }}>
-                    📍 Other Occurrences ({wordData.occurrences.length})
+                  <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: theme.textSecondary }}>
+                    <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/>
+                    </svg>
+                    Other Occurrences
+                    <span style={{ opacity: 0.55 }}>({wordData.occurrences.length})</span>
                   </h3>
                   <div className="space-y-2 max-h-48 overflow-auto reader-scrollbar">
                     {wordData.occurrences.slice(0, 10).map((occ, idx) => (
@@ -1926,8 +1931,11 @@ const WordPanel: React.FC<WordPanelProps> = ({
               {/* Tatoeba Examples - only for single words */}
               {!selectedWord.isPhrase && settings.tatoeba_enabled && wordData.tatoebaExamples && wordData.tatoebaExamples.length > 0 && (
                 <section>
-                  <h3 className="font-semibold mb-2" style={{ color: theme.text }}>
-                    🌐 Example Sentences (Tatoeba)
+                  <h3 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: theme.textSecondary }}>
+                    <svg className="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/>
+                    </svg>
+                    Example Sentences
                   </h3>
                   <div className="space-y-2 max-h-48 overflow-auto reader-scrollbar">
                     {wordData.tatoebaExamples.slice(0, 5).map((ex, idx) => (
@@ -1946,11 +1954,11 @@ const WordPanel: React.FC<WordPanelProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="border-t p-3" style={{ borderColor: theme.panelBorder }}>
+        <div className="border-t px-4 py-3" style={{ borderColor: theme.panelBorder }}>
           <button
             onClick={handleSave}
             disabled={saved || wordData.loading}
-            className={`w-full py-2 rounded-lg font-medium transition-colors ${
+            className={`w-full py-2.5 rounded-lg font-medium transition-colors text-sm tracking-wide ${
               saved
                 ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
                 : ''
@@ -1977,8 +1985,8 @@ const WordPanel: React.FC<WordPanelProps> = ({
             {saved
               ? '✓ Saved to Vocabulary'
               : selectedWord.isPhrase
-                ? '💾 Save Phrase to Vocabulary'
-                : '💾 Save to Vocabulary'}
+                ? 'Save Phrase to Vocabulary'
+                : 'Save to Vocabulary'}
           </button>
         </div>
       </div>
