@@ -94,14 +94,15 @@ const config: ForgeConfig = {
     },
   },
   makers: [
-    // Windows: MSIX for Microsoft Store — post-build CI script fixes the manifest
-    // (manifestVariables overrides are silently ignored by maker-msix, so we unpack
-    //  and patch AppxManifest.xml after the build in the build-msix CI job)
-    new MakerMSIX({
+    // MSIX is only included when MSIX_BUILD=true (set in the build-msix CI job).
+    // Regular `npm run make` must not include it — the CI MSIX job packages manually
+    // because the exe name "Smart Book.exe" doesn't match the $targetnametoken$ that
+    // maker-msix derives from the identity name, causing makeappx to fail.
+    ...(process.env.MSIX_BUILD === 'true' ? [new MakerMSIX({
       publisher: `CN=${process.env.MSIX_PUBLISHER_ID || 'CB8EE37E-117E-4E70-8185-8DEF5C546796'}`,
       publisherDisplayName: 'Mahmut Salman',
       identityName: 'MahmutSalman.SmartBookReader',
-    }),
+    })] : []),
     // Windows: Squirrel installer — enables silent auto-update via Electron autoUpdater.
     // Friends install once via SmartBookSetup.exe, then the app updates itself silently.
     // SmartScreen may warn on first install (one-time bypass: "More info" → "Run anyway").

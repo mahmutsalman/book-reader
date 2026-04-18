@@ -503,16 +503,12 @@ jobs:
         with:
           python-version: '3.11'
 
-      # package-lock.json from macOS has macOS-specific native binaries — delete it
-      # so npm install resolves Windows-compatible binaries fresh
       - name: Delete package-lock.json (Windows native binary fix)
         run: del package-lock.json
         shell: cmd
 
       - name: Install dependencies
         run: npm install
-        env:
-          MSIX_PUBLISHER_ID: ${{ secrets.MSIX_PUBLISHER_ID }}
 
       - name: Build Python server (Windows)
         run: |
@@ -520,17 +516,18 @@ jobs:
           call build.bat
         shell: cmd
 
+      - name: Package Electron app
+        run: npx electron-forge package
+
       - name: Generate self-signed dev certificate
-        id: gen_cert
         env:
           MSIX_PUBLISHER_ID: ${{ secrets.MSIX_PUBLISHER_ID }}
           MSIX_CERT_PASS: ${{ secrets.MSIX_CERT_PASS }}
         run: |
-          $publisherCN = $env:MSIX_PUBLISHER_ID
           $certPass = ConvertTo-SecureString -String $env:MSIX_CERT_PASS -Force -AsPlainText
           $cert = New-SelfSignedCertificate `
             -Type Custom `
-            -Subject "CN=$publisherCN" `
+            -Subject "CN=$($env:MSIX_PUBLISHER_ID)" `
             -KeyUsage DigitalSignature `
             -FriendlyName "SmartBookReader Dev Cert" `
             -CertStoreLocation "Cert:\CurrentUser\My" `
@@ -540,20 +537,15 @@ jobs:
           echo "MSIX_DEV_CERT=$certPath" >> $env:GITHUB_ENV
         shell: pwsh
 
-      - name: Build MSIX
-        run: npm run make:msstore
-        env:
-          MSIX_PUBLISHER_ID: ${{ secrets.MSIX_PUBLISHER_ID }}
-
-      - name: Post-build manifest fix + repack + re-sign
+      - name: Build and sign MSIX
         env:
           MSIX_PUBLISHER_ID: ${{ secrets.MSIX_PUBLISHER_ID }}
           MSIX_CERT_PASS: ${{ secrets.MSIX_CERT_PASS }}
         run: |
-          # Find the built MSIX
-          $msixFile = Get-ChildItem -Path "out\make" -Recurse -Filter "*.msix" | Select-Object -First 1
-          if (-not $msixFile) { throw "No .msix found in out\make" }
-          Write-Host "Found MSIX: $($msixFile.FullName)"
+          # Find the packaged app directory
+          $appDir = Get-ChildItem "out" -Directory | Where-Object { $_.Name -like "*win32*" } | Select-Object -First 1
+          if (-not $appDir) { throw "Packaged app directory not found in out/" }
+          Write-Host "App dir: $($appDir.FullName)"
 
           # Find Windows SDK tools
           $sdkBin = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\10.*" -Directory `
@@ -562,55 +554,51 @@ jobs:
           $signtool = Join-Path $sdkBin.FullName "x64\signtool.exe"
           Write-Host "SDK: $($sdkBin.FullName)"
 
-          # Unpack MSIX
-          $unpackDir = "$env:RUNNER_TEMP\msix-unpack"
-          & $makeappx unpack /p $msixFile.FullName /d $unpackDir /o
-          $manifestPath = Join-Path $unpackDir "AppxManifest.xml"
+          # Create staging directory (no spaces in path)
+          $stagingDir = "$env:RUNNER_TEMP\msix-staging"
+          New-Item -ItemType Directory -Force -Path $stagingDir | Out-Null
+          New-Item -ItemType Directory -Force -Path "$stagingDir\Assets" | Out-Null
 
-          # Read manifest version from our template (source of truth for version)
-          $template = Get-Content "assets\store\windows\AppxManifest.xml" -Raw
-          $templateVersion = [regex]::Match($template, '<Identity[^>]+Version="([^"]+)"').Groups[1].Value
-          Write-Host "Version from template: $templateVersion"
+          # Copy packaged app contents into staging root
+          Copy-Item "$($appDir.FullName)\*" $stagingDir -Recurse -Force
+          Write-Host "App copied to staging"
 
-          # Fix manifest fields
-          $manifest = Get-Content $manifestPath -Raw
-          # Fix publisher
-          $manifest = $manifest -replace 'Publisher="CN=[^"]*"', "Publisher=`"CN=$($env:MSIX_PUBLISHER_ID)`""
-          # Fix identity name (anchor to <Identity to avoid matching DisplayName)
-          $manifest = $manifest -replace '(<Identity[^>]+Name=")[^"]*(")', '${1}MahmutSalman.SmartBookReader${2}'
-          # Fix MinVersion and MaxVersionTested first (before version replacement to avoid collision)
-          $manifest = $manifest -replace 'MinVersion="[^"]*"', 'MinVersion="10.0.19041.0"'
-          $manifest = $manifest -replace 'MaxVersionTested="[^"]*"', 'MaxVersionTested="10.0.22621.0"'
-          # Fix version (only on <Identity line, after MinVersion/MaxVersion are already fixed)
-          $manifest = $manifest -replace '(<Identity[^>]+)Version="[^"]*"', "`$1Version=`"$templateVersion`""
-          Set-Content $manifestPath $manifest -Encoding UTF8
-          Write-Host "Manifest patched"
-
-          # Copy store icons into the unpacked MSIX assets folder
-          $assetsDir = Join-Path $unpackDir "assets"
-          New-Item -ItemType Directory -Force -Path $assetsDir | Out-Null
-          Copy-Item "assets\store\windows\StoreLogo.scale-100.png"  $assetsDir
-          Copy-Item "assets\store\windows\Square44x44Logo.png"      $assetsDir
-          Copy-Item "assets\store\windows\Square150x150Logo.png"    $assetsDir
-          Copy-Item "assets\store\windows\Square310x310Logo.png"    $assetsDir
-          Copy-Item "assets\store\windows\Wide310x150Logo.png"      $assetsDir
+          # Copy store icons
+          Copy-Item "assets\store\windows\StoreLogo.scale-100.png" "$stagingDir\Assets\"
+          Copy-Item "assets\store\windows\Square44x44Logo.png"     "$stagingDir\Assets\"
+          Copy-Item "assets\store\windows\Square150x150Logo.png"   "$stagingDir\Assets\"
+          Copy-Item "assets\store\windows\Square310x310Logo.png"   "$stagingDir\Assets\"
+          Copy-Item "assets\store\windows\Wide310x150Logo.png"     "$stagingDir\Assets\"
           Write-Host "Icons copied"
 
-          # Repack
-          & $makeappx pack /d $unpackDir /p $msixFile.FullName /o
-          Write-Host "Repacked MSIX"
+          # Read version from template and patch manifest
+          $manifest = Get-Content "assets\store\windows\AppxManifest.xml" -Raw
+          $manifest = $manifest -replace 'Publisher="CN=[^"]*"', "Publisher=`"CN=$($env:MSIX_PUBLISHER_ID)`""
+          Set-Content "$stagingDir\AppxManifest.xml" $manifest -Encoding UTF8
+          Write-Host "Manifest written"
 
-          # Re-sign with dev cert
-          $certPass = ConvertTo-SecureString -String $env:MSIX_CERT_PASS -Force -AsPlainText
-          & $signtool sign /f $env:MSIX_DEV_CERT /p $env:MSIX_CERT_PASS /fd SHA256 /v $msixFile.FullName
-          Write-Host "Signed MSIX: $($msixFile.FullName)"
+          # Pack MSIX
+          $msixPath = "$env:RUNNER_TEMP\SmartBookReader.msix"
+          & $makeappx pack /d $stagingDir /p $msixPath /o
+          if ($LASTEXITCODE -ne 0) { throw "makeappx pack failed with exit code $LASTEXITCODE" }
+          Write-Host "MSIX packed: $msixPath"
+
+          # Sign with dev cert
+          & $signtool sign /f $env:MSIX_DEV_CERT /p $env:MSIX_CERT_PASS /fd SHA256 /v $msixPath
+          if ($LASTEXITCODE -ne 0) { throw "signtool sign failed with exit code $LASTEXITCODE" }
+          Write-Host "MSIX signed"
+
+          # Copy to out/make for artifact upload
+          New-Item -ItemType Directory -Force -Path "out\make" | Out-Null
+          Copy-Item $msixPath "out\make\SmartBookReader.msix"
+          Write-Host "MSIX ready: out\make\SmartBookReader.msix"
         shell: pwsh
 
       - name: Upload MSIX artifact
         uses: actions/upload-artifact@v4
         with:
           name: windows-msix
-          path: out/make/**/*.msix
+          path: out/make/SmartBookReader.msix
           retention-days: 30
 
   release:
