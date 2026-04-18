@@ -1,5 +1,6 @@
 import type { ForgeConfig } from '@electron-forge/shared-types';
 import { MakerSquirrel } from '@electron-forge/maker-squirrel';
+import { MakerMSIX } from '@electron-forge/maker-msix';
 import { MakerZIP } from '@electron-forge/maker-zip';
 import { MakerDeb } from '@electron-forge/maker-deb';
 import { MakerRpm } from '@electron-forge/maker-rpm';
@@ -93,6 +94,14 @@ const config: ForgeConfig = {
     },
   },
   makers: [
+    // Windows: MSIX for Microsoft Store — post-build CI script fixes the manifest
+    // (manifestVariables overrides are silently ignored by maker-msix, so we unpack
+    //  and patch AppxManifest.xml after the build in the build-msix CI job)
+    new MakerMSIX({
+      publisher: `CN=${process.env.MSIX_PUBLISHER_ID || 'CB8EE37E-117E-4E70-8185-8DEF5C546796'}`,
+      publisherDisplayName: 'Mahmut Salman',
+      identityName: 'MahmutSalman.SmartBookReader',
+    }),
     // Windows: Squirrel installer — enables silent auto-update via Electron autoUpdater.
     // Friends install once via SmartBookSetup.exe, then the app updates itself silently.
     // SmartScreen may warn on first install (one-time bypass: "More info" → "Run anyway").
