@@ -75,6 +75,7 @@ export const IPC_CHANNELS = {
   PRONUNCIATION_DOWNLOAD_VOICE_MODEL: 'pronunciation:download-voice-model',
   PRONUNCIATION_DELETE_VOICE_MODEL: 'pronunciation:delete-voice-model',
   PRONUNCIATION_RESTART_SERVER: 'pronunciation:restart-server',
+  PRONUNCIATION_GET_DIAGNOSTICS: 'pronunciation:get-diagnostics',
 
   // Pre-Study Notes
   PRE_STUDY_GENERATE_NOTES: 'pre-study:generate-notes',

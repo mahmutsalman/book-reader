@@ -24,6 +24,47 @@ class PythonManager {
   private startupPromise: Promise<void> | null = null;
   private isRestarting = false;
   private lastStartupError: string | null = null;
+  private lastPythonOutput = '';
+  private pythonLogPath: string | null = null;
+  private pythonLogStream: import('fs').WriteStream | null = null;
+
+  private openLogStream(): void {
+    const fs = require('fs') as typeof import('fs');
+    const logsDir = path.join(app.getPath('userData'), 'logs');
+    try {
+      if (!fs.existsSync(logsDir)) fs.mkdirSync(logsDir, { recursive: true });
+      this.pythonLogPath = path.join(logsDir, 'python-server.log');
+      this.pythonLogStream?.destroy();
+      this.pythonLogStream = fs.createWriteStream(this.pythonLogPath, { flags: 'w' });
+      const header = [
+        `[${new Date().toISOString()}] Python server startup log`,
+        `[${new Date().toISOString()}] Platform: ${process.platform} | Packaged: ${app.isPackaged}`,
+        `[${new Date().toISOString()}] Resources: ${app.isPackaged ? process.resourcesPath : 'dev'}`,
+        '',
+      ].join('\n');
+      this.pythonLogStream.write(header);
+    } catch (e) {
+      console.warn('[PythonManager] Failed to open log file:', e);
+    }
+  }
+
+  private appendOutput(line: string): void {
+    const MAX = 3000;
+    this.lastPythonOutput += line + '\n';
+    if (this.lastPythonOutput.length > MAX) {
+      this.lastPythonOutput = this.lastPythonOutput.slice(-MAX);
+    }
+    this.pythonLogStream?.write(line + '\n');
+  }
+
+  getDiagnostics(): { lastError?: string; lastOutput: string; logFilePath: string } {
+    return {
+      lastError: this.lastStartupError || undefined,
+      lastOutput: this.lastPythonOutput,
+      logFilePath: this.pythonLogPath
+        ?? path.join(app.getPath('userData'), 'logs', 'python-server.log'),
+    };
+  }
 
   /**
    * Get the base URL of the Python server.
@@ -53,6 +94,8 @@ class PythonManager {
 
   private async _start(): Promise<void> {
     try {
+      this.lastPythonOutput = '';
+      this.openLogStream();
       // Log diagnostics before attempting to start — visible in DevTools console
       this.logStartupDiagnostics();
 
@@ -161,13 +204,27 @@ class PythonManager {
       const env = this.getEmbeddedPythonEnv();
 
       if (process.platform === 'win32') {
-        // Windows: Execute .bat launcher using ComSpec (full path to cmd.exe)
-        const cmdPath = process.env.ComSpec || 'C:\\Windows\\System32\\cmd.exe';
-        this.process = spawn(cmdPath, ['/c', launcherPath], {
-          cwd: path.dirname(launcherPath),
-          env,
-          stdio: ['ignore', 'pipe', 'pipe'],
-        });
+        // Prefer spawning python.exe directly — avoids cmd.exe identity gap in MSIX/Store installs
+        // where C:\Program Files\WindowsApps\... may be inaccessible to system processes like cmd.exe.
+        const pythonExeDirect = path.join(process.resourcesPath, 'python-runtime', 'python.exe');
+        const serverScriptDirect = path.join(process.resourcesPath, 'server.py');
+        if (fs.existsSync(pythonExeDirect)) {
+          console.log(`[PythonManager] Windows: spawning python.exe directly (MSIX-safe)`);
+          this.process = spawn(pythonExeDirect, [serverScriptDirect], {
+            cwd: process.resourcesPath,
+            env,
+            stdio: ['ignore', 'pipe', 'pipe'],
+          });
+        } else {
+          // Fallback: use .bat launcher (legacy / dev builds without python-runtime)
+          const cmdPath = process.env.ComSpec || 'C:\\Windows\\System32\\cmd.exe';
+          console.log(`[PythonManager] Windows: python.exe not found, falling back to launcher bat`);
+          this.process = spawn(cmdPath, ['/c', launcherPath], {
+            cwd: path.dirname(launcherPath),
+            env,
+            stdio: ['ignore', 'pipe', 'pipe'],
+          });
+        }
       } else {
         // macOS/Linux: Execute .sh launcher
         this.process = spawn('/bin/bash', [launcherPath], {
@@ -178,15 +235,17 @@ class PythonManager {
       }
     }
 
-    // Handle process output
+    // Handle process output — log to console, file, and in-memory buffer
     this.process.stdout?.on('data', (data) => {
       const msg = data.toString().trim();
       console.log(`[Python:${new Date().toISOString()}] ${msg}`);
+      this.appendOutput(`[OUT] ${msg}`);
     });
 
     this.process.stderr?.on('data', (data) => {
       const msg = data.toString().trim();
       console.error(`[Python:ERROR:${new Date().toISOString()}] ${msg}`);
+      this.appendOutput(`[ERR] ${msg}`);
     });
 
     this.process.on('error', (err) => {

@@ -8,7 +8,7 @@
     Name="MahmutSalman.SmartBookReader"
     ProcessorArchitecture="x64"
     Publisher="CN=CB8EE37E-117E-4E70-8185-8DEF5C546796"
-    Version="1.1.6.0" />
+    Version="1.1.7.0" />
 
   <Properties>
     <DisplayName>Smart Book Reader</DisplayName>

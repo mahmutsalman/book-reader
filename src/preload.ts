@@ -191,6 +191,8 @@ const electronAPI: ElectronAPI = {
       ipcRenderer.invoke(IPC_CHANNELS.PRONUNCIATION_DELETE_VOICE_MODEL, language),
     restartServer: () =>
       ipcRenderer.invoke(IPC_CHANNELS.PRONUNCIATION_RESTART_SERVER),
+    getDiagnostics: () =>
+      ipcRenderer.invoke(IPC_CHANNELS.PRONUNCIATION_GET_DIAGNOSTICS),
   },
 
   // Pre-Study Notes

@@ -185,6 +185,7 @@ export interface ElectronAPI {
     downloadVoiceModel: (language: string) => Promise<DownloadModelResponse>;
     deleteVoiceModel: (language: string) => Promise<DeleteModelResponse>;
     restartServer: () => Promise<{ success: boolean; error?: string }>;
+    getDiagnostics: () => Promise<{ lastError?: string; lastOutput: string; logFilePath: string }>;
   };
   preStudy: {
     generateNotes: (request: PreStudyNotesRequest) => Promise<PreStudyNotesResult>;

@@ -63,6 +63,11 @@ export function registerPronunciationHandlers(): void {
     }
   );
 
+  // Get Python startup diagnostics (log file path + last output)
+  ipcMain.handle(IPC_CHANNELS.PRONUNCIATION_GET_DIAGNOSTICS, () => {
+    return pythonManager.getDiagnostics();
+  });
+
   // Restart pronunciation server
   ipcMain.handle(IPC_CHANNELS.PRONUNCIATION_RESTART_SERVER, async () => {
     try {

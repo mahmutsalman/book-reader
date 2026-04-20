@@ -54,6 +54,7 @@ const SettingsPage: React.FC = () => {
   const [connectionResult, setConnectionResult] = useState<{ success: boolean; message: string } | null>(null);
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [pythonStatus, setPythonStatus] = useState<{ running: boolean; ready: boolean; url: string } | null>(null);
+  const [pythonDiagnostics, setPythonDiagnostics] = useState<{ lastError?: string; lastOutput: string; logFilePath: string } | null>(null);
   const [testingPython, setTestingPython] = useState(false);
   const [restartingPython, setRestartingPython] = useState(false);
   const [ipaLanguages, setIpaLanguages] = useState<IPALanguageInfo[]>([]);
@@ -251,8 +252,12 @@ const SettingsPage: React.FC = () => {
 
     setTestingPython(true);
     try {
-      const status = await window.electronAPI.pronunciation.getServerStatus();
+      const [status, diag] = await Promise.all([
+        window.electronAPI.pronunciation.getServerStatus(),
+        window.electronAPI.pronunciation.getDiagnostics(),
+      ]);
       setPythonStatus(status);
+      setPythonDiagnostics(diag);
     } catch {
       setPythonStatus({ running: false, ready: false, url: 'N/A' });
     } finally {
@@ -270,8 +275,12 @@ const SettingsPage: React.FC = () => {
       if (result.success) {
         // Wait then check status
         await new Promise(resolve => setTimeout(resolve, 1500));
-        const status = await window.electronAPI.pronunciation.getServerStatus();
+        const [status, diag] = await Promise.all([
+          window.electronAPI.pronunciation.getServerStatus(),
+          window.electronAPI.pronunciation.getDiagnostics(),
+        ]);
         setPythonStatus(status);
+        setPythonDiagnostics(diag);
       } else {
         console.error('Failed to restart server:', result.error);
         alert(`Failed to restart server: ${result.error || 'Unknown error'}`);
@@ -1317,6 +1326,52 @@ const SettingsPage: React.FC = () => {
             <div className="text-sm" style={{ color: theme.textSecondary }}>
               <div>Status: {pythonStatus.running ? 'Running' : 'Stopped'}</div>
               <div>URL: {pythonStatus.url}</div>
+            </div>
+          )}
+
+          {pythonDiagnostics && (
+            <div
+              className="text-xs rounded-lg p-3 space-y-2"
+              style={{ backgroundColor: addAlpha(theme.accent, 0.06), border: `1px solid ${theme.border}` }}
+            >
+              <div className="flex items-center justify-between">
+                <span className="font-medium" style={{ color: theme.textSecondary }}>Log file</span>
+                <button
+                  className="px-2 py-0.5 rounded text-xs"
+                  style={{ backgroundColor: addAlpha(theme.accent, 0.15), color: theme.accent }}
+                  onClick={() => navigator.clipboard.writeText(pythonDiagnostics.logFilePath)}
+                  title="Copy log file path"
+                >
+                  Copy path
+                </button>
+              </div>
+              <div
+                className="font-mono break-all"
+                style={{ color: theme.textSecondary, fontSize: '0.7rem' }}
+              >
+                {pythonDiagnostics.logFilePath}
+              </div>
+
+              {!pythonStatus?.ready && pythonDiagnostics.lastOutput && (
+                <>
+                  <div className="font-medium pt-1" style={{ color: theme.textSecondary }}>
+                    Last Python output
+                  </div>
+                  <pre
+                    className="overflow-auto rounded p-2"
+                    style={{
+                      maxHeight: '120px',
+                      fontSize: '0.65rem',
+                      backgroundColor: addAlpha(theme.accent, 0.08),
+                      color: theme.textSecondary,
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-all',
+                    }}
+                  >
+                    {pythonDiagnostics.lastOutput.slice(-1500)}
+                  </pre>
+                </>
+              )}
             </div>
           )}
 
